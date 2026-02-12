@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: storefront-api
+    runtime: node
+    rootDir: backend
+    buildCommand: yarn install --frozen-lockfile
+    startCommand: yarn start
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: storefront
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
