@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install backend deps
+        run: npm install
+      - name: Typecheck backend
+        run: npx tsc --noEmit
+      - name: Boot API and health check
+        env:
+          MONGO_URL: mongodb://127.0.0.1:27017
+          DB_NAME: ci_storefront
+          JWT_SECRET: ci-secret
+          PORT: 4001
+          HOST: 127.0.0.1
+        run: |
+          npm run start > /tmp/storefront-api.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:4001/api/ > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4001/api/products?limit=1 > /dev/null
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install frontend deps
+        run: npm install
+      - name: Build frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:4001
+        run: npm run build
