@@ -9,6 +9,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=4001
 
 # Accept env vars as build-args from CI
 ARG MONGO_URL
