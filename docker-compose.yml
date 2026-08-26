@@ -1,56 +1,28 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: storefront-mongo
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
   backend:
-    image: node:20-alpine
+    image: ghcr.io/pranay0083/storefront-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: storefront-backend
-    working_dir: /app
     restart: unless-stopped
-    depends_on:
-      - mongo
+    env_file: .env
     environment:
       PORT: "4001"
       HOST: "0.0.0.0"
-      MONGO_URL: "mongodb://mongo:27017"
-      DB_NAME: "storefront"
-      JWT_SECRET: "change-me-in-production"
-      FRONTEND_URL: "http://localhost:3000"
-      ADMIN_EMAIL: "admin@storefront.dev"
-      ADMIN_PASSWORD: "Admin@123"
-      RAZORPAY_KEY_ID: ""
-      RAZORPAY_KEY_SECRET: ""
-      RAZORPAY_WEBHOOK_SECRET: ""
-    volumes:
-      - ./backend:/app
-      - backend_node_modules:/app/node_modules
-    command: sh -c "corepack enable && yarn install && yarn dev"
     ports:
       - "4001:4001"
 
   frontend:
-    image: node:20-alpine
+    image: ghcr.io/pranay0083/storefront-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:4001}"
     container_name: storefront-frontend
-    working_dir: /app
     restart: unless-stopped
     depends_on:
       - backend
-    environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:4001"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
-    command: sh -c "corepack enable && yarn install && yarn dev"
     ports:
       - "3000:3000"
-
-volumes:
-  mongo_data:
-  backend_node_modules:
-  frontend_node_modules:
