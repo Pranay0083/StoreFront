@@ -1,39 +1,25 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, validate } from '../middleware';
-import { Cart } from '../models';
+import * as cartController from '../controllers/cart.controller';
 
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', async (req, res, next) => {
-  try {
-    const cart = await Cart.findOne({ userId: (req as any).user.id }).lean();
-    res.json({ items: cart?.items ?? [] });
-  } catch (e) { next(e); }
-});
+router.get('/', cartController.getCart);
 
-const cartSchema = z.object({
+export const cartSchema = z.object({
   items: z.array(z.object({
-    productId: z.string(),
-    title: z.string(),
-    image: z.string(),
-    price: z.number(),
-    size: z.string(),
-    qty: z.number().int().min(1).max(20),
-    slug: z.string(),
-  })).max(50),
-});
+    productId: z.string({ required_error: 'Product ID is required' }),
+    title: z.string({ required_error: 'Product title is required' }),
+    image: z.string({ required_error: 'Product image is required' }),
+    price: z.number({ required_error: 'Price is required' }).nonnegative('Price cannot be negative'),
+    size: z.string({ required_error: 'Size is required' }),
+    qty: z.number({ required_error: 'Quantity is required' }).int('Quantity must be a whole number').min(1, 'Quantity must be at least 1').max(20, 'Quantity cannot exceed 20 per item'),
+    slug: z.string({ required_error: 'Product slug is required' }),
+  })).max(50, 'Cart cannot exceed 50 distinct items'),
+}).strict();
 
-router.put('/', validate(cartSchema), async (req, res, next) => {
-  try {
-    await Cart.updateOne(
-      { userId: (req as any).user.id },
-      { $set: { items: req.body.items } },
-      { upsert: true }
-    );
-    res.json({ ok: true });
-  } catch (e) { next(e); }
-});
+router.put('/', validate(cartSchema), cartController.updateCart);
 
 export default router;

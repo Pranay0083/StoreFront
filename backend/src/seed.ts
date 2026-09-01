@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import { env } from './env';
+import mongoose from 'mongoose';
+import { env } from './config/env';
 import { Coupon, Order, Product, Review, User } from './models';
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=900&q=80&auto=format&fit=crop`;
@@ -57,6 +58,10 @@ async function seedCustomer(email: string, name: string, password: string) {
   return user;
 }
 
+/**
+ * Seeds the database with an admin user, mock products, coupons, and historical demo orders.
+ * Automatically skips seeding if the database is already populated.
+ */
 export async function seedIfNeeded() {
   await seedAdmin();
   const customer = await seedCustomer('customer@storefront.dev', 'Demo Customer', 'Customer@123');

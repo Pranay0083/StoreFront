@@ -1,92 +1,31 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { ApiError, requireAdmin, validate } from '../middleware';
-import { Product } from '../models';
+import { requireAdmin, validate } from '../middleware';
+import * as productsController from '../controllers/products.controller';
 
 const router = Router();
 
-router.get('/', async (req, res, next) => {
-  try {
-    const { category, size, minPrice, maxPrice, q, sort, featured, page = '1', limit = '24' } = req.query as Record<string, string>;
-    const filter: any = {};
-    if (category) filter.category = category;
-    if (featured === 'true') filter.featured = true;
-    if (size) filter['sizes'] = { $elemMatch: { size, stock: { $gt: 0 } } };
-    if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice);
-      if (maxPrice) filter.price.$lte = Number(maxPrice);
-    }
-    if (q) filter.$text = { $search: q };
-    const sortMap: Record<string, any> = {
-      'price-asc': { price: 1 }, 'price-desc': { price: -1 },
-      'newest': { createdAt: -1 }, 'rating': { rating: -1 },
-    };
-    const pageN = Math.max(1, Number(page));
-    const limitN = Math.min(48, Number(limit));
-    const [items, total] = await Promise.all([
-      Product.find(filter).sort(sortMap[sort] || { createdAt: -1 }).skip((pageN - 1) * limitN).limit(limitN).lean(),
-      Product.countDocuments(filter),
-    ]);
-    res.json({ items, total, page: pageN, pages: Math.ceil(total / limitN) });
-  } catch (e) { next(e); }
-});
-
-router.get('/categories', async (_req, res, next) => {
-  try {
-    const cats = await Product.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $sort: { _id: 1 } },
-    ]);
-    res.json(cats.map(c => ({ name: c._id, count: c.count })));
-  } catch (e) { next(e); }
-});
-
-router.get('/:slug', async (req, res, next) => {
-  try {
-    const product = await Product.findOne({ slug: req.params.slug }).lean();
-    if (!product) throw new ApiError(404, 'Product not found');
-    res.json(product);
-  } catch (e) { next(e); }
-});
-
-const productSchema = z.object({
-  title: z.string().min(2),
-  slug: z.string().min(2).optional(),
+export const productSchema = z.object({
+  title: z.string({ required_error: 'Product title is required' }).min(2, 'Title must be at least 2 characters'),
+  slug: z.string().min(2, 'Slug must be at least 2 characters').optional(),
   description: z.string().default(''),
-  category: z.string().min(2),
-  price: z.number().positive(),
-  compareAtPrice: z.number().positive().optional().nullable(),
-  images: z.array(z.string().url()).min(1),
-  sizes: z.array(z.object({ size: z.string(), stock: z.number().int().min(0) })).min(1),
+  category: z.string({ required_error: 'Category is required' }).min(2, 'Category must be at least 2 characters'),
+  price: z.number({ required_error: 'Price is required' }).positive('Price must be greater than 0'),
+  compareAtPrice: z.number().positive('Compare at price must be greater than 0').optional().nullable(),
+  images: z.array(z.string().url('Image must be a valid URL')).min(1, 'At least one image is required'),
+  sizes: z.array(z.object({ 
+    size: z.string({ required_error: 'Size name is required' }), 
+    stock: z.number({ required_error: 'Stock quantity is required' }).int('Stock must be a whole number').min(0, 'Stock cannot be negative') 
+  })).min(1, 'At least one size is required'),
   featured: z.boolean().default(false),
-});
+}).strict();
 
-const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+router.get('/', productsController.getProducts);
+router.get('/categories', productsController.getCategories);
+router.get('/:slug', productsController.getProductBySlug);
 
-router.post('/', requireAdmin, validate(productSchema), async (req, res, next) => {
-  try {
-    const slug = req.body.slug || slugify(req.body.title);
-    if (await Product.findOne({ slug })) throw new ApiError(409, 'Slug already exists');
-    const product = await Product.create({ ...req.body, slug });
-    res.status(201).json(product);
-  } catch (e) { next(e); }
-});
-
-router.put('/:id', requireAdmin, validate(productSchema.partial()), async (req, res, next) => {
-  try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!product) throw new ApiError(404, 'Product not found');
-    res.json(product);
-  } catch (e) { next(e); }
-});
-
-router.delete('/:id', requireAdmin, async (req, res, next) => {
-  try {
-    const product = await Product.findByIdAndDelete(req.params.id);
-    if (!product) throw new ApiError(404, 'Product not found');
-    res.json({ ok: true });
-  } catch (e) { next(e); }
-});
+router.post('/', requireAdmin, validate(productSchema), productsController.createProduct);
+router.put('/:id', requireAdmin, validate(productSchema.partial()), productsController.updateProduct);
+router.delete('/:id', requireAdmin, productsController.deleteProduct);
 
 export default router;

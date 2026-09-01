@@ -1,43 +1,18 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import { z } from 'zod';
-import { ApiError, requireAuth, validate } from '../middleware';
-import { Product, Review } from '../models';
+import { requireAuth, validate } from '../middleware';
+import * as reviewsController from '../controllers/reviews.controller';
 
 const router = Router();
 
-router.get('/product/:productId', async (req, res, next) => {
-  try {
-    const reviews = await Review.find({ productId: req.params.productId }).sort({ createdAt: -1 }).limit(50).lean();
-    res.json(reviews);
-  } catch (e) { next(e); }
-});
+router.get('/product/:productId', reviewsController.getReviews);
 
 const reviewSchema = z.object({
-  productId: z.string(),
-  rating: z.number().int().min(1).max(5),
-  comment: z.string().max(1000).default(''),
-});
+  productId: z.string({ required_error: 'Product ID is required' }),
+  rating: z.number({ required_error: 'Rating is required' }).int('Rating must be a whole number').min(1, 'Minimum rating is 1').max(5, 'Maximum rating is 5'),
+  comment: z.string().max(1000, 'Comment cannot exceed 1000 characters').default(''),
+}).strict();
 
-router.post('/', requireAuth, validate(reviewSchema), async (req, res, next) => {
-  try {
-    const user = (req as any).user;
-    const product = await Product.findById(req.body.productId);
-    if (!product) throw new ApiError(404, 'Product not found');
-    await Review.updateOne(
-      { productId: product._id, userId: user.id },
-      { $set: { rating: req.body.rating, comment: req.body.comment, userName: user.name } },
-      { upsert: true }
-    );
-    const [agg] = await Review.aggregate([
-      { $match: { productId: new mongoose.Types.ObjectId(String(product._id)) } },
-      { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
-    ]);
-    product.rating = Math.round((agg?.avg ?? 0) * 10) / 10;
-    product.numReviews = agg?.count ?? 0;
-    await product.save();
-    res.status(201).json({ ok: true, rating: product.rating, numReviews: product.numReviews });
-  } catch (e) { next(e); }
-});
+router.post('/', requireAuth, validate(reviewSchema), reviewsController.createReview);
 
 export default router;

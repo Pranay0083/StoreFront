@@ -1,5 +1,6 @@
-import { ApiError } from './middleware';
-import { Coupon, Order, OrderStatus, Product } from './models';
+import { ApiError } from '../middleware';
+import { Coupon, Order, Product } from '../models';
+import { OrderStatus } from '../types';
 
 // Explicit order state machine — the single source of truth for transitions.
 // created → paid → packed → shipped → delivered, with cancel/refund branches.
@@ -13,12 +14,18 @@ export const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   refunded: [],
 };
 
+/**
+ * Asserts that a proposed status transition is valid according to the state machine.
+ */
 export function assertTransition(from: OrderStatus, to: OrderStatus) {
   if (!TRANSITIONS[from]?.includes(to)) {
     throw new ApiError(409, `Illegal transition: ${from} → ${to}`);
   }
 }
 
+/**
+ * Transitions an order to a new status, recording the history audit trail.
+ */
 export async function transitionOrder(order: any, to: OrderStatus, by: string, note = '') {
   assertTransition(order.status, to);
   const from = order.status;
@@ -29,8 +36,10 @@ export async function transitionOrder(order: any, to: OrderStatus, by: string, n
   return order;
 }
 
-// Idempotent payment confirmation: safe against Razorpay webhook retries and
-// double verify calls — only a 'created' order transitions and decrements stock.
+/**
+ * Safely marks an order as paid, enforcing idempotency against retries.
+ * Decrements product stock and increments coupon usage upon success.
+ */
 export async function markOrderPaid(order: any, by: string, paymentInfo: Record<string, string>) {
   if (order.status !== 'created') return { order, alreadyProcessed: true };
   order.payment = { ...order.payment?.toObject?.() ?? order.payment, ...paymentInfo, status: 'captured' };

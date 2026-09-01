@@ -6,7 +6,8 @@ export class ApiError extends Error {
   }
 }
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || '';
+const isServer = typeof window === 'undefined';
+const BASE = (isServer ? process.env.INTERNAL_API_URL : process.env.NEXT_PUBLIC_API_URL) || process.env.NEXT_PUBLIC_API_URL || '';
 
 export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}/api${path}`, {

@@ -20,9 +20,12 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:4001}"
+        INTERNAL_API_URL: "http://backend:4001"
     container_name: storefront-frontend
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      - INTERNAL_API_URL=http://backend:4001
     ports:
       - "3000:3000"

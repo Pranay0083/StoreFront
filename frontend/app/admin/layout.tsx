@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, LayoutDashboard, LogOut, Package, ShoppingBag, TicketPercent } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, LogOut, MessageSquare, Package, ShoppingBag, TicketPercent } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -13,6 +13,7 @@ const LINKS = [
   { href: '/admin/orders', label: 'Order queue', icon: Package },
   { href: '/admin/products', label: 'Products', icon: ShoppingBag },
   { href: '/admin/coupons', label: 'Coupons', icon: TicketPercent },
+  { href: '/admin/chats', label: 'Agent chats', icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
