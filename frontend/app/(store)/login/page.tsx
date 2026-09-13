@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ function LoginContent() {
   const search = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -49,11 +50,16 @@ function LoginContent() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" data-testid="login-password-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-          <div className="flex justify-end">
-            <Link href="/forgot-password" data-testid="login-forgot-link" className="text-xs text-muted-foreground underline hover:text-foreground">
-              Forgot password?
-            </Link>
+          <div className="relative">
+            <Input id="password" type={showPassword ? 'text' : 'password'} data-testid="login-password-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required className="pr-11" />
+            <button
+              type="button"
+              onClick={() => setShowPassword(value => !value)}
+              className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
         <Button type="submit" size="lg" className="w-full" data-testid="login-submit-button" disabled={loading}>
@@ -70,20 +76,14 @@ function LoginContent() {
           >
             Customer
           </Button>
-          <Button
-            type="button" variant="outline" size="sm" data-testid="login-fill-admin"
-            onClick={() => { setEmail('admin@storefront.dev'); setPassword('Admin@123'); }}
-          >
-            Admin
-          </Button>
         </div>
       </div>
 
       <p className="mt-8 text-sm text-muted-foreground">
         New here?{' '}
-        <Link href="/register" data-testid="login-register-link" className="text-foreground underline">
+        <a href="/register" data-testid="login-register-link" className="text-foreground underline">
           Create an account
-        </Link>
+        </a>
       </p>
     </div>
   );

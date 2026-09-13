@@ -5,6 +5,5 @@ export * from './order.model';
 export * from './review.model';
 export * from './webhookEvent.model';
 export * from './coupon.model';
-export * from './passwordResetToken.model';
 export * from './conversation.model';
 export * from './loginAttempt.model';

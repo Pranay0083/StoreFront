@@ -8,8 +8,7 @@ export function Footer() {
           <div className="md:col-span-5">
             <p className="font-serif text-4xl font-semibold tracking-tight">STOREFRONT.</p>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Considered clothing, shipped with an explicit order state machine. Built on Next.js,
-              Express, and MongoDB aggregations — no tutorials were harmed.
+              Considered clothing, shipped with an explicit order state machine.
             </p>
           </div>
           <div className="md:col-span-2">
