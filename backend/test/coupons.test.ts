@@ -35,3 +35,26 @@ describe('coupon math', () => {
     expect((await validate('NOPE', 2000)).status).toBe(400);
   });
 });
+
+describe('admin coupon management', () => {
+  it('lets admins create, update, list and delete coupons', async () => {
+    const admin = await createUser({ role: 'admin' });
+    const customer = await createUser();
+    const body = { code: ' summer20 ', type: 'percent', value: 20, minSubtotal: 0 };
+
+    await t.http().post(`${API}/admin/coupons`).set(bearer(customer.token)).send(body).expect(403);
+    const created = await t.http().post(`${API}/admin/coupons`).set(bearer(admin.token)).send(body).expect(201);
+    expect(created.body).toMatchObject({ code: 'SUMMER20', type: 'percent', value: 20, usedCount: 0, active: true });
+    await t.http().post(`${API}/admin/coupons`).set(bearer(admin.token)).send(body).expect(409);
+    await t.http().post(`${API}/admin/coupons`).set(bearer(admin.token)).send({ ...body, code: 'HUGE', value: 150 }).expect(400);
+
+    const updated = await t.http().put(`${API}/admin/coupons/${created.body._id}`).set(bearer(admin.token)).send({ active: false }).expect(200);
+    expect(updated.body.active).toBe(false);
+
+    const list = await t.http().get(`${API}/admin/coupons`).set(bearer(admin.token)).expect(200);
+    expect(list.body).toHaveLength(1);
+
+    await t.http().delete(`${API}/admin/coupons/${created.body._id}`).set(bearer(admin.token)).expect(200);
+    await t.http().delete(`${API}/admin/coupons/${created.body._id}`).set(bearer(admin.token)).expect(404);
+  });
+});

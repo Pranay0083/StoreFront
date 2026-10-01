@@ -2,7 +2,10 @@ import { ApiError } from '../middleware';
 import { Cart, Order, Product } from '../models';
 import { transitionOrder } from '../services/stateMachine';
 import { logger } from '../core/logger';
-import { applyCoupon } from './coupons.controller';
+import { CouponRepository } from '../modules/coupons/coupon.repository';
+import { CouponService } from '../modules/coupons/coupons.service';
+
+const coupons = new CouponService(new CouponRepository());
 
 const FREE_SHIPPING_ABOVE = 2999;
 const SHIPPING_FEE = 99;
@@ -34,7 +37,7 @@ export const createOrder = async (req: any, res: any, next: any) => {
     let discount = 0;
     let couponCode: string | undefined;
     if (req.body.couponCode) {
-      const applied = await applyCoupon(req.body.couponCode, subtotal);
+      const applied = await coupons.quote(req.body.couponCode, subtotal);
       discount = applied.discount;
       couponCode = applied.coupon.code;
     }

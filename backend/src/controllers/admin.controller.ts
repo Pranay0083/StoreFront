@@ -1,5 +1,5 @@
 import { ApiError } from '../middleware';
-import { Cart, Conversation, Coupon, Order, Product, User } from '../models';
+import { Cart, Conversation, Order, Product, User } from '../models';
 import { ORDER_STATUSES } from '../types';
 import { transitionOrder, TRANSITIONS } from '../services/stateMachine';
 import { logger } from '../core/logger';
@@ -176,50 +176,5 @@ export const getConversations = async (_req: any, res: any, next: any) => {
         updatedAt: c.updatedAt,
       };
     }));
-  } catch (e) { next(e); }
-};
-
-/**
- * Lists all discount coupons in the system.
- */
-export const getCoupons = async (_req: any, res: any, next: any) => {
-  try {
-    res.json(await Coupon.find().sort({ createdAt: -1 }).lean());
-  } catch (e) { next(e); }
-};
-
-/**
- * Creates a new discount coupon.
- */
-export const createCoupon = async (req: any, res: any, next: any) => {
-  try {
-    if (await Coupon.findOne({ code: req.body.code })) throw new ApiError(409, 'A coupon with this code already exists');
-    const coupon = await Coupon.create(req.body);
-    logger.info({ adminId: req.user.id, couponCode: coupon.code }, 'Coupon created');
-    res.status(201).json(coupon);
-  } catch (e) { next(e); }
-};
-
-/**
- * Updates an existing discount coupon.
- */
-export const updateCoupon = async (req: any, res: any, next: any) => {
-  try {
-    const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!coupon) throw new ApiError(404, 'Coupon not found');
-    logger.info({ adminId: req.user.id, couponId: coupon._id }, 'Coupon updated');
-    res.json(coupon);
-  } catch (e) { next(e); }
-};
-
-/**
- * Deletes a discount coupon.
- */
-export const deleteCoupon = async (req: any, res: any, next: any) => {
-  try {
-    const coupon = await Coupon.findByIdAndDelete(req.params.id);
-    if (!coupon) throw new ApiError(404, 'Coupon not found');
-    logger.info({ adminId: req.user.id, couponId: req.params.id }, 'Coupon deleted');
-    res.json({ ok: true });
   } catch (e) { next(e); }
 };

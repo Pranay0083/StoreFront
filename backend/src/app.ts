@@ -11,8 +11,6 @@ import { handleMcpPost, handleMcpUnsupported } from './services/mcp';
 
 import adminRoutes from './routes/admin';
 import agentRoutes from './routes/agent';
-import cartRoutes from './routes/cart';
-import couponRoutes from './routes/coupons';
 import orderRoutes from './routes/orders';
 import paymentRoutes from './routes/payments';
 
@@ -38,8 +36,6 @@ export function buildApp(container: Container) {
   const api = express.Router();
   api.get('/', (_req, res) => res.json({ status: 'ok', service: 'storefront-api' }));
   for (const [path, router] of container.routes) api.use(path, router);
-  api.use('/cart', cartRoutes);
-  api.use('/coupons', couponRoutes);
   api.use('/orders', orderRoutes);
   api.use('/payments', paymentRoutes);
   api.use('/admin', adminRoutes);

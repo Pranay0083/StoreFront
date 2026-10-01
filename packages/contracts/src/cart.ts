@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PaiseSchema, type Paise } from './money';
+import { PaiseSchema } from './money';
 
 export const CartItemSchema = z.object({
   productId: z.string({ required_error: 'Product ID is required' }),
@@ -22,12 +22,4 @@ export const UpdateCartSchema = z
   .strict();
 export type UpdateCartInput = z.infer<typeof UpdateCartSchema>;
 
-export interface CartItem {
-  productId: string;
-  title: string;
-  image: string;
-  price: Paise;
-  size: string;
-  qty: number;
-  slug: string;
-}
+export type CartItem = z.infer<typeof CartItemSchema>;

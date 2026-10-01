@@ -14,6 +14,14 @@ import { ReviewRepository } from '../modules/reviews/review.repository';
 import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
+import { CartController } from '../modules/cart/cart.controller';
+import { CartRepository } from '../modules/cart/cart.repository';
+import { cartRoutes } from '../modules/cart/cart.routes';
+import { CartService } from '../modules/cart/cart.service';
+import { CouponRepository } from '../modules/coupons/coupon.repository';
+import { CouponsController } from '../modules/coupons/coupons.controller';
+import { adminCouponsRoutes, couponsRoutes } from '../modules/coupons/coupons.routes';
+import { CouponService } from '../modules/coupons/coupons.service';
 import type { Env } from './config/env';
 import { createRateLimiters } from './http/rate-limit';
 
@@ -26,6 +34,8 @@ export function buildContainer(env: Env) {
     loginAttempts: new LoginAttemptRepository(),
     products: new ProductRepository(),
     reviews: new ReviewRepository(),
+    carts: new CartRepository(),
+    coupons: new CouponRepository(),
   };
 
   const tokens = new TokenService(env.JWT_SECRET);
@@ -34,6 +44,8 @@ export function buildContainer(env: Env) {
     auth: new AuthService(repositories.users, repositories.loginAttempts, tokens),
     catalog: new CatalogService(repositories.products),
     reviews: new ReviewsService(repositories.reviews, repositories.products),
+    cart: new CartService(repositories.carts),
+    coupons: new CouponService(repositories.coupons),
   };
 
   const guards = new AuthGuards(services.auth);
@@ -42,12 +54,17 @@ export function buildContainer(env: Env) {
     auth: new AuthController(services.auth),
     catalog: new CatalogController(services.catalog),
     reviews: new ReviewsController(services.reviews),
+    cart: new CartController(services.cart),
+    coupons: new CouponsController(services.coupons),
   };
 
   const routes: Array<[path: string, router: Router]> = [
     ['/auth', authRoutes(controllers.auth, guards, limiters)],
     ['/products', catalogRoutes(controllers.catalog, guards)],
     ['/reviews', reviewsRoutes(controllers.reviews, guards)],
+    ['/cart', cartRoutes(controllers.cart, guards)],
+    ['/coupons', couponsRoutes(controllers.coupons, guards)],
+    ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
   ];
 
   return { env, limiters, repositories, services, guards, controllers, routes };
