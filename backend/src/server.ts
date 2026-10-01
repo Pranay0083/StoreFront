@@ -15,7 +15,7 @@ try {
 
   await connectDB(env.MONGO_URL, env.DB_NAME);
   logger.info({ db: env.DB_NAME }, 'Connected to MongoDB');
-  await seedIfNeeded();
+  await seedIfNeeded(env);
   buildApp(buildContainer(env)).listen(env.PORT, env.HOST, () => {
     logger.info(`storefront-api listening on ${env.HOST}:${env.PORT}`);
   });

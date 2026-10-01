@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { Coupon, Order, Product } from '../src/models';
+import { ProductModel as Product } from '../src/modules/catalog/product.model';
+import { CouponModel as Coupon } from '../src/modules/coupons/coupon.model';
+import { OrderModel as Order } from '../src/modules/orders/order.model';
 import { ADDRESS, createCoupon, createProduct, createUser } from './helpers/factories';
 import { API, bearer, useTestApp } from './helpers/app';
 

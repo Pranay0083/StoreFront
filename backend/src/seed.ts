@@ -1,7 +1,10 @@
 import bcrypt from 'bcryptjs';
-import mongoose from 'mongoose';
-import { env } from './core/config/env';
-import { Coupon, Order, Product, Review, User } from './models';
+import type { Env } from './core/config/env';
+import { UserModel } from './modules/auth/user.model';
+import { ProductModel } from './modules/catalog/product.model';
+import { CouponModel } from './modules/coupons/coupon.model';
+import { OrderModel } from './modules/orders/order.model';
+import { ReviewModel } from './modules/reviews/review.model';
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=900&q=80&auto=format&fit=crop`;
 const APPAREL = ['S', 'M', 'L', 'XL'];
@@ -37,18 +40,22 @@ const PRODUCTS = [
   { title: 'Waxed Canvas Backpack', category: 'Accessories', price: 5999, images: [img('photo-1553062407-98eeb64c6a62')], sizes: sizes(ONE, [8]), description: 'Weatherproof waxed canvas, leather trim, 20L. Built for the daily carry decade.' },
 ];
 
-const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
 const rand = (n: number) => Math.floor(Math.random() * n);
-const pick = <T,>(arr: T[]) => arr[rand(arr.length)];
+const pick = <T>(arr: readonly T[]): T => arr[rand(arr.length)];
 
-async function seedAdmin() {
+async function seedAdmin(env: Env) {
   if (!env.ADMIN_PASSWORD) {
     console.warn('[seed] ADMIN_PASSWORD is not set; skipping admin account seed');
     return;
   }
-  const existing = await User.findOne({ email: env.ADMIN_EMAIL });
+  const existing = await UserModel.findOne({ email: env.ADMIN_EMAIL });
   if (!existing) {
-    await User.create({ email: env.ADMIN_EMAIL, name: 'Store Admin', role: 'admin', passwordHash: await bcrypt.hash(env.ADMIN_PASSWORD, 10) });
+    await UserModel.create({ email: env.ADMIN_EMAIL, name: 'Store Admin', role: 'admin', passwordHash: await bcrypt.hash(env.ADMIN_PASSWORD, 10) });
     console.log('[seed] admin created');
   } else if (!(await bcrypt.compare(env.ADMIN_PASSWORD, existing.passwordHash))) {
     existing.passwordHash = await bcrypt.hash(env.ADMIN_PASSWORD, 10);
@@ -57,58 +64,59 @@ async function seedAdmin() {
 }
 
 async function seedCustomer(email: string, name: string, password: string) {
-  let user = await User.findOne({ email });
-  if (!user) user = await User.create({ email, name, passwordHash: await bcrypt.hash(password, 10) });
-  return user;
+  return (await UserModel.findOne({ email })) ?? (await UserModel.create({ email, name, passwordHash: await bcrypt.hash(password, 10) }));
+}
+
+type OrderPath = Array<'created' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'>;
+
+function pickOrderPath(daysAgo: number): OrderPath {
+  const roll = Math.random();
+  if (roll < 0.06) return ['created'];
+  if (roll < 0.12) return ['created', 'cancelled'];
+  if (roll < 0.16) return ['created', 'paid', 'refunded'];
+  if (daysAgo > 7) return ['created', 'paid', 'packed', 'shipped', 'delivered'];
+  if (daysAgo > 3) return pick([['created', 'paid', 'packed', 'shipped'], ['created', 'paid', 'packed', 'shipped'], ['created', 'paid', 'packed']] as OrderPath[]);
+  return pick([['created', 'paid'], ['created', 'paid']] as OrderPath[]);
 }
 
 /**
- * Seeds the database with an admin user, mock products, coupons, and historical demo orders.
- * Automatically skips seeding if the database is already populated.
+ * Seeds an admin user, demo products, coupons, historical demo orders and reviews.
+ * Skips catalog/order seeding when products already exist.
  */
-export async function seedIfNeeded() {
-  await seedAdmin();
+export async function seedIfNeeded(env: Env) {
+  await seedAdmin(env);
   const customer = await seedCustomer('customer@storefront.dev', 'Demo Customer', 'Customer@123');
-  if (await Coupon.countDocuments() === 0) {
-    await Coupon.insertMany([
+  if ((await CouponModel.countDocuments()) === 0) {
+    await CouponModel.insertMany([
       { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 1000, maxDiscount: 500, active: true },
       { code: 'FLAT500', type: 'flat', value: 500, minSubtotal: 2999, active: true },
     ]);
     console.log('[seed] coupons created');
   }
-  if (await Product.countDocuments() > 0) return;
+  if ((await ProductModel.countDocuments()) > 0) return;
 
-  const products = await Product.insertMany(PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));
+  const products = await ProductModel.insertMany(PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));
   console.log(`[seed] ${products.length} products`);
 
+  const buyerNames = ['Aarav Shah', 'Meera Iyer', 'Kabir Rao', 'Ananya Das'];
   const buyers = [customer];
-  for (let i = 1; i <= 4; i++) {
-    buyers.push(await seedCustomer(`buyer${i}@demo.storefront.dev`, ['Aarav Shah', 'Meera Iyer', 'Kabir Rao', 'Ananya Das'][i - 1], 'Buyer@123'));
+  for (let i = 1; i <= buyerNames.length; i++) {
+    buyers.push(await seedCustomer(`buyer${i}@demo.storefront.dev`, buyerNames[i - 1], 'Buyer@123'));
   }
 
-  // Demo orders spread across the last 35 days to feed the dashboard aggregations.
   const now = Date.now();
-  const orders: any[] = [];
+  const orders = [];
   for (let i = 0; i < 110; i++) {
     const daysAgo = rand(35);
     const createdAt = new Date(now - daysAgo * 86_400_000 - rand(86_400_000));
     const buyer = pick(buyers);
-    const nItems = 1 + rand(3);
-    const items = [];
-    for (let j = 0; j < nItems; j++) {
-      const p: any = pick(products);
-      items.push({ productId: p._id, title: p.title, image: p.images[0], price: p.price, size: pick(p.sizes as any[]).size, qty: 1 + rand(2), slug: p.slug });
-    }
+    const items = Array.from({ length: 1 + rand(3) }, () => {
+      const p = pick(products);
+      return { productId: p._id, title: p.title, image: p.images[0], price: p.price, size: pick(p.sizes).size, qty: 1 + rand(2), slug: p.slug };
+    });
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
     const shipping = subtotal >= 2999 ? 0 : 99;
-    const roll = Math.random();
-    let path: string[];
-    if (roll < 0.06) path = ['created'];
-    else if (roll < 0.12) path = ['created', 'cancelled'];
-    else if (roll < 0.16) path = ['created', 'paid', 'refunded'];
-    else if (daysAgo > 7) path = ['created', 'paid', 'packed', 'shipped', 'delivered'];
-    else if (daysAgo > 3) path = ['created', 'paid', 'packed', pick(['shipped', 'shipped', 'packed'])].filter((v, idx, a) => a.indexOf(v) === idx);
-    else path = ['created', pick([...['paid', 'paid', 'packed'].slice(0, 2)])].filter((v, idx, a) => a.indexOf(v) === idx);
+    const path = pickOrderPath(daysAgo);
 
     const statusHistory = [];
     let prev: string | null = null;
@@ -122,17 +130,28 @@ export async function seedIfNeeded() {
     }
     orders.push({
       orderNumber: `SF-${createdAt.getTime().toString(36).toUpperCase()}${100 + i}`,
-      userId: buyer._id, items,
-      address: { name: buyer.name, line1: `${10 + rand(90)} Residency Road`, city: pick(['Mumbai', 'Bengaluru', 'Delhi', 'Pune', 'Chennai']), state: pick(['MH', 'KA', 'DL', 'TN']), pincode: `5600${10 + rand(89)}`, phone: `98${10000000 + rand(89999999)}` },
-      subtotal, shipping, total: subtotal + shipping,
+      userId: buyer._id,
+      items,
+      address: {
+        name: buyer.name,
+        line1: `${10 + rand(90)} Residency Road`,
+        city: pick(['Mumbai', 'Bengaluru', 'Delhi', 'Pune', 'Chennai']),
+        state: pick(['MH', 'KA', 'DL', 'TN']),
+        pincode: `5600${10 + rand(89)}`,
+        phone: `98${10000000 + rand(89999999)}`,
+      },
+      subtotal,
+      shipping,
+      total: subtotal + shipping,
       status: path[path.length - 1],
       statusHistory,
       payment: { provider: 'demo', status: paidAt ? 'captured' : 'pending', razorpayPaymentId: paidAt ? `demo_seed_${i}` : undefined },
       paidAt,
-      createdAt, updatedAt: new Date(t),
+      createdAt,
+      updatedAt: new Date(t),
     });
   }
-  await Order.insertMany(orders);
+  await OrderModel.insertMany(orders);
   console.log(`[seed] ${orders.length} orders`);
 
   const comments = [
@@ -148,7 +167,7 @@ export async function seedIfNeeded() {
     for (const b of reviewers) {
       const rating = 4 + rand(2);
       total += rating;
-      await Review.create({ productId: p._id, userId: b._id, userName: b.name, rating, comment: pick(comments) });
+      await ReviewModel.create({ productId: p._id, userId: b._id, userName: b.name, rating, comment: pick(comments) });
     }
     p.rating = Math.round((total / reviewers.length) * 10) / 10;
     p.numReviews = reviewers.length;

@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { Coupon, Product, User } from '../../src/models';
+import { UserModel as User } from '../../src/modules/auth/user.model';
+import { ProductModel as Product } from '../../src/modules/catalog/product.model';
+import { CouponModel as Coupon } from '../../src/modules/coupons/coupon.model';
 
 export async function createUser(overrides: { email?: string; password?: string; name?: string; role?: 'customer' | 'admin' } = {}) {
   const password = overrides.password ?? 'Password@123';

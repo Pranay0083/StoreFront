@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Cart, Order } from '../src/models';
+import { CartModel as Cart } from '../src/modules/cart/cart.model';
+import { OrderModel as Order } from '../src/modules/orders/order.model';
 import { ADDRESS, createCoupon, createProduct, createUser } from './helpers/factories';
 import { API, bearer, useTestApp } from './helpers/app';
 

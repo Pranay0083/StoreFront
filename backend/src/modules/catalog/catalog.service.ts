@@ -28,6 +28,10 @@ export class CatalogService {
     return this.products.categoryCounts();
   }
 
+  findBySlug(slug: string): Promise<ProductRecord | null> {
+    return this.products.findBySlug(slug);
+  }
+
   async getBySlug(slug: string): Promise<ProductRecord> {
     const product = await this.products.findBySlug(slug);
     if (!product) throw new NotFoundError('Product not found');
