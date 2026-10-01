@@ -1,4 +1,8 @@
 import { Order, Product, User } from '../models';
+import { ProductQueryBuilder } from '../modules/catalog/product-query.builder';
+import { ProductRepository } from '../modules/catalog/product.repository';
+
+const products = new ProductRepository();
 
 export interface ToolCtx {
   userId?: string;
@@ -40,23 +44,16 @@ export const STORE_INFO = {
 
 export const toolExecutors: Record<string, (args: any, ctx: ToolCtx) => Promise<any>> = {
   async search_products(args) {
-    const filter: any = {};
-    if (args.category) filter.category = args.category;
-    if (args.query) filter.$text = { $search: String(args.query) };
-    if (args.minPrice || args.maxPrice) {
-      filter.price = {};
-      if (args.minPrice) filter.price.$gte = Number(args.minPrice);
-      if (args.maxPrice) filter.price.$lte = Number(args.maxPrice);
-    }
-    if (args.featured === true) filter.featured = true;
-    const sortMap: Record<string, any> = {
-      'price-asc': { price: 1 }, 'price-desc': { price: -1 },
-      newest: { createdAt: -1 }, rating: { rating: -1 },
-    };
     const limit = Math.min(8, Number(args.limit) || 5);
-    let items = await Product.find(filter).sort(sortMap[args.sort] || { rating: -1 }).limit(limit).lean();
+    const base = () =>
+      new ProductQueryBuilder()
+        .inCategory(args.category)
+        .priceBetween(Number(args.minPrice) || undefined, Number(args.maxPrice) || undefined)
+        .featuredOnly(args.featured === true)
+        .take(limit);
+    let items = await products.find(base().matchingText(args.query ? String(args.query) : undefined).sortBy(args.sort, 'rating').build());
     if (!items.length && args.query) {
-      items = await Product.find({ title: { $regex: String(args.query).split(/\s+/).join('|'), $options: 'i' } }).limit(limit).lean();
+      items = await products.find(new ProductQueryBuilder().titleMatchingAnyWord(String(args.query)).take(limit).build());
     }
     return { count: items.length, products: items.map(productSummary) };
   },

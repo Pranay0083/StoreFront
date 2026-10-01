@@ -28,7 +28,7 @@ export const ProductInputSchema = z
   .strict();
 export type ProductInput = z.infer<typeof ProductInputSchema>;
 
-const optionalNumber = z.coerce.number().nonnegative().optional();
+const optionalNumber = z.coerce.number().nonnegative().optional().catch(undefined);
 
 export const ProductListQuerySchema = z.object({
   category: z.string().optional(),
@@ -38,11 +38,19 @@ export const ProductListQuerySchema = z.object({
   q: z.string().max(200).optional(),
   sort: z.enum(PRODUCT_SORTS).optional().catch(undefined),
   featured: z
-    .enum(['true', 'false'])
+    .string()
     .optional()
     .transform(v => v === 'true'),
-  page: z.coerce.number().int().min(1).catch(1).default(1),
-  limit: z.coerce.number().int().min(1).max(48).catch(24).default(24),
+  page: z.coerce
+    .number()
+    .int()
+    .catch(1)
+    .transform(n => Math.max(1, n)),
+  limit: z.coerce
+    .number()
+    .int()
+    .catch(24)
+    .transform(n => Math.min(48, Math.max(1, n))),
 });
 export type ProductListQuery = z.infer<typeof ProductListQuerySchema>;
 

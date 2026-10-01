@@ -15,8 +15,6 @@ import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
 import orderRoutes from './routes/orders';
 import paymentRoutes from './routes/payments';
-import productRoutes from './routes/products';
-import reviewRoutes from './routes/reviews';
 
 export function buildApp(container: Container) {
   const { env, limiters } = container;
@@ -40,12 +38,10 @@ export function buildApp(container: Container) {
   const api = express.Router();
   api.get('/', (_req, res) => res.json({ status: 'ok', service: 'storefront-api' }));
   for (const [path, router] of container.routes) api.use(path, router);
-  api.use('/products', productRoutes);
   api.use('/cart', cartRoutes);
   api.use('/coupons', couponRoutes);
   api.use('/orders', orderRoutes);
   api.use('/payments', paymentRoutes);
-  api.use('/reviews', reviewRoutes);
   api.use('/admin', adminRoutes);
   api.use('/agent', agentRoutes);
 
