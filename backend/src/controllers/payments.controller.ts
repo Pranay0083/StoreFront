@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
-import { env, paymentsMode } from '../config/env';
+import { env, paymentsMode } from '../core/config/env';
 import { ApiError } from '../middleware';
 import { Order, WebhookEvent } from '../models';
 import { markOrderPaid } from '../services/stateMachine';

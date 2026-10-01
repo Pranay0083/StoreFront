@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
-import { env } from './config/env';
+import { env } from './core/config/env';
 import { Coupon, Order, Product, Review, User } from './models';
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=900&q=80&auto=format&fit=crop`;
@@ -42,6 +42,10 @@ const rand = (n: number) => Math.floor(Math.random() * n);
 const pick = <T,>(arr: T[]) => arr[rand(arr.length)];
 
 async function seedAdmin() {
+  if (!env.ADMIN_PASSWORD) {
+    console.warn('[seed] ADMIN_PASSWORD is not set; skipping admin account seed');
+    return;
+  }
   const existing = await User.findOne({ email: env.ADMIN_EMAIL });
   if (!existing) {
     await User.create({ email: env.ADMIN_EMAIL, name: 'Store Admin', role: 'admin', passwordHash: await bcrypt.hash(env.ADMIN_PASSWORD, 10) });

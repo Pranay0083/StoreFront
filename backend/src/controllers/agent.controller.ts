@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk';
 import { agentToolDefs, toolExecutors, ToolCtx } from '../agent/tools';
-import { env } from '../config/env';
+import { env } from '../core/config/env';
 import { ApiError } from '../middleware';
 import { Conversation } from '../models';
 import { logger } from '../utils/logger';

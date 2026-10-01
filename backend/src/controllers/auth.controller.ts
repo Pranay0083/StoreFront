@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { env } from '../config/env';
+import { env } from '../core/config/env';
 import { ApiError } from '../middleware';
 import { LoginAttempt, User } from '../models';
 import { logger } from '../utils/logger';

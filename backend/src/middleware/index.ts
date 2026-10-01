@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { ZodSchema } from 'zod';
-import { env } from '../config/env';
+import { env } from '../core/config/env';
 import { User } from '../models';
 
 import { logger } from '../utils/logger';
