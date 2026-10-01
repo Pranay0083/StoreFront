@@ -1,7 +1,7 @@
 import { ApiError } from '../middleware';
 import { Cart, Order, Product } from '../models';
 import { transitionOrder } from '../services/stateMachine';
-import { logger } from '../utils/logger';
+import { logger } from '../core/logger';
 import { applyCoupon } from './coupons.controller';
 
 const FREE_SHIPPING_ABOVE = 2999;

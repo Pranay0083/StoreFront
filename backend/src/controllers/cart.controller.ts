@@ -1,5 +1,5 @@
 import { Cart } from '../models';
-import { logger } from '../utils/logger';
+import { logger } from '../core/logger';
 
 /**
  * Retrieves the authenticated user's cart.

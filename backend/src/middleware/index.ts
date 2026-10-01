@@ -4,18 +4,11 @@ import { ZodSchema } from 'zod';
 import { env } from '../core/config/env';
 import { User } from '../models';
 
-import { logger } from '../utils/logger';
+import { AppError } from '../core/errors';
 
-/**
- * Custom error class to format API responses with status codes and optional detailed validation errors.
- */
-export class ApiError extends Error {
-  status: number;
-  details?: any;
+export class ApiError extends AppError {
   constructor(status: number, message: string, details?: any) {
-    super(message);
-    this.status = status;
-    this.details = details;
+    super(status, message, details);
   }
 }
 
@@ -97,19 +90,3 @@ export const validate = (schema: ZodSchema) =>
     req.body = result.data;
     next();
   };
-
-/**
- * Global Express error handling middleware.
- * Formats caught exceptions into standardized JSON responses. Logs unexpected 500 errors.
- */
-export const errorHandler = (err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const status = err instanceof ApiError ? err.status : 500;
-  const details = err instanceof ApiError ? err.details : undefined;
-  if (status === 500) {
-    logger.error({ err }, 'Internal server error');
-  }
-  res.status(status).json({ 
-    error: err.message || 'Internal server error',
-    ...(details && { details })
-  });
-};

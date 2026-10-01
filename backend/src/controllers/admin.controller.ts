@@ -2,7 +2,7 @@ import { ApiError } from '../middleware';
 import { Cart, Conversation, Coupon, Order, Product, User } from '../models';
 import { ORDER_STATUSES } from '../types';
 import { transitionOrder, TRANSITIONS } from '../services/stateMachine';
-import { logger } from '../utils/logger';
+import { logger } from '../core/logger';
 
 const REVENUE_STATUSES = ['paid', 'packed', 'shipped', 'delivered'];
 

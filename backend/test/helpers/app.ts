@@ -3,12 +3,15 @@ import mongoose from 'mongoose';
 import supertest from 'supertest';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { buildApp } from '../../src/app';
+import { loadEnv } from '../../src/core/config/env';
 import { connectDB, disconnectDB } from '../../src/core/config/db';
+import { buildContainer, type Container } from '../../src/core/container';
 
 export const API = '/api';
 
 export interface TestApp {
   app: Express;
+  container: Container;
   http: () => supertest.Agent;
 }
 
@@ -18,7 +21,8 @@ export function useTestApp(): TestApp {
   beforeAll(async () => {
     await connectDB(process.env.MONGO_URL!, process.env.DB_NAME!);
     await Promise.all(Object.values(mongoose.models).map(m => m.syncIndexes()));
-    ctx.app = buildApp();
+    ctx.container = buildContainer(loadEnv());
+    ctx.app = buildApp(ctx.container);
     ctx.http = () => supertest.agent(ctx.app);
   });
 

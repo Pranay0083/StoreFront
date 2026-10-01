@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { ApiError } from '../middleware';
 import { Product, Review } from '../models';
-import { logger } from '../utils/logger';
+import { logger } from '../core/logger';
 
 /**
  * Retrieves up to 50 recent reviews for a specific product.

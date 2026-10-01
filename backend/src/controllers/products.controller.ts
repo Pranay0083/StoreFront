@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ApiError } from '../middleware';
 import { Product } from '../models';
-import { logger } from '../utils/logger';
+import { logger } from '../core/logger';
 
 /**
  * Lists products based on various filters (category, size, price, search query, featured),

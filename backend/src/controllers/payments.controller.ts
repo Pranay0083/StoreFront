@@ -4,7 +4,7 @@ import { env, paymentsMode } from '../core/config/env';
 import { ApiError } from '../middleware';
 import { Order, WebhookEvent } from '../models';
 import { markOrderPaid } from '../services/stateMachine';
-import { logger } from '../utils/logger';
+import { logger } from '../core/logger';
 
 const rzp = () => new Razorpay({ key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET });
 

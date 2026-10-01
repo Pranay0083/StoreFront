@@ -3,7 +3,7 @@ import { agentToolDefs, toolExecutors, ToolCtx } from '../agent/tools';
 import { env } from '../core/config/env';
 import { ApiError } from '../middleware';
 import { Conversation } from '../models';
-import { logger } from '../utils/logger';
+import { logger } from '../core/logger';
 
 const groq = new Groq({ apiKey: env.GROQ_API_KEY });
 
