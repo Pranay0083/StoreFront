@@ -6,6 +6,7 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  transpilePackages: ['@storefront/contracts'],
   experimental: {
     outputFileTracingRoot: repoRoot,
   },
