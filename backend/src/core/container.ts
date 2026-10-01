@@ -22,6 +22,14 @@ import { CouponRepository } from '../modules/coupons/coupon.repository';
 import { CouponsController } from '../modules/coupons/coupons.controller';
 import { adminCouponsRoutes, couponsRoutes } from '../modules/coupons/coupons.routes';
 import { CouponService } from '../modules/coupons/coupons.service';
+import { OrderRepository } from '../modules/orders/order.repository';
+import { OrdersController } from '../modules/orders/orders.controller';
+import { ordersRoutes } from '../modules/orders/orders.routes';
+import { OrdersService } from '../modules/orders/orders.service';
+import { PaymentsController } from '../modules/payments/payments.controller';
+import { paymentsRoutes } from '../modules/payments/payments.routes';
+import { PaymentsService } from '../modules/payments/payments.service';
+import { WebhookEventRepository } from '../modules/payments/webhook-event.repository';
 import type { Env } from './config/env';
 import { createRateLimiters } from './http/rate-limit';
 
@@ -36,16 +44,27 @@ export function buildContainer(env: Env) {
     reviews: new ReviewRepository(),
     carts: new CartRepository(),
     coupons: new CouponRepository(),
+    orders: new OrderRepository(),
+    webhookEvents: new WebhookEventRepository(),
   };
 
   const tokens = new TokenService(env.JWT_SECRET);
+  const cart = new CartService(repositories.carts);
+  const coupons = new CouponService(repositories.coupons);
+  const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart);
   const services = {
     tokens,
     auth: new AuthService(repositories.users, repositories.loginAttempts, tokens),
     catalog: new CatalogService(repositories.products),
     reviews: new ReviewsService(repositories.reviews, repositories.products),
-    cart: new CartService(repositories.carts),
-    coupons: new CouponService(repositories.coupons),
+    cart,
+    coupons,
+    orders,
+    payments: new PaymentsService(
+      { keyId: env.RAZORPAY_KEY_ID, keySecret: env.RAZORPAY_KEY_SECRET, webhookSecret: env.RAZORPAY_WEBHOOK_SECRET },
+      orders,
+      repositories.webhookEvents,
+    ),
   };
 
   const guards = new AuthGuards(services.auth);
@@ -56,6 +75,8 @@ export function buildContainer(env: Env) {
     reviews: new ReviewsController(services.reviews),
     cart: new CartController(services.cart),
     coupons: new CouponsController(services.coupons),
+    orders: new OrdersController(services.orders),
+    payments: new PaymentsController(services.payments),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -65,6 +86,8 @@ export function buildContainer(env: Env) {
     ['/cart', cartRoutes(controllers.cart, guards)],
     ['/coupons', couponsRoutes(controllers.coupons, guards)],
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
+    ['/orders', ordersRoutes(controllers.orders, guards)],
+    ['/payments', paymentsRoutes(controllers.payments, guards)],
   ];
 
   return { env, limiters, repositories, services, guards, controllers, routes };

@@ -1,7 +1,7 @@
 import { ApiError } from '../middleware';
 import { Cart, Conversation, Order, Product, User } from '../models';
 import { ORDER_STATUSES } from '../types';
-import { transitionOrder, TRANSITIONS } from '../services/stateMachine';
+import { OrderStateMachine } from '../modules/orders/order-state-machine';
 import { logger } from '../core/logger';
 
 const REVENUE_STATUSES = ['paid', 'packed', 'shipped', 'delivered'];
@@ -126,7 +126,7 @@ export const getOrders = async (req: any, res: any, next: any) => {
       Order.find(filter).sort({ createdAt: -1 }).skip((pageN - 1) * limit).limit(limit).lean(),
       Order.countDocuments(filter),
     ]);
-    res.json({ orders, total, page: pageN, pages: Math.ceil(total / limit), transitions: TRANSITIONS });
+    res.json({ orders, total, page: pageN, pages: Math.ceil(total / limit), transitions: OrderStateMachine.transitions });
   } catch (e) { next(e); }
 };
 
@@ -141,7 +141,8 @@ export const bulkTransitionOrders = async (req: any, res: any, next: any) => {
       const order = await Order.findById(id);
       if (!order) { results.rejected.push({ id, reason: 'Not found' }); continue; }
       try {
-        await transitionOrder(order, req.body.to, `admin:${admin.id}`, 'Bulk action');
+        OrderStateMachine.apply(order, req.body.to, `admin:${admin.id}`, 'Bulk action');
+        await order.save();
         results.updated++;
       } catch (e: any) {
         results.rejected.push({ id: order.orderNumber, reason: e.message });

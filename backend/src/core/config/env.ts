@@ -33,6 +33,3 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
 }
 
 export const env = loadEnv();
-
-export const paymentsMode = (): 'razorpay' | 'demo' =>
-  env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET ? 'razorpay' : 'demo';
