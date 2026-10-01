@@ -1,10 +1,11 @@
 import bcrypt from 'bcryptjs';
-import type { Env } from './core/config/env';
-import { UserModel } from './modules/auth/user.model';
-import { ProductModel } from './modules/catalog/product.model';
-import { CouponModel } from './modules/coupons/coupon.model';
-import { OrderModel } from './modules/orders/order.model';
-import { ReviewModel } from './modules/reviews/review.model';
+import { logger } from '../../core/logger';
+import type { Env } from '../../core/config/env';
+import { UserModel } from '../../modules/auth/user.model';
+import { ProductModel } from '../../modules/catalog/product.model';
+import { CouponModel } from '../../modules/coupons/coupon.model';
+import { OrderModel } from '../../modules/orders/order.model';
+import { ReviewModel } from '../../modules/reviews/review.model';
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=900&q=80&auto=format&fit=crop`;
 const APPAREL = ['S', 'M', 'L', 'XL'];
@@ -48,18 +49,19 @@ const slugify = (s: string) =>
 const rand = (n: number) => Math.floor(Math.random() * n);
 const pick = <T>(arr: readonly T[]): T => arr[rand(arr.length)];
 
-async function seedAdmin(env: Env) {
+async function seedAdmin(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWORD'>) {
   if (!env.ADMIN_PASSWORD) {
-    console.warn('[seed] ADMIN_PASSWORD is not set; skipping admin account seed');
+    logger.warn('ADMIN_PASSWORD is not set; skipping admin account seed');
     return;
   }
   const existing = await UserModel.findOne({ email: env.ADMIN_EMAIL });
   if (!existing) {
     await UserModel.create({ email: env.ADMIN_EMAIL, name: 'Store Admin', role: 'admin', passwordHash: await bcrypt.hash(env.ADMIN_PASSWORD, 10) });
-    console.log('[seed] admin created');
+    logger.info('Seeded admin account');
   } else if (!(await bcrypt.compare(env.ADMIN_PASSWORD, existing.passwordHash))) {
     existing.passwordHash = await bcrypt.hash(env.ADMIN_PASSWORD, 10);
     await existing.save();
+    logger.info('Rotated admin password to match ADMIN_PASSWORD');
   }
 }
 
@@ -79,11 +81,15 @@ function pickOrderPath(daysAgo: number): OrderPath {
   return pick([['created', 'paid'], ['created', 'paid']] as OrderPath[]);
 }
 
+export interface SeedResult {
+  catalogSeeded: boolean;
+}
+
 /**
- * Seeds an admin user, demo products, coupons, historical demo orders and reviews.
- * Skips catalog/order seeding when products already exist.
+ * Idempotent demo seed: ensures the admin and demo customer accounts and default coupons exist,
+ * and populates the catalog, historical orders and reviews only when the catalog is empty.
  */
-export async function seedIfNeeded(env: Env) {
+export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWORD'>): Promise<SeedResult> {
   await seedAdmin(env);
   const customer = await seedCustomer('customer@storefront.dev', 'Demo Customer', 'Customer@123');
   if ((await CouponModel.countDocuments()) === 0) {
@@ -91,12 +97,11 @@ export async function seedIfNeeded(env: Env) {
       { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 1000, maxDiscount: 500, active: true },
       { code: 'FLAT500', type: 'flat', value: 500, minSubtotal: 2999, active: true },
     ]);
-    console.log('[seed] coupons created');
+    logger.info('Seeded default coupons');
   }
-  if ((await ProductModel.countDocuments()) > 0) return;
+  if ((await ProductModel.countDocuments()) > 0) return { catalogSeeded: false };
 
   const products = await ProductModel.insertMany(PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));
-  console.log(`[seed] ${products.length} products`);
 
   const buyerNames = ['Aarav Shah', 'Meera Iyer', 'Kabir Rao', 'Ananya Das'];
   const buyers = [customer];
@@ -152,7 +157,6 @@ export async function seedIfNeeded(env: Env) {
     });
   }
   await OrderModel.insertMany(orders);
-  console.log(`[seed] ${orders.length} orders`);
 
   const comments = [
     'Exceptional quality — the fabric feels far above this price point.',
@@ -173,5 +177,6 @@ export async function seedIfNeeded(env: Env) {
     p.numReviews = reviewers.length;
     await p.save();
   }
-  console.log('[seed] reviews done');
+  logger.info({ products: products.length, orders: orders.length }, 'Seeded demo catalog, orders and reviews');
+  return { catalogSeeded: true };
 }

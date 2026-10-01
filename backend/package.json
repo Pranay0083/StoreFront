@@ -3,9 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false src/server.ts",
-    "start": "tsx src/server.ts",
-    "seed": "tsx src/seed.ts",
+    "dev": "npm run db:setup && tsx watch --clear-screen=false src/server.ts",
+    "start": "npm run db:setup && tsx src/server.ts",
+    "start:server": "tsx src/server.ts",
+    "db:migrate": "tsx src/db/cli.ts migrate",
+    "db:seed": "tsx src/db/cli.ts seed",
+    "db:setup": "tsx src/db/cli.ts setup",
+    "db:status": "tsx src/db/cli.ts status",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -16,6 +16,10 @@ const EnvSchema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().default(''),
   GROQ_API_KEY: z.string().default(''),
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
+  SEED_DEMO_DATA: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform(v => v === 'true'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -32,4 +36,3 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return result.data;
 }
 
-export const env = loadEnv();
