@@ -23,7 +23,7 @@ Admin      Aggregation pipelines: revenue by day, conversion funnel, top product
 ### Runtime topology
 
 The backend runs as Express from `backend/` on **:4001**. All routes are under
-`/api`. Frontend (Next dev) binds **:3000**.
+`/api/v1`. Frontend (Next dev) binds **:3000**.
 
 ## The order state machine
 
@@ -69,7 +69,7 @@ layer — the admin bulk action surfaces these rejections per order instead of s
 
 ## Aggregation pipelines, not `find()` in a loop
 
-Revenue chart (`GET /api/admin/revenue-by-day`):
+Revenue chart (`GET /api/v1/admin/revenue-by-day`):
 
 ```js
 Order.aggregate([
@@ -106,8 +106,8 @@ Verified live: replaying demo-confirm returned `pay1: paid alreadyProcessed:fals
 
 Set in `backend/.env` and restart: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`,
 `RAZORPAY_WEBHOOK_SECRET`. The checkout automatically switches from DEMO PAY to the real
-Razorpay modal (`/api/payments/config` reports the mode). Register the webhook at
-`<host>/api/payments/webhook`.
+Razorpay modal (`/api/v1/payments/config` reports the mode). Register the webhook at
+`<host>/api/v1/payments/webhook`.
 
 ## Deploy
 

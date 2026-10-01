@@ -7,7 +7,7 @@ import { loadEnv } from '../../src/core/config/env';
 import { connectDB, disconnectDB } from '../../src/core/config/db';
 import { buildContainer, type Container } from '../../src/core/container';
 
-export const API = '/api';
+export const API = '/api/v1';
 
 export interface TestApp {
   app: Express;

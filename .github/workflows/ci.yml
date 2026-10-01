@@ -37,12 +37,12 @@ jobs:
         run: |
           npm run start -w backend > /tmp/storefront-api.log 2>&1 &
           for i in $(seq 1 45); do
-            if curl -fsS http://127.0.0.1:4001/api/ > /dev/null; then
+            if curl -fsS http://127.0.0.1:4001/api/v1/ > /dev/null; then
               break
             fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:4001/api/products?limit=1 > /dev/null
+          curl -fsS http://127.0.0.1:4001/api/v1/products?limit=1 > /dev/null
 
   frontend:
     runs-on: ubuntu-latest

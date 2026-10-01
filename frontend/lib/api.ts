@@ -10,7 +10,7 @@ const isServer = typeof window === 'undefined';
 const BASE = (isServer ? process.env.INTERNAL_API_URL : process.env.NEXT_PUBLIC_API_URL) || process.env.NEXT_PUBLIC_API_URL || '';
 
 export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}/api${path}`, {
+  const res = await fetch(`${BASE}/api/v1${path}`, {
     credentials: 'include',
     ...options,
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },

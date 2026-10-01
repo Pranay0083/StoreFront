@@ -57,24 +57,24 @@ export default function DocsPage() {
       <div className="mt-14 space-y-14">
         <Section id="api" label="01 — REST" title="REST API">
           <p>
-            All routes live under <code className="bg-secondary px-1.5 py-0.5 text-xs">{origin}/api</code>. Authentication uses
+            All routes live under <code className="bg-secondary px-1.5 py-0.5 text-xs">{origin}/api/v1</code>. Authentication uses
             JWT — sent as an httpOnly cookie or an <code className="bg-secondary px-1.5 py-0.5 text-xs">Authorization: Bearer</code> header.
             Admin routes require an admin-role token.
           </p>
           <div className="space-y-2">
-            <Endpoint method="POST" path="/api/auth/register" desc="Create an account, returns JWT cookie" />
-            <Endpoint method="POST" path="/api/auth/login" desc="Sign in, returns JWT cookie + user" />
-            <Endpoint method="GET" path="/api/products" desc="List products — q, category, size, minPrice, maxPrice, sort, page" />
-            <Endpoint method="GET" path="/api/products/categories" desc="Categories with counts" />
-            <Endpoint method="GET" path="/api/products/:slug" desc="Single product with per-size stock" />
-            <Endpoint method="GET" path="/api/cart" desc="Server-side cart" auth="auth" />
-            <Endpoint method="POST" path="/api/orders" desc="Place an order (state machine: created → …)" auth="auth" />
-            <Endpoint method="GET" path="/api/orders" desc="Your orders with audit timeline" auth="auth" />
-            <Endpoint method="POST" path="/api/agent/chat" desc="Talk to Aria — sessionId + message" />
-            <Endpoint method="GET" path="/api/admin/conversations" desc="All agent conversations w/ transcripts" auth="admin" />
+            <Endpoint method="POST" path="/api/v1/auth/register" desc="Create an account, returns JWT cookie" />
+            <Endpoint method="POST" path="/api/v1/auth/login" desc="Sign in, returns JWT cookie + user" />
+            <Endpoint method="GET" path="/api/v1/products" desc="List products — q, category, size, minPrice, maxPrice, sort, page" />
+            <Endpoint method="GET" path="/api/v1/products/categories" desc="Categories with counts" />
+            <Endpoint method="GET" path="/api/v1/products/:slug" desc="Single product with per-size stock" />
+            <Endpoint method="GET" path="/api/v1/cart" desc="Server-side cart" auth="auth" />
+            <Endpoint method="POST" path="/api/v1/orders" desc="Place an order (state machine: created → …)" auth="auth" />
+            <Endpoint method="GET" path="/api/v1/orders" desc="Your orders with audit timeline" auth="auth" />
+            <Endpoint method="POST" path="/api/v1/agent/chat" desc="Talk to Aria — sessionId + message" />
+            <Endpoint method="GET" path="/api/v1/admin/conversations" desc="All agent conversations w/ transcripts" auth="admin" />
           </div>
           <p className="label-caps pt-2 text-muted-foreground">Example — search products</p>
-          <Code>{`curl "${origin}/api/products?q=jacket&maxPrice=5000&sort=rating"`}</Code>
+          <Code>{`curl "${origin}/api/v1/products?q=jacket&maxPrice=5000&sort=rating"`}</Code>
         </Section>
 
         <Section id="agent" label="02 — AI" title="AI Agent (Aria)">
@@ -85,7 +85,7 @@ export default function DocsPage() {
             persisted and reviewable by admins under <strong>Admin → Agent chats</strong>.
           </p>
           <p>You can also call the agent directly:</p>
-          <Code>{`curl -X POST "${origin}/api/agent/chat" \\
+          <Code>{`curl -X POST "${origin}/api/v1/agent/chat" \\
   -H "Content-Type: application/json" \\
   -d '{
     "sessionId": "sess-my-unique-id",
@@ -103,7 +103,7 @@ export default function DocsPage() {
             Cursor, or any MCP client can query the catalog and order status as native tools.
           </p>
           <p className="label-caps pt-1 text-muted-foreground">Endpoint</p>
-          <Code>{`${origin}/mcp        (alias of ${origin}/api/mcp)`}</Code>
+          <Code>{`${origin}/mcp        (alias of ${origin}/api/v1/mcp)`}</Code>
           <p className="label-caps pt-1 text-muted-foreground">Tools exposed</p>
           <div className="space-y-2">
             <Endpoint method="tool" path="search_products" desc="Search catalog by query, category, price range" />

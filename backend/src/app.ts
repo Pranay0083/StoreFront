@@ -8,6 +8,8 @@ import type { Container } from './core/container';
 import { errorHandler, notFoundHandler } from './core/http/error-handler';
 import { logger } from './core/logger';
 
+export const API_PREFIX = '/api/v1';
+
 export function buildApp(container: Container) {
   const { env, limiters } = container;
   const app = express();
@@ -31,7 +33,7 @@ export function buildApp(container: Container) {
   api.get('/', (_req, res) => res.json({ status: 'ok', service: 'storefront-api' }));
   for (const [path, router] of container.routes) api.use(path, router);
 
-  app.use('/api', api);
+  app.use(API_PREFIX, api);
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
