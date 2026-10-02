@@ -1,5 +1,5 @@
 import { REVENUE_STATUSES, type OrderStatus } from '@storefront/contracts';
-import { Types, type FilterQuery } from 'mongoose';
+import type { FilterQuery, Types } from 'mongoose';
 import { OrderModel, type OrderDocument, type OrderRecord } from './order.model';
 
 export type NewOrder = Omit<OrderRecord, '_id' | 'userId' | 'createdAt' | 'updatedAt' | 'payment' | 'paidAt'> & { userId: string };

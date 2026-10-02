@@ -1,7 +1,6 @@
 'use client';
 
 import { Search, X } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ProductCard } from '@/components/product-card';
