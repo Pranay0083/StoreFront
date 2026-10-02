@@ -5,10 +5,10 @@ import { API, bearer, useTestApp } from './helpers/app';
 const t = useTestApp();
 
 async function seedCatalog() {
-  await createProduct({ title: 'Oxford Shirt', category: 'Men', price: 2499, featured: true, rating: 4.5 });
-  await createProduct({ title: 'Linen Blazer', category: 'Men', price: 7999, rating: 4.1, sizes: [{ size: 'M', stock: 0 }, { size: 'L', stock: 3 }] });
-  await createProduct({ title: 'Silk Dress', category: 'Women', price: 6499, featured: true, rating: 4.9 });
-  await createProduct({ title: 'Canvas Sneakers', category: 'Footwear', price: 2999, rating: 3.8, sizes: [{ size: 'UK 8', stock: 4 }] });
+  await createProduct({ title: 'Oxford Shirt', category: 'Men', price: 249_900, featured: true, rating: 4.5 });
+  await createProduct({ title: 'Linen Blazer', category: 'Men', price: 799_900, rating: 4.1, sizes: [{ size: 'M', stock: 0 }, { size: 'L', stock: 3 }] });
+  await createProduct({ title: 'Silk Dress', category: 'Women', price: 649_900, featured: true, rating: 4.9 });
+  await createProduct({ title: 'Canvas Sneakers', category: 'Footwear', price: 299_900, rating: 3.8, sizes: [{ size: 'UK 8', stock: 4 }] });
 }
 
 describe('catalog', () => {
@@ -27,7 +27,7 @@ describe('catalog', () => {
     const featured = await t.http().get(`${API}/products?featured=true`).expect(200);
     expect(featured.body.total).toBe(2);
 
-    const range = await t.http().get(`${API}/products?minPrice=2500&maxPrice=7000`).expect(200);
+    const range = await t.http().get(`${API}/products?minPrice=250000&maxPrice=700000`).expect(200);
     expect(range.body.items.map((p: { title: string }) => p.title).sort()).toEqual(['Canvas Sneakers', 'Silk Dress']);
   });
 
@@ -40,7 +40,7 @@ describe('catalog', () => {
   it('sorts by price and searches text', async () => {
     await seedCatalog();
     const asc = await t.http().get(`${API}/products?sort=price-asc`).expect(200);
-    expect(asc.body.items.map((p: { price: number }) => p.price)).toEqual([2499, 2999, 6499, 7999]);
+    expect(asc.body.items.map((p: { price: number }) => p.price)).toEqual([249_900, 299_900, 649_900, 799_900]);
 
     const search = await t.http().get(`${API}/products?q=blazer`).expect(200);
     expect(search.body.items).toHaveLength(1);
@@ -63,7 +63,7 @@ describe('catalog', () => {
   it('restricts product management to admins', async () => {
     const customer = await createUser();
     const admin = await createUser({ role: 'admin' });
-    const body = { title: 'New Tee', category: 'Men', price: 999, images: ['https://example.com/a.jpg'], sizes: [{ size: 'M', stock: 5 }] };
+    const body = { title: 'New Tee', category: 'Men', price: 99_900, images: ['https://example.com/a.jpg'], sizes: [{ size: 'M', stock: 5 }] };
 
     await t.http().post(`${API}/products`).send(body).expect(401);
     await t.http().post(`${API}/products`).set(bearer(customer.token)).send(body).expect(403);

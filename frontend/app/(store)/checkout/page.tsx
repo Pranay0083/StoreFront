@@ -9,6 +9,7 @@ import { useAuth, useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { shippingFor } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
 import type { Order } from '@/lib/types';
 
@@ -27,7 +28,7 @@ export default function CheckoutPage() {
   const [couponInput, setCouponInput] = useState('');
   const [applying, setApplying] = useState(false);
 
-  const shipping = subtotal >= 2999 || subtotal === 0 ? 0 : 99;
+  const shipping = shippingFor(subtotal);
   const discount = coupon?.discount ?? 0;
   const total = subtotal - discount + shipping;
 

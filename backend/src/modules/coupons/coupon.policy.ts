@@ -1,4 +1,4 @@
-import { percentOf, type Paise } from '@storefront/contracts';
+import { formatINR, percentOf, type Paise } from '@storefront/contracts';
 import { BadRequestError } from '../../core/errors';
 import type { CouponRecord } from './coupon.model';
 
@@ -14,7 +14,7 @@ export function assertCouponRedeemable(coupon: CouponTerms, subtotal: Paise, now
   if (coupon.expiresAt && coupon.expiresAt < now) throw new BadRequestError('This coupon has expired');
   if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) throw new BadRequestError('This coupon has been fully redeemed');
   if (subtotal < (coupon.minSubtotal ?? 0)) {
-    throw new BadRequestError(`Minimum order of ₹${coupon.minSubtotal} required for ${coupon.code}`);
+    throw new BadRequestError(`Minimum order of ${formatINR(coupon.minSubtotal)} required for ${coupon.code}`);
   }
 }
 

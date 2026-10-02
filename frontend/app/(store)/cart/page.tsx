@@ -5,11 +5,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
+import { shippingFor } from '@storefront/contracts';
 import { fmtINR } from '@/lib/api';
 
 export default function CartPage() {
   const { items, subtotal, updateQty, removeItem } = useCart();
-  const shipping = subtotal >= 2999 || subtotal === 0 ? 0 : 99;
+  const shipping = shippingFor(subtotal);
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8" data-testid="cart-page">

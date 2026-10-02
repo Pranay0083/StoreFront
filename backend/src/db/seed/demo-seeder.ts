@@ -1,3 +1,4 @@
+import { rupeesToPaise as inr, shippingFor } from '@storefront/contracts';
 import bcrypt from 'bcryptjs';
 import { logger } from '../../core/logger';
 import type { Env } from '../../core/config/env';
@@ -15,30 +16,30 @@ const ONE = ['One Size'];
 const sizes = (list: string[], stocks: number[]) => list.map((size, i) => ({ size, stock: stocks[i % stocks.length] }));
 
 const PRODUCTS = [
-  { title: 'Oxford Cotton Shirt', category: 'Men', price: 2499, compareAtPrice: 3299, featured: true, images: [img('photo-1603189343302-e603f7add05a'), img('photo-1611312449408-fcece27cdbb7')], sizes: sizes(APPAREL, [14, 22, 18, 9]), description: 'A crisp Oxford weave in pure long-staple cotton. Mother-of-pearl buttons, single-needle stitching, and a collar that holds its line from morning to midnight.' },
-  { title: 'Merino Crewneck Sweater', category: 'Men', price: 3999, featured: true, images: [img('photo-1591047139829-d91aecb6caea')], sizes: sizes(APPAREL, [10, 16, 12, 4]), description: 'Extra-fine 19.5 micron merino, fully fashioned and garment-washed for a soft, structured drape.' },
-  { title: 'Selvedge Denim Jeans', category: 'Men', price: 4599, compareAtPrice: 5499, images: [img('photo-1542272604-787c3835535d'), img('photo-1541099649105-f69ad21f3246')], sizes: sizes(APPAREL, [12, 20, 15, 8]), description: '14oz Japanese selvedge, sanforized. Ages beautifully — high contrast fades in six months of honest wear.' },
-  { title: 'Unstructured Linen Blazer', category: 'Men', price: 7999, featured: true, images: [img('photo-1594938298603-c8148c4dae35')], sizes: sizes(APPAREL, [6, 9, 7, 3]), description: 'Half-canvassed, unlined linen blazer in a stone hue. Tailored in a relaxed silhouette for warm evenings.' },
-  { title: 'Twill Overshirt', category: 'Men', price: 3299, images: [img('photo-1620012253295-c15cc3e65df4')], sizes: sizes(APPAREL, [11, 14, 10, 6]), description: 'A heavyweight cotton twill overshirt that works as a light jacket three seasons a year.' },
-  { title: 'Breton Linen Shirt', category: 'Men', price: 2799, images: [img('photo-1596755094514-f87e34085b2c')], sizes: sizes(APPAREL, [13, 17, 11, 7]), description: 'Airy European flax, garment-dyed. Wrinkles are part of the charm.' },
-  { title: 'Silk Slip Dress', category: 'Women', price: 6499, compareAtPrice: 7999, featured: true, images: [img('photo-1664076458686-3449062080ac'), img('photo-1515372039744-b8f02a3ae446')], sizes: sizes(APPAREL, [8, 12, 9, 4]), description: 'Bias-cut 22-momme mulberry silk with an adjustable strap. Falls like water, moves like light.' },
-  { title: 'Wide-Leg Trousers', category: 'Women', price: 3899, featured: true, images: [img('photo-1594633312681-425c7b97ccd1')], sizes: sizes(APPAREL, [10, 15, 12, 6]), description: 'High-rise, floor-skimming trousers in a fluid crepe. Pressed front crease, invisible side zip.' },
-  { title: 'Cashmere Cardigan', category: 'Women', price: 8999, images: [img('photo-1434389677669-e08b4cac3105')], sizes: sizes(APPAREL, [5, 8, 6, 2]), description: 'Grade-A Mongolian cashmere, 12-gauge knit. A lifetime piece with corozo buttons.' },
-  { title: 'Pleated Midi Skirt', category: 'Women', price: 3499, images: [img('photo-1582142306909-195724d33ffc')], sizes: sizes(APPAREL, [9, 13, 10, 5]), description: 'Knife pleats in a satin-back crepe that catch the light with every step.' },
-  { title: 'Double-Faced Wool Coat', category: 'Women', price: 12999, compareAtPrice: 15999, featured: true, images: [img('photo-1539533018447-63fcce2678e3')], sizes: sizes(APPAREL, [4, 6, 5, 2]), description: 'Hand-finished double-faced wool with a belted waist. The winter silhouette, perfected.' },
-  { title: 'Ribbed Knit Top', category: 'Women', price: 1999, images: [img('photo-1496747611176-843222e1e57c')], sizes: sizes(APPAREL, [16, 20, 14, 8]), description: 'A second-skin ribbed knit in stretch modal. The foundation of every capsule wardrobe.' },
-  { title: 'Court Leather Sneakers', category: 'Footwear', price: 5499, featured: true, images: [img('photo-1595950653106-6c9ebd614d3a'), img('photo-1560769629-975ec94e6a86')], sizes: sizes(SHOES, [9, 14, 11, 6]), description: 'Full-grain Italian leather on a cupsole. Minimal branding, maximal wear.' },
-  { title: 'Suede Chelsea Boots', category: 'Footwear', price: 7499, images: [img('photo-1638247025967-b4e38f787b76')], sizes: sizes(SHOES, [7, 10, 8, 3]), description: 'Water-repellent suede, elastic gores, Goodyear-welted crepe sole.' },
-  { title: 'Canvas High-Tops', category: 'Footwear', price: 2999, images: [img('photo-1600269452121-4f2416e55c28')], sizes: sizes(SHOES, [12, 16, 13, 9]), description: 'Vulcanized rubber, organic canvas, broken-in comfort from the first lace-up.' },
-  { title: 'Suede Loafers', category: 'Footwear', price: 6299, compareAtPrice: 6999, images: [img('photo-1614252369475-531eba835eb1')], sizes: sizes(SHOES, [8, 11, 9, 4]), description: 'Unlined suede penny loafers with a hand-stitched apron. Wear sockless, live better.' },
-  { title: 'Structured Leather Tote', category: 'Accessories', price: 8499, featured: true, images: [img('photo-1591561954557-26941169b49e'), img('photo-1584917865442-de89df76afd3')], sizes: sizes(ONE, [7]), description: 'Vegetable-tanned leather that patinas with you. Fits a 14" laptop and a week of ambition.' },
-  { title: 'Hand-Rolled Silk Scarf', category: 'Accessories', price: 2299, images: [img('photo-1601924994987-69e26d50dc26')], sizes: sizes(ONE, [15]), description: 'A 90cm twill square, hand-rolled edges, archival print. Twelve ways to wear it.' },
-  { title: 'Aviator Sunglasses', category: 'Accessories', price: 3499, images: [img('photo-1572635196237-14b3f281503f'), img('photo-1511499767150-a48a237f0083')], sizes: sizes(ONE, [11]), description: 'Titanium frame, CR-39 polarized lenses, 100% UV protection.' },
-  { title: 'Minimal Automatic Watch', category: 'Accessories', price: 11999, compareAtPrice: 13999, images: [img('photo-1524592094714-0f0654e20314')], sizes: sizes(ONE, [4]), description: 'A 38mm automatic with a sapphire crystal and Horween leather strap. Quietly excellent.' },
-  { title: 'Full-Grain Leather Belt', category: 'Accessories', price: 1799, images: [img('photo-1624222247344-550fb60583dc')], sizes: sizes(APPAREL, [10, 13, 11, 7]), description: 'A single strip of bridle leather with a solid brass buckle. Darkens gracefully.' },
-  { title: 'Ribbed Wool Beanie', category: 'Accessories', price: 1299, images: [img('photo-1576871337622-98d48d1cf531')], sizes: sizes(ONE, [18]), description: 'Lambswool, knitted in a fisherman rib. The last beanie you will buy.' },
-  { title: 'Leather Card Holder', category: 'Accessories', price: 1499, images: [img('photo-1627123424574-724758594e93')], sizes: sizes(ONE, [2]), description: 'Six cards, folded notes, nothing else. Saddle-stitched by hand.' },
-  { title: 'Waxed Canvas Backpack', category: 'Accessories', price: 5999, images: [img('photo-1553062407-98eeb64c6a62')], sizes: sizes(ONE, [8]), description: 'Weatherproof waxed canvas, leather trim, 20L. Built for the daily carry decade.' },
+  { title: 'Oxford Cotton Shirt', category: 'Men', price: inr(2499), compareAtPrice: inr(3299), featured: true, images: [img('photo-1603189343302-e603f7add05a'), img('photo-1611312449408-fcece27cdbb7')], sizes: sizes(APPAREL, [14, 22, 18, 9]), description: 'A crisp Oxford weave in pure long-staple cotton. Mother-of-pearl buttons, single-needle stitching, and a collar that holds its line from morning to midnight.' },
+  { title: 'Merino Crewneck Sweater', category: 'Men', price: inr(3999), featured: true, images: [img('photo-1591047139829-d91aecb6caea')], sizes: sizes(APPAREL, [10, 16, 12, 4]), description: 'Extra-fine 19.5 micron merino, fully fashioned and garment-washed for a soft, structured drape.' },
+  { title: 'Selvedge Denim Jeans', category: 'Men', price: inr(4599), compareAtPrice: inr(5499), images: [img('photo-1542272604-787c3835535d'), img('photo-1541099649105-f69ad21f3246')], sizes: sizes(APPAREL, [12, 20, 15, 8]), description: '14oz Japanese selvedge, sanforized. Ages beautifully — high contrast fades in six months of honest wear.' },
+  { title: 'Unstructured Linen Blazer', category: 'Men', price: inr(7999), featured: true, images: [img('photo-1594938298603-c8148c4dae35')], sizes: sizes(APPAREL, [6, 9, 7, 3]), description: 'Half-canvassed, unlined linen blazer in a stone hue. Tailored in a relaxed silhouette for warm evenings.' },
+  { title: 'Twill Overshirt', category: 'Men', price: inr(3299), images: [img('photo-1620012253295-c15cc3e65df4')], sizes: sizes(APPAREL, [11, 14, 10, 6]), description: 'A heavyweight cotton twill overshirt that works as a light jacket three seasons a year.' },
+  { title: 'Breton Linen Shirt', category: 'Men', price: inr(2799), images: [img('photo-1596755094514-f87e34085b2c')], sizes: sizes(APPAREL, [13, 17, 11, 7]), description: 'Airy European flax, garment-dyed. Wrinkles are part of the charm.' },
+  { title: 'Silk Slip Dress', category: 'Women', price: inr(6499), compareAtPrice: inr(7999), featured: true, images: [img('photo-1664076458686-3449062080ac'), img('photo-1515372039744-b8f02a3ae446')], sizes: sizes(APPAREL, [8, 12, 9, 4]), description: 'Bias-cut 22-momme mulberry silk with an adjustable strap. Falls like water, moves like light.' },
+  { title: 'Wide-Leg Trousers', category: 'Women', price: inr(3899), featured: true, images: [img('photo-1594633312681-425c7b97ccd1')], sizes: sizes(APPAREL, [10, 15, 12, 6]), description: 'High-rise, floor-skimming trousers in a fluid crepe. Pressed front crease, invisible side zip.' },
+  { title: 'Cashmere Cardigan', category: 'Women', price: inr(8999), images: [img('photo-1434389677669-e08b4cac3105')], sizes: sizes(APPAREL, [5, 8, 6, 2]), description: 'Grade-A Mongolian cashmere, 12-gauge knit. A lifetime piece with corozo buttons.' },
+  { title: 'Pleated Midi Skirt', category: 'Women', price: inr(3499), images: [img('photo-1582142306909-195724d33ffc')], sizes: sizes(APPAREL, [9, 13, 10, 5]), description: 'Knife pleats in a satin-back crepe that catch the light with every step.' },
+  { title: 'Double-Faced Wool Coat', category: 'Women', price: inr(12999), compareAtPrice: inr(15999), featured: true, images: [img('photo-1539533018447-63fcce2678e3')], sizes: sizes(APPAREL, [4, 6, 5, 2]), description: 'Hand-finished double-faced wool with a belted waist. The winter silhouette, perfected.' },
+  { title: 'Ribbed Knit Top', category: 'Women', price: inr(1999), images: [img('photo-1496747611176-843222e1e57c')], sizes: sizes(APPAREL, [16, 20, 14, 8]), description: 'A second-skin ribbed knit in stretch modal. The foundation of every capsule wardrobe.' },
+  { title: 'Court Leather Sneakers', category: 'Footwear', price: inr(5499), featured: true, images: [img('photo-1595950653106-6c9ebd614d3a'), img('photo-1560769629-975ec94e6a86')], sizes: sizes(SHOES, [9, 14, 11, 6]), description: 'Full-grain Italian leather on a cupsole. Minimal branding, maximal wear.' },
+  { title: 'Suede Chelsea Boots', category: 'Footwear', price: inr(7499), images: [img('photo-1638247025967-b4e38f787b76')], sizes: sizes(SHOES, [7, 10, 8, 3]), description: 'Water-repellent suede, elastic gores, Goodyear-welted crepe sole.' },
+  { title: 'Canvas High-Tops', category: 'Footwear', price: inr(2999), images: [img('photo-1600269452121-4f2416e55c28')], sizes: sizes(SHOES, [12, 16, 13, 9]), description: 'Vulcanized rubber, organic canvas, broken-in comfort from the first lace-up.' },
+  { title: 'Suede Loafers', category: 'Footwear', price: inr(6299), compareAtPrice: inr(6999), images: [img('photo-1614252369475-531eba835eb1')], sizes: sizes(SHOES, [8, 11, 9, 4]), description: 'Unlined suede penny loafers with a hand-stitched apron. Wear sockless, live better.' },
+  { title: 'Structured Leather Tote', category: 'Accessories', price: inr(8499), featured: true, images: [img('photo-1591561954557-26941169b49e'), img('photo-1584917865442-de89df76afd3')], sizes: sizes(ONE, [7]), description: 'Vegetable-tanned leather that patinas with you. Fits a 14" laptop and a week of ambition.' },
+  { title: 'Hand-Rolled Silk Scarf', category: 'Accessories', price: inr(2299), images: [img('photo-1601924994987-69e26d50dc26')], sizes: sizes(ONE, [15]), description: 'A 90cm twill square, hand-rolled edges, archival print. Twelve ways to wear it.' },
+  { title: 'Aviator Sunglasses', category: 'Accessories', price: inr(3499), images: [img('photo-1572635196237-14b3f281503f'), img('photo-1511499767150-a48a237f0083')], sizes: sizes(ONE, [11]), description: 'Titanium frame, CR-39 polarized lenses, 100% UV protection.' },
+  { title: 'Minimal Automatic Watch', category: 'Accessories', price: inr(11999), compareAtPrice: inr(13999), images: [img('photo-1524592094714-0f0654e20314')], sizes: sizes(ONE, [4]), description: 'A 38mm automatic with a sapphire crystal and Horween leather strap. Quietly excellent.' },
+  { title: 'Full-Grain Leather Belt', category: 'Accessories', price: inr(1799), images: [img('photo-1624222247344-550fb60583dc')], sizes: sizes(APPAREL, [10, 13, 11, 7]), description: 'A single strip of bridle leather with a solid brass buckle. Darkens gracefully.' },
+  { title: 'Ribbed Wool Beanie', category: 'Accessories', price: inr(1299), images: [img('photo-1576871337622-98d48d1cf531')], sizes: sizes(ONE, [18]), description: 'Lambswool, knitted in a fisherman rib. The last beanie you will buy.' },
+  { title: 'Leather Card Holder', category: 'Accessories', price: inr(1499), images: [img('photo-1627123424574-724758594e93')], sizes: sizes(ONE, [2]), description: 'Six cards, folded notes, nothing else. Saddle-stitched by hand.' },
+  { title: 'Waxed Canvas Backpack', category: 'Accessories', price: inr(5999), images: [img('photo-1553062407-98eeb64c6a62')], sizes: sizes(ONE, [8]), description: 'Weatherproof waxed canvas, leather trim, 20L. Built for the daily carry decade.' },
 ];
 
 const slugify = (s: string) =>
@@ -94,8 +95,8 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
   const customer = await seedCustomer('customer@storefront.dev', 'Demo Customer', 'Customer@123');
   if ((await CouponModel.countDocuments()) === 0) {
     await CouponModel.insertMany([
-      { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 1000, maxDiscount: 500, active: true },
-      { code: 'FLAT500', type: 'flat', value: 500, minSubtotal: 2999, active: true },
+      { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: inr(1000), maxDiscount: inr(500), active: true },
+      { code: 'FLAT500', type: 'flat', value: inr(500), minSubtotal: inr(2999), active: true },
     ]);
     logger.info('Seeded default coupons');
   }
@@ -120,7 +121,7 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
       return { productId: p._id, title: p.title, image: p.images[0], price: p.price, size: pick(p.sizes).size, qty: 1 + rand(2), slug: p.slug };
     });
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
-    const shipping = subtotal >= 2999 ? 0 : 99;
+    const shipping = shippingFor(subtotal);
     const path = pickOrderPath(daysAgo);
 
     const statusHistory = [];

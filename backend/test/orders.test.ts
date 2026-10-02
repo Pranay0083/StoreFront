@@ -13,23 +13,23 @@ function placeOrder(token: string, body: Record<string, unknown>) {
 describe('orders', () => {
   it('creates an order from current product prices and clears the cart', async () => {
     const buyer = await createUser();
-    const product = await createProduct({ price: 1000 });
-    await Cart.create({ userId: buyer.user._id, items: [{ productId: product._id, title: product.title, price: 1000, size: 'M', qty: 2, slug: product.slug }] });
+    const product = await createProduct({ price: 100_000 });
+    await Cart.create({ userId: buyer.user._id, items: [{ productId: product._id, title: product.title, price: 100_000, size: 'M', qty: 2, slug: product.slug }] });
 
     const res = await placeOrder(buyer.token, { items: [{ productId: String(product._id), size: 'M', qty: 2 }] }).expect(201);
-    expect(res.body).toMatchObject({ subtotal: 2000, shipping: 99, discount: 0, total: 2099, status: 'created' });
+    expect(res.body).toMatchObject({ subtotal: 200_000, shipping: 9_900, discount: 0, total: 209_900, status: 'created' });
     expect(res.body.orderNumber).toMatch(/^SF-/);
-    expect(res.body.items[0]).toMatchObject({ title: product.title, price: 1000, qty: 2, size: 'M' });
+    expect(res.body.items[0]).toMatchObject({ title: product.title, price: 100_000, qty: 2, size: 'M' });
     expect(res.body.statusHistory).toEqual([expect.objectContaining({ from: null, to: 'created', note: 'Order placed' })]);
     expect((await Cart.findOne({ userId: buyer.user._id }))!.items).toHaveLength(0);
   });
 
   it('applies coupons and free shipping above the threshold', async () => {
     const buyer = await createUser();
-    const product = await createProduct({ price: 4000 });
+    const product = await createProduct({ price: 400_000 });
     await createCoupon();
     const res = await placeOrder(buyer.token, { items: [{ productId: String(product._id), size: 'M', qty: 1 }], couponCode: 'welcome10' }).expect(201);
-    expect(res.body).toMatchObject({ subtotal: 4000, discount: 400, shipping: 0, total: 3600, couponCode: 'WELCOME10' });
+    expect(res.body).toMatchObject({ subtotal: 400_000, discount: 40_000, shipping: 0, total: 360_000, couponCode: 'WELCOME10' });
   });
 
   it('rejects unavailable sizes and insufficient stock', async () => {

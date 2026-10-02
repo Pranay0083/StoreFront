@@ -29,6 +29,9 @@ const CartContext = createContext<CartCtx>(null!);
 export const useAuth = () => useContext(AuthContext);
 export const useCart = () => useContext(CartContext);
 
+/** Bumped when the stored cart shape changes (v2: prices in paise). */
+const CART_STORAGE_KEY = 'sf_cart_v2';
+
 const keyOf = (i: { productId: string; size: string }) => `${i.productId}::${i.size}`;
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -40,7 +43,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('sf_cart');
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
       if (saved) setItems(JSON.parse(saved));
     } catch {}
     hydrated.current = true;
@@ -51,7 +54,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated.current) return;
-    localStorage.setItem('sf_cart', JSON.stringify(items));
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
     if (user && typeof user === 'object') {
       clearTimeout(syncTimer.current);
       syncTimer.current = setTimeout(() => {

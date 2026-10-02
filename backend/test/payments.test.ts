@@ -10,7 +10,7 @@ const t = useTestApp();
 
 async function setupOrder(withCoupon = false) {
   const buyer = await createUser();
-  const product = await createProduct({ price: 2000 });
+  const product = await createProduct({ price: 200_000 });
   if (withCoupon) await createCoupon();
   const order = (
     await t
@@ -36,7 +36,7 @@ describe('payments (demo mode)', () => {
     const { buyer, product, order } = await setupOrder(true);
 
     const setup = await t.http().post(`${API}/payments/create`).set(bearer(buyer.token)).send({ orderId: order._id }).expect(200);
-    expect(setup.body).toMatchObject({ mode: 'demo', orderId: order._id, amount: order.total * 100 });
+    expect(setup.body).toMatchObject({ mode: 'demo', orderId: order._id, amount: order.total });
 
     const first = await t.http().post(`${API}/payments/demo-confirm`).set(bearer(buyer.token)).send({ orderId: order._id }).expect(200);
     expect(first.body).toMatchObject({ ok: true, alreadyProcessed: false });

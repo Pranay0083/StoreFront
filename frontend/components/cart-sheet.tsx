@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
 import { fmtINR } from '@/lib/api';
 
 export function CartSheet() {
@@ -18,7 +19,7 @@ export function CartSheet() {
         <div className="border-b border-black/5 px-7 py-6">
           <SheetTitle className="font-serif text-2xl font-semibold">Your bag</SheetTitle>
           <SheetDescription className="text-xs text-muted-foreground">
-            Free shipping on orders over ₹2,999
+            Free shipping on orders over {fmtINR(FREE_SHIPPING_THRESHOLD)}
           </SheetDescription>
         </div>
 

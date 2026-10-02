@@ -16,8 +16,8 @@ export function buildMcpServer(tools: AgentTools): McpServer {
       inputSchema: {
         query: z.string().optional().describe('Free-text search over titles and descriptions'),
         category: z.string().optional().describe('Exact category, e.g. Men, Women, Footwear, Accessories'),
-        minPrice: z.number().optional(),
-        maxPrice: z.number().optional(),
+        minPrice: z.number().optional().describe('Minimum price in rupees'),
+        maxPrice: z.number().optional().describe('Maximum price in rupees'),
         featured: z.boolean().optional(),
         sort: z.enum(['price-asc', 'price-desc', 'newest', 'rating']).optional(),
         limit: z.number().max(8).optional(),

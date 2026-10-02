@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { paiseToRupees } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
 
 interface Stats { revenue: number; paidOrders: number; avgOrderValue: number; totalOrders: number; customers: number; pendingOrders: number }
@@ -75,7 +76,7 @@ export default function AdminDashboard() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d: string) => d.slice(5)} stroke="rgba(0,0,0,0.35)" />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} stroke="rgba(0,0,0,0.35)" width={40} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${Math.round(paiseToRupees(v) / 1000)}k`} stroke="rgba(0,0,0,0.35)" width={40} />
                   <Tooltip
                     formatter={(v: any) => [fmtINR(Number(v)), 'Revenue']}
                     contentStyle={{ borderRadius: 0, border: '1px solid rgba(0,0,0,0.15)', fontSize: 12 }}

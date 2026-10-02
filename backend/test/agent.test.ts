@@ -62,3 +62,12 @@ describe('mcp endpoint', () => {
     await t.http().get(`${API}/mcp`).expect(405);
   });
 });
+
+describe('agent money formatting', () => {
+  it('reports prices in rupees and filters by rupee price ranges', async () => {
+    await createProduct({ title: 'Linen Shirt', price: 249_900, compareAtPrice: 329_900 });
+    await createProduct({ title: 'Wool Coat', price: 1_299_900 });
+    const result = await t.container.services.agentTools.execute('search_products', { maxPrice: 5000 }, {});
+    expect(result).toMatchObject({ count: 1, products: [{ title: 'Linen Shirt', price: '₹2,499', compareAtPrice: '₹3,299' }] });
+  });
+});

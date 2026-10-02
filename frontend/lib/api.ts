@@ -20,7 +20,8 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
   return data as T;
 }
 
-export const fmtINR = (n: number) => `₹${(n ?? 0).toLocaleString('en-IN')}`;
+/** Formats an integer paise amount as rupees, e.g. 249900 → ₹2,499. */
+export { formatINR as fmtINR } from '@storefront/contracts';
 
 export const fmtDate = (d: string | Date) =>
   new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });

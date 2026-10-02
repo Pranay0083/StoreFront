@@ -15,10 +15,10 @@ import { cn } from '@/lib/utils';
 
 const SIZES = ['S', 'M', 'L', 'XL', 'UK 8', 'UK 9', 'One Size'];
 const PRICE_RANGES = [
-  { label: 'Under ₹2,000', min: '', max: '2000' },
-  { label: '₹2,000 – ₹5,000', min: '2000', max: '5000' },
-  { label: '₹5,000 – ₹10,000', min: '5000', max: '10000' },
-  { label: '₹10,000 +', min: '10000', max: '' },
+  { label: 'Under ₹2,000', min: '', max: '200000' },
+  { label: '₹2,000 – ₹5,000', min: '200000', max: '500000' },
+  { label: '₹5,000 – ₹10,000', min: '500000', max: '1000000' },
+  { label: '₹10,000 +', min: '1000000', max: '' },
 ];
 
 function ProductsContent() {

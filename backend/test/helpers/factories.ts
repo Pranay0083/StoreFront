@@ -23,7 +23,7 @@ export async function createProduct(overrides: Record<string, unknown> = {}) {
     title,
     slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
     category: 'Men',
-    price: 1000,
+    price: 100_000,
     images: ['https://images.unsplash.com/photo-1'],
     sizes: [
       { size: 'M', stock: 10 },
@@ -34,7 +34,7 @@ export async function createProduct(overrides: Record<string, unknown> = {}) {
 }
 
 export async function createCoupon(overrides: Record<string, unknown> = {}) {
-  return Coupon.create({ code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 1000, maxDiscount: 500, active: true, ...overrides });
+  return Coupon.create({ code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 100_000, maxDiscount: 50_000, active: true, ...overrides });
 }
 
 export const ADDRESS = {

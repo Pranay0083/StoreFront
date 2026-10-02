@@ -1,4 +1,4 @@
-import type { CreateOrderInput, OrderStatus } from '@storefront/contracts';
+import { shippingFor, type CreateOrderInput, type OrderStatus } from '@storefront/contracts';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../core/errors';
 import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
@@ -9,9 +9,6 @@ import { generateOrderNumber } from './order-number';
 import { OrderStateMachine } from './order-state-machine';
 import type { OrderDocument, OrderRecord } from './order.model';
 import type { OrderRepository } from './order.repository';
-
-const FREE_SHIPPING_ABOVE = 2999;
-const SHIPPING_FEE = 99;
 
 export interface PaymentInfo {
   razorpayPaymentId?: string;
@@ -55,7 +52,7 @@ export class OrdersService {
       discount = quote.discount;
       couponCode = quote.coupon.code;
     }
-    const shipping = subtotal >= FREE_SHIPPING_ABOVE ? 0 : SHIPPING_FEE;
+    const shipping = shippingFor(subtotal);
 
     const order = await this.orders.create({
       orderNumber: generateOrderNumber(),

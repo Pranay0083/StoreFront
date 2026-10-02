@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
 import { api, fmtDate, fmtINR } from '@/lib/api';
 import type { Product, Review } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -179,7 +180,7 @@ export default function ProductDetailPage() {
           </div>
 
           <p className="mt-6 text-xs text-muted-foreground">
-            Free shipping over ₹2,999 · Cancel any time before shipping · Audited order tracking
+            Free shipping over {fmtINR(FREE_SHIPPING_THRESHOLD)} · Cancel any time before shipping · Audited order tracking
           </p>
         </div>
       </div>

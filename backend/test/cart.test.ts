@@ -4,7 +4,7 @@ import { API, bearer, useTestApp } from './helpers/app';
 
 const t = useTestApp();
 
-const item = { productId: '64b7f0c2a1b2c3d4e5f60718', title: 'Oxford Shirt', image: 'https://x/y.jpg', price: 2499, size: 'M', qty: 2, slug: 'oxford-shirt' };
+const item = { productId: '64b7f0c2a1b2c3d4e5f60718', title: 'Oxford Shirt', image: 'https://x/y.jpg', price: 249_900, size: 'M', qty: 2, slug: 'oxford-shirt' };
 
 describe('cart', () => {
   it('stores and returns the server-side cart per user', async () => {

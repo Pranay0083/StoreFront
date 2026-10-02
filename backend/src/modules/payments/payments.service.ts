@@ -49,10 +49,10 @@ export class PaymentsService {
     if (this.mode === 'demo') {
       order.set('payment.provider', 'demo');
       await order.save();
-      return { mode: 'demo' as const, orderId: String(order._id), amount: order.total * 100 };
+      return { mode: 'demo' as const, orderId: String(order._id), amount: order.total };
     }
     const razorOrder = await this.razorpay().orders.create({
-      amount: order.total * 100,
+      amount: order.total,
       currency: 'INR',
       receipt: order.orderNumber.slice(0, 40),
       payment_capture: true,

@@ -1,3 +1,4 @@
+import { PaiseSchema } from '@storefront/contracts';
 import { z } from 'zod';
 
 export const ChatSchema = z
@@ -14,7 +15,7 @@ export const ChatSchema = z
       .object({
         path: z.string().max(200).optional(),
         cart: z
-          .array(z.object({ title: z.string(), size: z.string(), qty: z.number(), price: z.number() }))
+          .array(z.object({ title: z.string(), size: z.string(), qty: z.number(), price: PaiseSchema }))
           .max(30)
           .optional(),
       })

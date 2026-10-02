@@ -74,7 +74,7 @@ export default function DocsPage() {
             <Endpoint method="GET" path="/api/v1/admin/conversations" desc="All agent conversations w/ transcripts" auth="admin" />
           </div>
           <p className="label-caps pt-2 text-muted-foreground">Example — search products</p>
-          <Code>{`curl "${origin}/api/v1/products?q=jacket&maxPrice=5000&sort=rating"`}</Code>
+          <Code>{`curl "${origin}/api/v1/products?q=jacket&maxPrice=500000&sort=rating"`}</Code>
         </Section>
 
         <Section id="agent" label="02 — AI" title="AI Agent (Aria)">

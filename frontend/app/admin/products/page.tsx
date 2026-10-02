@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { paiseToRupees, rupeesToPaise } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
 import type { Product } from '@/lib/types';
 
@@ -44,8 +45,8 @@ export default function AdminProductsPage() {
   const openEdit = (p: Product) => {
     setEditing(p);
     setForm({
-      title: p.title, category: p.category, price: String(p.price),
-      compareAtPrice: p.compareAtPrice ? String(p.compareAtPrice) : '',
+      title: p.title, category: p.category, price: String(paiseToRupees(p.price)),
+      compareAtPrice: p.compareAtPrice ? String(paiseToRupees(p.compareAtPrice)) : '',
       description: p.description, images: p.images.join('\n'),
       sizes: p.sizes.map(s => `${s.size}:${s.stock}`).join(', '),
       featured: p.featured,
@@ -63,10 +64,10 @@ export default function AdminProductsPage() {
       return toast.error('Title, price, at least one image URL and one size are required');
     }
     const payload: any = {
-      title: form.title, category: form.category, price: Number(form.price),
+      title: form.title, category: form.category, price: rupeesToPaise(Number(form.price)),
       description: form.description, images, sizes, featured: form.featured,
     };
-    if (form.compareAtPrice) payload.compareAtPrice = Number(form.compareAtPrice);
+    if (form.compareAtPrice) payload.compareAtPrice = rupeesToPaise(Number(form.compareAtPrice));
     setSaving(true);
     try {
       if (editing) {

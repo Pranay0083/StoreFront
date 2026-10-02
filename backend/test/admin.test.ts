@@ -21,14 +21,14 @@ describe('admin dashboard', () => {
   it('aggregates revenue, funnel, top products and low stock', async () => {
     const admin = await createUser({ role: 'admin' });
     const buyer = await createUser();
-    const shirt = await createProduct({ title: 'Shirt', price: 1500 });
-    const coat = await createProduct({ title: 'Coat', price: 5000, sizes: [{ size: 'M', stock: 3 }] });
+    const shirt = await createProduct({ title: 'Shirt', price: 150_000 });
+    const coat = await createProduct({ title: 'Coat', price: 500_000, sizes: [{ size: 'M', stock: 3 }] });
     await paidOrder(buyer.token, String(shirt._id), 2);
     await paidOrder(buyer.token, String(coat._id));
     await t.http().post(`${API}/orders`).set(bearer(buyer.token)).send({ address: ADDRESS, items: [{ productId: String(shirt._id), size: 'M', qty: 1 }] }).expect(201);
 
     const stats = await t.http().get(`${API}/admin/stats`).set(bearer(admin.token)).expect(200);
-    expect(stats.body).toMatchObject({ revenue: 3000 + 5000, paidOrders: 2, avgOrderValue: 4000, totalOrders: 3, customers: 1, pendingOrders: 2 });
+    expect(stats.body).toMatchObject({ revenue: 300_000 + 500_000, paidOrders: 2, avgOrderValue: 400_000, totalOrders: 3, customers: 1, pendingOrders: 2 });
 
     const funnel = await t.http().get(`${API}/admin/funnel`).set(bearer(admin.token)).expect(200);
     expect(funnel.body).toEqual([
@@ -40,7 +40,7 @@ describe('admin dashboard', () => {
 
     const revenue = await t.http().get(`${API}/admin/revenue-by-day?days=7`).set(bearer(admin.token)).expect(200);
     expect(revenue.body).toHaveLength(1);
-    expect(revenue.body[0]).toMatchObject({ revenue: 8000, orders: 2 });
+    expect(revenue.body[0]).toMatchObject({ revenue: 800_000, orders: 2 });
 
     const top = await t.http().get(`${API}/admin/top-products`).set(bearer(admin.token)).expect(200);
     expect(top.body.map((r: { title: string }) => r.title)).toEqual(['Coat', 'Shirt']);

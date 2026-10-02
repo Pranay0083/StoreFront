@@ -1,4 +1,4 @@
-import type { ProductSort } from '@storefront/contracts';
+import { formatINR, rupeesToPaise, type ProductSort } from '@storefront/contracts';
 import type { UserRepository } from '../auth/user.repository';
 import type { CatalogService } from '../catalog/catalog.service';
 import type { ProductRecord } from '../catalog/product.model';
@@ -25,12 +25,14 @@ export interface SearchProductsArgs {
   limit?: number;
 }
 
+const toPaise = (rupees: unknown) => (Number(rupees) > 0 ? rupeesToPaise(Number(rupees)) : undefined);
+
 const productSummary = (p: ProductRecord) => ({
   title: p.title,
   slug: p.slug,
   url: `/products/${p.slug}`,
-  price: p.price,
-  compareAtPrice: p.compareAtPrice || null,
+  price: formatINR(p.price),
+  compareAtPrice: p.compareAtPrice ? formatINR(p.compareAtPrice) : null,
   category: p.category,
   rating: p.rating,
   numReviews: p.numReviews,
@@ -40,9 +42,9 @@ const productSummary = (p: ProductRecord) => ({
 const orderSummary = (o: OrderRecord) => ({
   orderNumber: o.orderNumber,
   status: o.status,
-  total: o.total,
+  total: formatINR(o.total),
   placedAt: o.createdAt,
-  items: o.items.map(i => ({ title: i.title, size: i.size, qty: i.qty, price: i.price })),
+  items: o.items.map(i => ({ title: i.title, size: i.size, qty: i.qty, price: formatINR(i.price) })),
   timeline: o.statusHistory.map(h => ({ to: h.to, at: h.at, note: h.note })),
 });
 
@@ -57,8 +59,8 @@ export const AGENT_TOOL_DEFINITIONS = [
         properties: {
           query: { type: 'string', description: 'Free-text search over titles and descriptions' },
           category: { type: 'string', description: 'Exact category filter, e.g. Men, Women, Footwear, Accessories' },
-          minPrice: { type: 'number' },
-          maxPrice: { type: 'number' },
+          minPrice: { type: 'number', description: 'Minimum price in rupees' },
+          maxPrice: { type: 'number', description: 'Maximum price in rupees' },
           featured: { type: 'boolean', description: 'Only featured products' },
           sort: { type: 'string', enum: ['price-asc', 'price-desc', 'newest', 'rating'] },
           limit: { type: 'number', description: 'Max results (default 5, max 8)' },
@@ -153,7 +155,7 @@ export class AgentTools {
     let items = await this.catalog.search(
       new ProductQueryBuilder()
         .inCategory(args.category)
-        .priceBetween(Number(args.minPrice) || undefined, Number(args.maxPrice) || undefined)
+        .priceBetween(toPaise(args.minPrice), toPaise(args.maxPrice))
         .featuredOnly(args.featured === true)
         .matchingText(args.query ? String(args.query) : undefined)
         .sortBy(args.sort, 'rating')

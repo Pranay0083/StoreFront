@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { paiseToRupees, rupeesToPaise } from '@storefront/contracts';
 import { api, fmtDate, fmtINR } from '@/lib/api';
 import type { Coupon } from '@/lib/types';
 
@@ -40,8 +41,9 @@ export default function AdminCouponsPage() {
   const openEdit = (c: Coupon) => {
     setEditing(c);
     setForm({
-      code: c.code, type: c.type, value: String(c.value), minSubtotal: String(c.minSubtotal ?? 0),
-      maxDiscount: c.maxDiscount ? String(c.maxDiscount) : '',
+      code: c.code, type: c.type, value: String(c.type === 'flat' ? paiseToRupees(c.value) : c.value),
+      minSubtotal: String(paiseToRupees(c.minSubtotal ?? 0)),
+      maxDiscount: c.maxDiscount ? String(paiseToRupees(c.maxDiscount)) : '',
       usageLimit: c.usageLimit ? String(c.usageLimit) : '',
       expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '',
       active: c.active,
@@ -54,11 +56,11 @@ export default function AdminCouponsPage() {
     const payload: any = {
       code: form.code.trim().toUpperCase(),
       type: form.type,
-      value: Number(form.value),
-      minSubtotal: Number(form.minSubtotal || 0),
+      value: form.type === 'flat' ? rupeesToPaise(Number(form.value)) : Number(form.value),
+      minSubtotal: rupeesToPaise(Number(form.minSubtotal || 0)),
       active: form.active,
     };
-    if (form.maxDiscount) payload.maxDiscount = Number(form.maxDiscount);
+    if (form.maxDiscount) payload.maxDiscount = rupeesToPaise(Number(form.maxDiscount));
     if (form.usageLimit) payload.usageLimit = Number(form.usageLimit);
     if (form.expiresAt) payload.expiresAt = new Date(`${form.expiresAt}T23:59:59Z`).toISOString();
     setSaving(true);
