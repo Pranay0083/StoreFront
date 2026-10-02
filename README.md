@@ -2,7 +2,7 @@
 
 An explicit **order state machine**, a **role-gated admin dashboard built on real MongoDB aggregations**, **idempotent payment confirmation**, and a Figma-grade editorial UI.
 
-**Demo accounts** — admin: `admin@storefront.dev` / `Admin@123` · customer: `customer@storefront.dev` / `Customer@123`
+**Demo accounts** — admin: `admin@storefront.dev` / the `ADMIN_PASSWORD` you configure · customer: `customer@storefront.dev` / `Customer@123`
 
 ## Architecture
 
@@ -11,8 +11,13 @@ Frontend   Next.js 14 (App Router) + TypeScript + Tailwind + shadcn-style compon
            Optimistic cart (localStorage + server merge), skeleton loading, next/image, route groups
 Auth       Custom JWT (email/password) → httpOnly cookies + Bearer fallback → RBAC (customer/admin)
            Provider boundary isolated in middleware.ts — swap in Firebase Admin verifyIdToken later
-Backend    Node.js + Express (TypeScript, tsx) REST, Zod request validation, central error middleware
-Data       MongoDB + Mongoose — products, orders, carts, reviews; compound indexes for search & filters
+Monorepo   npm workspaces: backend (@storefront/api), frontend (@storefront/web), packages/contracts
+           (@storefront/contracts — shared zod schemas, DTO types, order transitions, paise money helpers)
+Backend    Express 5 + strict TypeScript, modular monolith (src/modules/<module>: routes → controller
+           class → service class → repository class), constructor injection wired in one composition
+           root (src/core/container.ts), typed AppError hierarchy, zod-validated env, versioned /api/v1
+Data       MongoDB + Mongoose; versioned migrations (src/db/migrations) + idempotent demo seed;
+           all money stored as integer paise
 Orders     Explicit state machine, every transition audited, illegal transitions rejected (409)
 Payments   Razorpay (auto-enabled when keys set in backend/.env) with signature-verified webhook +
            idempotent confirmation; DEMO PAY mode exercises the identical path without keys
@@ -112,14 +117,19 @@ Razorpay modal (`/api/v1/payments/config` reports the mode). Register the webhoo
 ## Deploy
 
 - **Frontend → Vercel**: root `frontend/`, zero-config Next.js. Set `NEXT_PUBLIC_API_URL`.
-- **API → Render/Railway**: `render.yaml` included — runs `yarn start` in `backend/`.
-  Set Mongo + JWT + Razorpay env vars.
-- **CI**: `.github/workflows/ci.yml` — backend typecheck + health check and frontend build on push/PR.
+- **API → Render/Railway**: `render.yaml` included — `npm start -w backend` applies pending
+  migrations, seeds demo data when the catalog is empty (`SEED_DEMO_DATA=false` to skip), then serves.
+  Set Mongo + JWT + Razorpay env vars (and `ADMIN_PASSWORD` to provision the admin account).
+- **CI**: `.github/workflows/ci.yml` — format check, lint, typecheck, contracts + backend test suites
+  (mongodb-memory-server), a migrate/seed/boot smoke test and the frontend build.
 
 ## Local scripts
 
 ```bash
-cd backend && yarn dev     # API on :4001 (tsx watch, auto-seeds)
-cd frontend && yarn dev    # Next.js on :3000
-cd tests && npx playwright test    # smoke tests (set BASE_URL)
+npm install                 # one install for every workspace
+npm run dev:api             # migrate + seed, then API on :4001 (tsx watch)
+npm run dev:web             # Next.js on :3000
+npm test                    # contracts + backend tests (in-memory MongoDB replica set)
+npm run lint && npm run typecheck && npm run format:check
+npm run db:status -w backend   # applied/pending migrations
 ```
