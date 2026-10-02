@@ -38,7 +38,13 @@ function ToolLine({ m }: { m: ConvoMsg }) {
       </button>
       {open && (
         <pre className="mt-1 max-h-40 overflow-auto border border-black/10 bg-secondary/50 p-2 text-[10px] leading-relaxed">
-          {(() => { try { return JSON.stringify(JSON.parse(m.content), null, 2); } catch { return m.content; } })()}
+          {(() => {
+            try {
+              return JSON.stringify(JSON.parse(m.content), null, 2);
+            } catch {
+              return m.content;
+            }
+          })()}
         </pre>
       )}
     </div>
@@ -52,7 +58,10 @@ export default function AdminChatsPage() {
 
   useEffect(() => {
     api<Convo[]>('/admin/conversations')
-      .then(d => { setConvos(d); if (d.length) setSelected(d[0]._id); })
+      .then(d => {
+        setConvos(d);
+        if (d.length) setSelected(d[0]._id);
+      })
       .catch(e => setError(e.message));
   }, []);
 
@@ -75,15 +84,15 @@ export default function AdminChatsPage() {
           <p className="label-caps text-muted-foreground">Aria · AI concierge</p>
           <h1 className="mt-1 font-serif text-3xl font-semibold">Agent chats</h1>
         </div>
-        <p className="text-sm text-muted-foreground">{convos.length} conversation{convos.length === 1 ? '' : 's'}</p>
+        <p className="text-sm text-muted-foreground">
+          {convos.length} conversation{convos.length === 1 ? '' : 's'}
+        </p>
       </div>
 
       {convos.length === 0 ? (
         <div className="mt-10 border border-dashed border-black/20 p-16 text-center">
           <MessageSquare className="mx-auto h-8 w-8 text-muted-foreground" strokeWidth={1} />
-          <p className="mt-4 text-sm text-muted-foreground">
-            No conversations yet — chats from the storefront widget will appear here.
-          </p>
+          <p className="mt-4 text-sm text-muted-foreground">No conversations yet — chats from the storefront widget will appear here.</p>
         </div>
       ) : (
         <div className="mt-8 grid gap-6 lg:grid-cols-[340px_1fr]">
@@ -95,13 +104,11 @@ export default function AdminChatsPage() {
                 onClick={() => setSelected(c._id)}
                 className={cn(
                   'w-full border px-4 py-3 text-left transition-colors',
-                  selected === c._id ? 'border-black bg-black text-white' : 'border-black/10 bg-white hover:border-black/40'
+                  selected === c._id ? 'border-black bg-black text-white' : 'border-black/10 bg-white hover:border-black/40',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-medium">
-                    {c.userName || c.userEmail || 'Guest visitor'}
-                  </p>
+                  <p className="truncate text-sm font-medium">{c.userName || c.userEmail || 'Guest visitor'}</p>
                   <span className={cn('label-caps text-[10px]', selected === c._id ? 'text-white/60' : 'text-muted-foreground')}>
                     {c.messageCount} msgs
                   </span>
@@ -110,7 +117,8 @@ export default function AdminChatsPage() {
                   {c.preview || '—'}
                 </p>
                 <p className={cn('mt-1.5 text-[10px]', selected === c._id ? 'text-white/50' : 'text-muted-foreground/70')}>
-                  {fmtDateTime(c.updatedAt)}{c.userEmail ? ` · ${c.userEmail}` : ''}
+                  {fmtDateTime(c.updatedAt)}
+                  {c.userEmail ? ` · ${c.userEmail}` : ''}
                 </p>
               </button>
             ))}
@@ -151,7 +159,7 @@ export default function AdminChatsPage() {
                         </p>
                       </div>
                     </div>
-                  )
+                  ),
                 )}
               </div>
             ) : (

@@ -43,15 +43,39 @@ export default function RegisterPage() {
       <form onSubmit={submit} className="mt-10 space-y-6">
         <div className="space-y-2">
           <Label htmlFor="name">Full name</Label>
-          <Input id="name" data-testid="register-name-input" value={name} onChange={e => setName(e.target.value)} placeholder="Asha Verma" required />
+          <Input
+            id="name"
+            data-testid="register-name-input"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Asha Verma"
+            required
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" data-testid="register-email-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
+          <Input
+            id="email"
+            type="email"
+            data-testid="register-email-input"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" data-testid="register-password-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimum 6 characters" minLength={6} required />
+          <Input
+            id="password"
+            type="password"
+            data-testid="register-password-input"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Minimum 6 characters"
+            minLength={6}
+            required
+          />
         </div>
         <Button type="submit" size="lg" className="w-full" data-testid="register-submit-button" disabled={loading}>
           {loading ? 'Creating…' : 'Create account'}

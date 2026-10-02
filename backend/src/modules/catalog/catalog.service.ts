@@ -1,0 +1,60 @@
+import type { Category, ProductInput, ProductListQuery } from '@storefront/contracts';
+import { ConflictError, NotFoundError } from '../../core/errors';
+import { logger } from '../../core/logger';
+import type { ProductRecord } from './product.model';
+import { ProductQueryBuilder } from './product-query.builder';
+import type { ProductRepository } from './product.repository';
+
+export const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+export class CatalogService {
+  constructor(private readonly products: ProductRepository) {}
+
+  async list(query: ProductListQuery): Promise<{ items: ProductRecord[]; total: number; page: number; pages: number }> {
+    const spec = ProductQueryBuilder.fromListQuery(query).build();
+    const [items, total] = await Promise.all([this.products.find(spec), this.products.count(spec.filter)]);
+    return { items, total, page: query.page, pages: Math.ceil(total / query.limit) };
+  }
+
+  search(builder: ProductQueryBuilder): Promise<ProductRecord[]> {
+    return this.products.find(builder.build());
+  }
+
+  categories(): Promise<Category[]> {
+    return this.products.categoryCounts();
+  }
+
+  findBySlug(slug: string): Promise<ProductRecord | null> {
+    return this.products.findBySlug(slug);
+  }
+
+  async getBySlug(slug: string): Promise<ProductRecord> {
+    const product = await this.products.findBySlug(slug);
+    if (!product) throw new NotFoundError('Product not found');
+    return product;
+  }
+
+  async create(input: ProductInput, actorId: string): Promise<ProductRecord> {
+    const slug = input.slug || slugify(input.title);
+    if (await this.products.existsBySlug(slug)) throw new ConflictError('Slug already exists');
+    const product = await this.products.create({ ...input, slug });
+    logger.info({ adminId: actorId, productId: product._id, slug }, 'Product created');
+    return product;
+  }
+
+  async update(id: string, patch: Partial<ProductInput>, actorId: string): Promise<ProductRecord> {
+    const product = await this.products.update(id, patch);
+    if (!product) throw new NotFoundError('Product not found');
+    logger.info({ adminId: actorId, productId: id }, 'Product updated');
+    return product;
+  }
+
+  async delete(id: string, actorId: string): Promise<void> {
+    if (!(await this.products.delete(id))) throw new NotFoundError('Product not found');
+    logger.info({ adminId: actorId, productId: id }, 'Product deleted');
+  }
+}

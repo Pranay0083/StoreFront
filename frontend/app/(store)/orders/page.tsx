@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Order } from '@/lib/types';
+import type { Order } from '@storefront/contracts';
 
 export default function OrdersPage() {
   const { user } = useAuth();
@@ -20,7 +20,9 @@ export default function OrdersPage() {
   useEffect(() => {
     if (user === false) router.replace('/login?next=/orders');
     if (user && typeof user === 'object') {
-      api<Order[]>('/orders').then(setOrders).catch(() => setOrders([]));
+      api<Order[]>('/orders')
+        .then(setOrders)
+        .catch(() => setOrders([]));
     }
   }, [user, router]);
 
@@ -30,12 +32,16 @@ export default function OrdersPage() {
 
       {orders === null ? (
         <div className="mt-10 space-y-4">
-          {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
         </div>
       ) : orders.length === 0 ? (
         <div className="py-24 text-center">
           <p className="font-serif text-3xl">No orders yet.</p>
-          <Button asChild className="mt-6"><Link href="/products">Start with something good</Link></Button>
+          <Button asChild className="mt-6">
+            <Link href="/products">Start with something good</Link>
+          </Button>
         </div>
       ) : (
         <div className="mt-10 space-y-5">

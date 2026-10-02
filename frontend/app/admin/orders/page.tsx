@@ -6,14 +6,12 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { api, fmtDateTime, fmtINR } from '@/lib/api';
-import type { Order, OrderStatus } from '@/lib/types';
+import type { Order, OrderStatus } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
 const STATUSES: (OrderStatus | 'all')[] = ['all', 'created', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'];
@@ -29,11 +27,18 @@ export default function AdminOrdersPage() {
   const load = useCallback(() => {
     const qs = new URLSearchParams({ page: String(page) });
     if (status !== 'all') qs.set('status', status);
-    api<any>(`/admin/orders?${qs}`).then(setData).catch(() => {});
+    api<any>(`/admin/orders?${qs}`)
+      .then(setData)
+      .catch(() => {});
   }, [status, page]);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { setSelected(new Set()); setPage(1); }, [status]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  useEffect(() => {
+    setSelected(new Set());
+    setPage(1);
+  }, [status]);
 
   const toggleAll = () => {
     if (!data) return;
@@ -43,17 +48,18 @@ export default function AdminOrdersPage() {
   const toggle = (id: string) =>
     setSelected(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
   const transition = async (ids: string[], to: string) => {
     setBusy(true);
     try {
-      const result = await api<{ updated: number; rejected: { id: string; reason: string }[] }>(
-        '/admin/orders/bulk-transition',
-        { method: 'POST', body: JSON.stringify({ ids, to }) }
-      );
+      const result = await api<{ updated: number; rejected: { id: string; reason: string }[] }>('/admin/orders/bulk-transition', {
+        method: 'POST',
+        body: JSON.stringify({ ids, to }),
+      });
       if (result.updated) toast.success(`${result.updated} order${result.updated > 1 ? 's' : ''} → ${to}`);
       for (const r of result.rejected) toast.error(`${r.id}: ${r.reason}`);
       setSelected(new Set());
@@ -80,7 +86,7 @@ export default function AdminOrdersPage() {
             onClick={() => setStatus(s)}
             className={cn(
               'border px-3.5 py-1.5 text-xs uppercase tracking-[0.12em] transition-colors',
-              status === s ? 'border-black bg-black text-white' : 'border-black/15 hover:border-black'
+              status === s ? 'border-black bg-black text-white' : 'border-black/15 hover:border-black',
             )}
           >
             {s}
@@ -89,7 +95,10 @@ export default function AdminOrdersPage() {
       </div>
 
       {selected.size > 0 && (
-        <div data-testid="bulk-action-bar" className="mt-5 flex flex-wrap items-center gap-4 border border-black bg-black px-5 py-3 text-white">
+        <div
+          data-testid="bulk-action-bar"
+          className="mt-5 flex flex-wrap items-center gap-4 border border-black bg-black px-5 py-3 text-white"
+        >
           <p className="text-sm">{selected.size} selected</p>
           <div className="flex items-center gap-3">
             <Select value={bulkTo} onValueChange={setBulkTo}>
@@ -98,13 +107,16 @@ export default function AdminOrdersPage() {
               </SelectTrigger>
               <SelectContent>
                 {['paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'].map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Button
               data-testid="bulk-apply-button"
-              variant="secondary" size="sm"
+              variant="secondary"
+              size="sm"
               disabled={!bulkTo || busy}
               onClick={() => transition(Array.from(selected), bulkTo)}
             >
@@ -117,7 +129,9 @@ export default function AdminOrdersPage() {
       <div className="mt-5 border border-black/10 bg-white">
         {data === null ? (
           <div className="space-y-3 p-6">
-            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
           </div>
         ) : (
           <Table data-testid="orders-table">
@@ -156,7 +170,9 @@ export default function AdminOrdersPage() {
                     <TableCell className="text-xs text-muted-foreground">{fmtDateTime(order.createdAt)}</TableCell>
                     <TableCell className="text-sm">{order.items.reduce((s, i) => s + i.qty, 0)}</TableCell>
                     <TableCell className="text-sm font-semibold">{fmtINR(order.total)}</TableCell>
-                    <TableCell><StatusBadge status={order.status} testId={`admin-order-status-${order.orderNumber}`} /></TableCell>
+                    <TableCell>
+                      <StatusBadge status={order.status} testId={`admin-order-status-${order.orderNumber}`} />
+                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -193,12 +209,20 @@ export default function AdminOrdersPage() {
 
       {data && data.pages > 1 && (
         <div className="mt-5 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">{data.total} orders · page {page} of {data.pages}</p>
+          <p className="text-xs text-muted-foreground">
+            {data.total} orders · page {page} of {data.pages}
+          </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" data-testid="orders-prev-page" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
               <ChevronLeft className="h-4 w-4" /> Prev
             </Button>
-            <Button variant="outline" size="sm" data-testid="orders-next-page" disabled={page >= data.pages} onClick={() => setPage(p => p + 1)}>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="orders-next-page"
+              disabled={page >= data.pages}
+              onClick={() => setPage(p => p + 1)}
+            >
               Next <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

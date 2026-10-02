@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import type { OrderStatus } from '@/lib/types';
+import type { OrderStatus } from '@storefront/contracts';
 
 const VARIANTS: Record<OrderStatus, 'secondary' | 'default' | 'success' | 'warning' | 'destructive' | 'outline'> = {
   created: 'outline',

@@ -14,27 +14,71 @@ export function Footer() {
           <div className="md:col-span-2">
             <p className="label-caps mb-5 text-muted-foreground">Shop</p>
             <ul className="space-y-3 text-sm">
-              <li><Link href="/products?category=Men" className="hover:underline">Men</Link></li>
-              <li><Link href="/products?category=Women" className="hover:underline">Women</Link></li>
-              <li><Link href="/products?category=Footwear" className="hover:underline">Footwear</Link></li>
-              <li><Link href="/products?category=Accessories" className="hover:underline">Accessories</Link></li>
+              <li>
+                <Link href="/products?category=Men" className="hover:underline">
+                  Men
+                </Link>
+              </li>
+              <li>
+                <Link href="/products?category=Women" className="hover:underline">
+                  Women
+                </Link>
+              </li>
+              <li>
+                <Link href="/products?category=Footwear" className="hover:underline">
+                  Footwear
+                </Link>
+              </li>
+              <li>
+                <Link href="/products?category=Accessories" className="hover:underline">
+                  Accessories
+                </Link>
+              </li>
             </ul>
           </div>
           <div className="md:col-span-2">
             <p className="label-caps mb-5 text-muted-foreground">Account</p>
             <ul className="space-y-3 text-sm">
-              <li><Link href="/orders" className="hover:underline">Order tracking</Link></li>
-              <li><Link href="/login" className="hover:underline">Sign in</Link></li>
-              <li><Link href="/register" className="hover:underline">Create account</Link></li>
+              <li>
+                <Link href="/orders" className="hover:underline">
+                  Order tracking
+                </Link>
+              </li>
+              <li>
+                <Link href="/login" className="hover:underline">
+                  Sign in
+                </Link>
+              </li>
+              <li>
+                <Link href="/register" className="hover:underline">
+                  Create account
+                </Link>
+              </li>
             </ul>
           </div>
           <div className="md:col-span-3">
             <p className="label-caps mb-5 text-muted-foreground">Platform</p>
             <ul className="space-y-3 text-sm">
-              <li><Link href="/docs" data-testid="footer-docs-link" className="hover:underline">Documentation</Link></li>
-              <li><Link href="/docs#api" className="hover:underline">REST API</Link></li>
-              <li><Link href="/docs#mcp" className="hover:underline">MCP server</Link></li>
-              <li><Link href="/docs#agent" className="hover:underline">AI agent</Link></li>
+              <li>
+                <Link href="/docs" data-testid="footer-docs-link" className="hover:underline">
+                  Documentation
+                </Link>
+              </li>
+              <li>
+                <Link href="/docs#api" className="hover:underline">
+                  REST API
+                </Link>
+              </li>
+              <li>
+                <Link href="/docs#mcp" className="hover:underline">
+                  MCP server
+                </Link>
+              </li>
+              <li>
+                <Link href="/docs#agent" className="hover:underline">
+                  AI agent
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

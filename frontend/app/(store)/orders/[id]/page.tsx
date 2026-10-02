@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Order } from '@/lib/types';
+import type { Order } from '@storefront/contracts';
 
 function OrderDetailContent() {
   const { id } = useParams<{ id: string }>();
@@ -19,7 +19,9 @@ function OrderDetailContent() {
   const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(() => {
-    api<Order>(`/orders/${id}`).then(setOrder).catch(() => {});
+    api<Order>(`/orders/${id}`)
+      .then(setOrder)
+      .catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -56,7 +58,9 @@ function OrderDetailContent() {
     <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8" data-testid="order-detail-page">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link href="/orders" className="label-caps text-muted-foreground hover:underline">← All orders</Link>
+          <Link href="/orders" className="label-caps text-muted-foreground hover:underline">
+            ← All orders
+          </Link>
           <h1 className="mt-2 font-mono text-3xl font-semibold tracking-tight">{order.orderNumber}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Placed {fmtDate(order.createdAt)}</p>
         </div>
@@ -85,23 +89,32 @@ function OrderDetailContent() {
               <div className="flex flex-1 items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">Size {item.size} × {item.qty}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Size {item.size} × {item.qty}
+                  </p>
                 </div>
                 <p className="text-sm font-semibold">{fmtINR(item.price * item.qty)}</p>
               </div>
             </div>
           ))}
           <div className="mt-5 space-y-2 text-sm">
-            <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{fmtINR(order.subtotal)}</span></div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Subtotal</span>
+              <span>{fmtINR(order.subtotal)}</span>
+            </div>
             {order.discount > 0 && (
               <div className="flex justify-between text-emerald-800">
                 <span>Discount{order.couponCode ? ` (${order.couponCode})` : ''}</span>
                 <span data-testid="order-detail-discount">−{fmtINR(order.discount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>{order.shipping === 0 ? 'Free' : fmtINR(order.shipping)}</span></div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Shipping</span>
+              <span>{order.shipping === 0 ? 'Free' : fmtINR(order.shipping)}</span>
+            </div>
             <div className="flex justify-between border-t border-black/10 pt-2 text-base font-semibold">
-              <span>Total</span><span data-testid="order-detail-total">{fmtINR(order.total)}</span>
+              <span>Total</span>
+              <span data-testid="order-detail-total">{fmtINR(order.total)}</span>
             </div>
           </div>
         </div>
@@ -111,12 +124,18 @@ function OrderDetailContent() {
             <p className="label-caps mb-4 text-muted-foreground">Delivery</p>
             <p className="text-sm font-medium">{order.address.name}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {order.address.line1}<br />{order.address.city}, {order.address.state} {order.address.pincode}<br />{order.address.phone}
+              {order.address.line1}
+              <br />
+              {order.address.city}, {order.address.state} {order.address.pincode}
+              <br />
+              {order.address.phone}
             </p>
           </div>
           <div className="border border-black/10 bg-white p-6">
             <p className="label-caps mb-4 text-muted-foreground">Payment</p>
-            <p className="text-sm capitalize">{order.payment.provider} · {order.payment.status}</p>
+            <p className="text-sm capitalize">
+              {order.payment.provider} · {order.payment.status}
+            </p>
             {order.payment.razorpayPaymentId && (
               <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{order.payment.razorpayPaymentId}</p>
             )}

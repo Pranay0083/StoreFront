@@ -2,9 +2,8 @@ services:
   - type: web
     name: storefront-api
     runtime: node
-    rootDir: backend
-    buildCommand: yarn install --frozen-lockfile
-    startCommand: yarn start
+    buildCommand: npm ci --workspace backend --include-workspace-root=false
+    startCommand: npm run start -w backend
     envVars:
       - key: MONGO_URL
         sync: false

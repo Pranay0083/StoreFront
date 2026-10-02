@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
 import { fmtINR } from '@/lib/api';
 
 export function CartSheet() {
@@ -18,14 +19,20 @@ export function CartSheet() {
         <div className="border-b border-black/5 px-7 py-6">
           <SheetTitle className="font-serif text-2xl font-semibold">Your bag</SheetTitle>
           <SheetDescription className="text-xs text-muted-foreground">
-            Free shipping on orders over ₹2,999
+            Free shipping on orders over {fmtINR(FREE_SHIPPING_THRESHOLD)}
           </SheetDescription>
         </div>
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-5 p-8 text-center">
             <p className="font-serif text-3xl">Nothing here yet.</p>
-            <Button data-testid="cart-empty-shop-button" onClick={() => { setOpen(false); router.push('/products'); }}>
+            <Button
+              data-testid="cart-empty-shop-button"
+              onClick={() => {
+                setOpen(false);
+                router.push('/products');
+              }}
+            >
               Browse the collection
             </Button>
           </div>
@@ -65,7 +72,9 @@ export function CartSheet() {
                         >
                           <Minus className="h-3 w-3" />
                         </button>
-                        <span data-testid={`cart-item-qty-${item.slug}`} className="w-8 text-center text-sm">{item.qty}</span>
+                        <span data-testid={`cart-item-qty-${item.slug}`} className="w-8 text-center text-sm">
+                          {item.qty}
+                        </span>
                         <button
                           data-testid={`cart-item-increase-${item.slug}`}
                           onClick={() => updateQty(item.productId, item.size, item.qty + 1)}
@@ -83,13 +92,18 @@ export function CartSheet() {
             <div className="border-t border-black/10 px-7 py-6">
               <div className="mb-4 flex items-center justify-between">
                 <span className="label-caps text-muted-foreground">Subtotal</span>
-                <span data-testid="cart-subtotal" className="font-serif text-2xl font-semibold">{fmtINR(subtotal)}</span>
+                <span data-testid="cart-subtotal" className="font-serif text-2xl font-semibold">
+                  {fmtINR(subtotal)}
+                </span>
               </div>
               <Button
                 data-testid="cart-checkout-button"
                 className="w-full"
                 size="lg"
-                onClick={() => { setOpen(false); router.push('/checkout'); }}
+                onClick={() => {
+                  setOpen(false);
+                  router.push('/checkout');
+                }}
               >
                 Checkout
               </Button>

@@ -10,55 +10,85 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend:
+  quality:
+    name: Format, lint & typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+  test:
+    name: Unit & integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npm test -w packages/contracts
+      - run: npm test -w backend
+
+  smoke:
+    name: API boot smoke test
     runs-on: ubuntu-latest
     services:
       mongo:
         image: mongo:7
         ports:
           - 27017:27017
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install backend deps
-        run: npm install
-      - name: Typecheck backend
-        run: npx tsc --noEmit
-      - name: Boot API and health check
+          cache: npm
+      - run: npm ci
+      - name: Migrate, seed, boot and probe the API
         env:
+          NODE_ENV: production
           MONGO_URL: mongodb://127.0.0.1:27017
           DB_NAME: ci_storefront
-          JWT_SECRET: ci-secret
+          JWT_SECRET: ci-secret-value
           PORT: 4001
           HOST: 127.0.0.1
         run: |
-          npm run start > /tmp/storefront-api.log 2>&1 &
-          for i in $(seq 1 45); do
-            if curl -fsS http://127.0.0.1:4001/api/ > /dev/null; then
+          npm run start -w backend > /tmp/storefront-api.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4001/api/v1/ > /dev/null; then
               break
             fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:4001/api/products?limit=1 > /dev/null
+          curl -fsS "http://127.0.0.1:4001/api/v1/products?limit=1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const b=JSON.parse(s);if(!b.total){console.error("catalog is empty");process.exit(1)}console.log(`catalog ok: ${b.total} products`)})'
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/storefront-api.log
 
   frontend:
+    name: Build web app
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install frontend deps
-        run: npm install
+          cache: npm
+      - run: npm ci
       - name: Build frontend
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:4001
-        run: npm run build
+        run: npm run build -w frontend

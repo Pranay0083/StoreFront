@@ -1,7 +1,6 @@
 'use client';
 
 import { Search, X } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ProductCard } from '@/components/product-card';
@@ -10,15 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { api } from '@/lib/api';
-import type { Product } from '@/lib/types';
+import type { Product } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
 const SIZES = ['S', 'M', 'L', 'XL', 'UK 8', 'UK 9', 'One Size'];
 const PRICE_RANGES = [
-  { label: 'Under ₹2,000', min: '', max: '2000' },
-  { label: '₹2,000 – ₹5,000', min: '2000', max: '5000' },
-  { label: '₹5,000 – ₹10,000', min: '5000', max: '10000' },
-  { label: '₹10,000 +', min: '10000', max: '' },
+  { label: 'Under ₹2,000', min: '', max: '200000' },
+  { label: '₹2,000 – ₹5,000', min: '200000', max: '500000' },
+  { label: '₹5,000 – ₹10,000', min: '500000', max: '1000000' },
+  { label: '₹10,000 +', min: '1000000', max: '' },
 ];
 
 function ProductsContent() {
@@ -45,7 +44,9 @@ function ProductsContent() {
   };
 
   useEffect(() => {
-    api<{ name: string; count: number }[]>('/products/categories').then(setCategories).catch(() => {});
+    api<{ name: string; count: number }[]>('/products/categories')
+      .then(setCategories)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -69,14 +70,15 @@ function ProductsContent() {
       <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="label-caps text-muted-foreground">The collection</p>
-          <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tighter sm:text-5xl">
-            {category || 'All pieces'}
-          </h1>
+          <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tighter sm:text-5xl">{category || 'All pieces'}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <form
             className="relative"
-            onSubmit={e => { e.preventDefault(); setParam({ q: search }); }}
+            onSubmit={e => {
+              e.preventDefault();
+              setParam({ q: search });
+            }}
           >
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -120,7 +122,10 @@ function ProductsContent() {
                   <button
                     data-testid={`filter-category-${c.name.toLowerCase()}`}
                     onClick={() => setParam({ category: c.name })}
-                    className={cn('transition-colors hover:text-foreground', category === c.name ? 'font-semibold' : 'text-muted-foreground')}
+                    className={cn(
+                      'transition-colors hover:text-foreground',
+                      category === c.name ? 'font-semibold' : 'text-muted-foreground',
+                    )}
                   >
                     {c.name} ({c.count})
                   </button>
@@ -139,7 +144,7 @@ function ProductsContent() {
                   onClick={() => setParam({ size: size === s ? '' : s })}
                   className={cn(
                     'border px-3 py-1.5 text-xs transition-colors',
-                    size === s ? 'border-black bg-black text-white' : 'border-black/20 hover:border-black'
+                    size === s ? 'border-black bg-black text-white' : 'border-black/20 hover:border-black',
                   )}
                 >
                   {s}
@@ -169,7 +174,15 @@ function ProductsContent() {
           </div>
 
           {hasFilters && (
-            <Button variant="outline" size="sm" data-testid="filters-clear-button" onClick={() => { setSearch(''); router.push('/products'); }}>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="filters-clear-button"
+              onClick={() => {
+                setSearch('');
+                router.push('/products');
+              }}
+            >
               <X className="h-3.5 w-3.5" /> Clear filters
             </Button>
           )}
@@ -203,7 +216,13 @@ function ProductsContent() {
 
 export default function ProductsPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-7xl px-5 py-12 sm:px-8"><ProductGridSkeleton /></div>}>
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8">
+          <ProductGridSkeleton />
+        </div>
+      }
+    >
       <ProductsContent />
     </Suspense>
   );

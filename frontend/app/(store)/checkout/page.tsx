@@ -9,11 +9,14 @@ import { useAuth, useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { shippingFor } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
-import type { Order } from '@/lib/types';
+import type { Order } from '@storefront/contracts';
 
 declare global {
-  interface Window { Razorpay: any }
+  interface Window {
+    Razorpay: any;
+  }
 }
 
 export default function CheckoutPage() {
@@ -27,7 +30,7 @@ export default function CheckoutPage() {
   const [couponInput, setCouponInput] = useState('');
   const [applying, setApplying] = useState(false);
 
-  const shipping = subtotal >= 2999 || subtotal === 0 ? 0 : 99;
+  const shipping = shippingFor(subtotal);
   const discount = coupon?.discount ?? 0;
   const total = subtotal - discount + shipping;
 
@@ -36,7 +39,9 @@ export default function CheckoutPage() {
   }, [user, router]);
 
   useEffect(() => {
-    api<{ mode: 'demo' | 'razorpay' }>('/payments/config').then(d => setMode(d.mode)).catch(() => setMode('demo'));
+    api<{ mode: 'demo' | 'razorpay' }>('/payments/config')
+      .then(d => setMode(d.mode))
+      .catch(() => setMode('demo'));
   }, []);
 
   useEffect(() => {
@@ -46,8 +51,7 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setAddress(a => ({ ...a, [k]: e.target.value }));
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setAddress(a => ({ ...a, [k]: e.target.value }));
 
   const applyCouponCode = async () => {
     if (!couponInput.trim()) return;
@@ -75,7 +79,10 @@ export default function CheckoutPage() {
   const payWithRazorpay = async (order: Order) => {
     const setup = await api<any>('/payments/create', { method: 'POST', body: JSON.stringify({ orderId: order._id }) });
     if (setup.mode === 'demo') {
-      const result = await api<{ order: Order }>('/payments/demo-confirm', { method: 'POST', body: JSON.stringify({ orderId: order._id }) });
+      const result = await api<{ order: Order }>('/payments/demo-confirm', {
+        method: 'POST',
+        body: JSON.stringify({ orderId: order._id }),
+      });
       return finishPayment(result.order);
     }
     await new Promise<void>((resolve, reject) => {
@@ -110,7 +117,14 @@ export default function CheckoutPage() {
   };
 
   const placeOrder = async () => {
-    for (const [k, label] of Object.entries({ name: 'Full name', line1: 'Address', city: 'City', state: 'State', pincode: 'Pincode', phone: 'Phone' })) {
+    for (const [k, label] of Object.entries({
+      name: 'Full name',
+      line1: 'Address',
+      city: 'City',
+      state: 'State',
+      pincode: 'Pincode',
+      phone: 'Phone',
+    })) {
       if (!(address as any)[k]) return toast.error(`${label} is required`);
     }
     setPaying(true);
@@ -156,7 +170,13 @@ export default function CheckoutPage() {
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="line1">Address</Label>
-              <Input id="line1" data-testid="checkout-address-input" value={address.line1} onChange={set('line1')} placeholder="221B Residency Road" />
+              <Input
+                id="line1"
+                data-testid="checkout-address-input"
+                value={address.line1}
+                onChange={set('line1')}
+                placeholder="221B Residency Road"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
@@ -168,18 +188,32 @@ export default function CheckoutPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="pincode">Pincode</Label>
-              <Input id="pincode" data-testid="checkout-pincode-input" value={address.pincode} onChange={set('pincode')} placeholder="560025" maxLength={6} />
+              <Input
+                id="pincode"
+                data-testid="checkout-pincode-input"
+                value={address.pincode}
+                onChange={set('pincode')}
+                placeholder="560025"
+                maxLength={6}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" data-testid="checkout-phone-input" value={address.phone} onChange={set('phone')} placeholder="9812345678" maxLength={10} />
+              <Input
+                id="phone"
+                data-testid="checkout-phone-input"
+                value={address.phone}
+                onChange={set('phone')}
+                placeholder="9812345678"
+                maxLength={10}
+              />
             </div>
           </div>
 
           {mode === 'demo' && (
             <div data-testid="checkout-demo-banner" className="border border-amber-700/30 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Payments are in <strong>demo mode</strong> — clicking Pay simulates a Razorpay capture
-              through the same idempotent confirmation path. Add Razorpay keys to go live.
+              Payments are in <strong>demo mode</strong> — clicking Pay simulates a Razorpay capture through the same idempotent
+              confirmation path. Add Razorpay keys to go live.
             </div>
           )}
         </div>
@@ -194,7 +228,9 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex-1 text-sm">
                   <p className="font-medium leading-tight">{i.title}</p>
-                  <p className="text-xs text-muted-foreground">{i.size} × {i.qty}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {i.size} × {i.qty}
+                  </p>
                 </div>
                 <p className="text-sm font-medium">{fmtINR(i.price * i.qty)}</p>
               </div>
@@ -234,16 +270,23 @@ export default function CheckoutPage() {
             )}
           </div>
           <div className="mt-5 space-y-3 border-t border-black/10 pt-5 text-sm">
-            <div className="flex justify-between"><span>Subtotal</span><span>{fmtINR(subtotal)}</span></div>
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{fmtINR(subtotal)}</span>
+            </div>
             {discount > 0 && (
               <div className="flex justify-between text-emerald-800">
                 <span>Discount ({coupon?.code})</span>
                 <span data-testid="checkout-discount">−{fmtINR(discount)}</span>
               </div>
             )}
-            <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? 'Free' : fmtINR(shipping)}</span></div>
+            <div className="flex justify-between">
+              <span>Shipping</span>
+              <span>{shipping === 0 ? 'Free' : fmtINR(shipping)}</span>
+            </div>
             <div className="flex justify-between text-base font-semibold">
-              <span>Total</span><span data-testid="checkout-total">{fmtINR(total)}</span>
+              <span>Total</span>
+              <span data-testid="checkout-total">{fmtINR(total)}</span>
             </div>
           </div>
           <Button

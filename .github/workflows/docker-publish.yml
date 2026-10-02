@@ -3,7 +3,7 @@ name: Build & Push to GHCR
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ['v*']
   workflow_dispatch:
 
 env:
@@ -38,7 +38,8 @@ jobs:
       - name: Build & push backend
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
+          file: backend/Dockerfile
           push: true
           no-cache: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -80,7 +81,8 @@ jobs:
       - name: Build & push frontend
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: .
+          file: frontend/Dockerfile
           push: true
           no-cache: true
           tags: ${{ steps.meta.outputs.tags }}

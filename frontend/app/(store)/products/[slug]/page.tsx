@@ -11,8 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
 import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Product, Review } from '@/lib/types';
+import type { Product, Review } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
 export default function ProductDetailPage() {
@@ -34,7 +35,9 @@ export default function ProductDetailPage() {
       .then(p => {
         setProduct(p);
         if (p.sizes.length === 1) setSize(p.sizes[0].size);
-        api<Review[]>(`/reviews/product/${p._id}`).then(setReviews).catch(() => {});
+        api<Review[]>(`/reviews/product/${p._id}`)
+          .then(setReviews)
+          .catch(() => {});
       })
       .catch(() => setNotFound(true));
   }, [slug]);
@@ -43,7 +46,9 @@ export default function ProductDetailPage() {
     return (
       <div className="mx-auto max-w-7xl px-5 py-32 text-center sm:px-8">
         <p className="font-serif text-4xl">This piece doesn&apos;t exist.</p>
-        <Button asChild className="mt-6"><Link href="/products">Back to the collection</Link></Button>
+        <Button asChild className="mt-6">
+          <Link href="/products">Back to the collection</Link>
+        </Button>
       </div>
     );
   }
@@ -68,8 +73,13 @@ export default function ProductDetailPage() {
     if (!size) return toast.error('Select a size first');
     if (!selected || selected.stock < 1) return toast.error('This size is out of stock');
     addItem({
-      productId: product._id, title: product.title, image: product.images[0],
-      price: product.price, size, qty, slug: product.slug,
+      productId: product._id,
+      title: product.title,
+      image: product.images[0],
+      price: product.price,
+      size,
+      qty,
+      slug: product.slug,
     });
     toast.success(`${product.title} added to your bag`);
   };
@@ -80,7 +90,9 @@ export default function ProductDetailPage() {
       await api('/reviews', { method: 'POST', body: JSON.stringify({ productId: product._id, rating, comment }) });
       toast.success('Review submitted');
       setComment('');
-      api<Review[]>(`/reviews/product/${product._id}`).then(setReviews).catch(() => {});
+      api<Review[]>(`/reviews/product/${product._id}`)
+        .then(setReviews)
+        .catch(() => {});
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -109,7 +121,10 @@ export default function ProductDetailPage() {
                   key={i}
                   data-testid={`product-thumb-${i}`}
                   onClick={() => setImageIdx(i)}
-                  className={cn('relative h-24 w-20 overflow-hidden border transition-colors', i === imageIdx ? 'border-black' : 'border-transparent')}
+                  className={cn(
+                    'relative h-24 w-20 overflow-hidden border transition-colors',
+                    i === imageIdx ? 'border-black' : 'border-transparent',
+                  )}
                 >
                   <Image src={img} alt="" fill sizes="80px" className="object-cover" />
                 </button>
@@ -124,10 +139,10 @@ export default function ProductDetailPage() {
             {product.title}
           </h1>
           <div className="mt-4 flex items-center gap-4">
-            <p data-testid="product-price" className="text-xl font-semibold">{fmtINR(product.price)}</p>
-            {product.compareAtPrice && (
-              <p className="text-muted-foreground line-through">{fmtINR(product.compareAtPrice)}</p>
-            )}
+            <p data-testid="product-price" className="text-xl font-semibold">
+              {fmtINR(product.price)}
+            </p>
+            {product.compareAtPrice && <p className="text-muted-foreground line-through">{fmtINR(product.compareAtPrice)}</p>}
             {product.numReviews > 0 && (
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Star className="h-4 w-4 fill-black text-black" /> {product.rating} ({product.numReviews})
@@ -149,7 +164,7 @@ export default function ProductDetailPage() {
                   className={cn(
                     'min-w-12 border px-4 py-2.5 text-sm transition-colors',
                     size === s.size ? 'border-black bg-black text-white' : 'border-black/20 hover:border-black',
-                    s.stock < 1 && 'cursor-not-allowed opacity-30 line-through'
+                    s.stock < 1 && 'cursor-not-allowed opacity-30 line-through',
                   )}
                 >
                   {s.size}
@@ -165,11 +180,21 @@ export default function ProductDetailPage() {
 
           <div className="mt-8 flex items-center gap-4">
             <div className="flex items-center border border-black/20">
-              <button data-testid="product-qty-decrease" onClick={() => setQty(Math.max(1, qty - 1))} className="flex h-11 w-11 items-center justify-center hover:bg-black/5">
+              <button
+                data-testid="product-qty-decrease"
+                onClick={() => setQty(Math.max(1, qty - 1))}
+                className="flex h-11 w-11 items-center justify-center hover:bg-black/5"
+              >
                 <Minus className="h-4 w-4" />
               </button>
-              <span data-testid="product-qty" className="w-10 text-center">{qty}</span>
-              <button data-testid="product-qty-increase" onClick={() => setQty(Math.min(10, qty + 1))} className="flex h-11 w-11 items-center justify-center hover:bg-black/5">
+              <span data-testid="product-qty" className="w-10 text-center">
+                {qty}
+              </span>
+              <button
+                data-testid="product-qty-increase"
+                onClick={() => setQty(Math.min(10, qty + 1))}
+                className="flex h-11 w-11 items-center justify-center hover:bg-black/5"
+              >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
@@ -179,7 +204,7 @@ export default function ProductDetailPage() {
           </div>
 
           <p className="mt-6 text-xs text-muted-foreground">
-            Free shipping over ₹2,999 · Cancel any time before shipping · Audited order tracking
+            Free shipping over {fmtINR(FREE_SHIPPING_THRESHOLD)} · Cancel any time before shipping · Audited order tracking
           </p>
         </div>
       </div>
@@ -213,7 +238,10 @@ export default function ProductDetailPage() {
           </div>
         ) : (
           <p className="mt-6 text-sm text-muted-foreground">
-            <Link href="/login" className="underline">Sign in</Link> to leave a review.
+            <Link href="/login" className="underline">
+              Sign in
+            </Link>{' '}
+            to leave a review.
           </p>
         )}
 
@@ -222,9 +250,7 @@ export default function ProductDetailPage() {
           {reviews.map(r => (
             <div key={r._id} className="border-b border-black/5 pb-6">
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center bg-black font-serif text-white">
-                  {r.userName?.[0] || '?'}
-                </span>
+                <span className="flex h-9 w-9 items-center justify-center bg-black font-serif text-white">{r.userName?.[0] || '?'}</span>
                 <div>
                   <p className="text-sm font-medium">{r.userName}</p>
                   <div className="flex items-center gap-2">

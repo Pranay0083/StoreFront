@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { fmtINR } from '@/lib/api';
-import type { Product } from '@/lib/types';
+import type { Product } from '@storefront/contracts';
 
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const totalStock = product.sizes.reduce((s, v) => s + v.stock, 0);
@@ -21,9 +21,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
         {product.compareAtPrice && (
-          <span className="absolute left-3 top-3 bg-black px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-white">
-            Sale
-          </span>
+          <span className="absolute left-3 top-3 bg-black px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-white">Sale</span>
         )}
         {totalStock <= 5 && totalStock > 0 && (
           <span className="absolute right-3 top-3 bg-white/90 px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-destructive">
@@ -36,9 +34,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         <h3 className="mt-1 font-serif text-lg font-medium leading-snug">{product.title}</h3>
         <p className="mt-1 text-sm">
           <span className="font-semibold">{fmtINR(product.price)}</span>
-          {product.compareAtPrice && (
-            <span className="ml-2 text-muted-foreground line-through">{fmtINR(product.compareAtPrice)}</span>
-          )}
+          {product.compareAtPrice && <span className="ml-2 text-muted-foreground line-through">{fmtINR(product.compareAtPrice)}</span>}
         </p>
       </div>
     </Link>

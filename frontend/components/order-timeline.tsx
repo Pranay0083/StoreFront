@@ -1,6 +1,6 @@
 import { Ban, Check, RotateCcw } from 'lucide-react';
 import { fmtDateTime } from '@/lib/api';
-import type { Order } from '@/lib/types';
+import type { Order } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
 const FLOW = ['created', 'paid', 'packed', 'shipped', 'delivered'] as const;
@@ -24,14 +24,21 @@ export function OrderTimeline({ order }: { order: Order }) {
                 <div
                   className={cn(
                     'flex h-8 w-8 shrink-0 items-center justify-center border transition-colors',
-                    done ? 'border-black bg-black text-white' : 'border-black/20 bg-white text-black/30'
+                    done ? 'border-black bg-black text-white' : 'border-black/20 bg-white text-black/30',
                   )}
                 >
                   {done ? <Check className="h-4 w-4" /> : <span className="text-xs">{i + 1}</span>}
                 </div>
-                <div className={cn('h-px flex-1', i === FLOW.length - 1 ? 'bg-transparent' : i < lastFlowIdx ? 'bg-black' : 'bg-black/15')} />
+                <div
+                  className={cn('h-px flex-1', i === FLOW.length - 1 ? 'bg-transparent' : i < lastFlowIdx ? 'bg-black' : 'bg-black/15')}
+                />
               </div>
-              <p className={cn('mt-2 text-[10px] uppercase tracking-[0.15em] sm:text-xs', isCurrent ? 'font-semibold' : done ? 'text-foreground/70' : 'text-black/30')}>
+              <p
+                className={cn(
+                  'mt-2 text-[10px] uppercase tracking-[0.15em] sm:text-xs',
+                  isCurrent ? 'font-semibold' : done ? 'text-foreground/70' : 'text-black/30',
+                )}
+              >
                 {step}
               </p>
             </div>
@@ -56,7 +63,9 @@ export function OrderTimeline({ order }: { order: Order }) {
             <li key={i} className="relative text-sm">
               <span className="absolute -left-[23px] top-1.5 h-1.5 w-1.5 bg-black" />
               <span className="font-medium">{e.from ? `${e.from} → ${e.to}` : `Order ${e.to}`}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{fmtDateTime(e.at)} · {e.by}</span>
+              <span className="ml-2 text-xs text-muted-foreground">
+                {fmtDateTime(e.at)} · {e.by}
+              </span>
               {e.note && <p className="text-xs text-muted-foreground">{e.note}</p>}
             </li>
           ))}

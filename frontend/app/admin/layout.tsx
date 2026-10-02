@@ -39,7 +39,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-screen" data-testid="admin-layout">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-black/10 bg-white md:flex">
         <div className="border-b border-black/10 px-6 py-5">
-          <Link href="/" className="font-serif text-xl font-semibold">STOREFRONT<span className="text-muted-foreground">.</span></Link>
+          <Link href="/" className="font-serif text-xl font-semibold">
+            STOREFRONT<span className="text-muted-foreground">.</span>
+          </Link>
           <p className="label-caps mt-1 text-muted-foreground">Back office</p>
         </div>
         <nav className="flex-1 space-y-1 p-3">
@@ -50,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               data-testid={`admin-nav-${l.label.toLowerCase().replace(/\s/g, '-')}`}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 text-sm transition-colors',
-                pathname === l.href ? 'bg-black text-white' : 'text-foreground/70 hover:bg-black/5'
+                pathname === l.href ? 'bg-black text-white' : 'text-foreground/70 hover:bg-black/5',
               )}
             >
               <l.icon className="h-4 w-4" strokeWidth={1.5} /> {l.label}
@@ -63,7 +65,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
           <button
             data-testid="admin-logout-button"
-            onClick={async () => { await logout(); router.replace('/'); }}
+            onClick={async () => {
+              await logout();
+              router.replace('/');
+            }}
             className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground/70 hover:bg-black/5"
           >
             <LogOut className="h-4 w-4" strokeWidth={1.5} /> Sign out
@@ -75,13 +80,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <header className="flex h-16 items-center justify-between border-b border-black/10 bg-white/70 px-6 backdrop-blur-xl">
           <div className="flex gap-4 md:hidden">
             {LINKS.map(l => (
-              <Link key={l.href} href={l.href} className={cn('label-caps', pathname === l.href ? 'text-foreground' : 'text-muted-foreground')}>
+              <Link
+                key={l.href}
+                href={l.href}
+                className={cn('label-caps', pathname === l.href ? 'text-foreground' : 'text-muted-foreground')}
+              >
                 {l.label}
               </Link>
             ))}
           </div>
           <p className="hidden text-sm text-muted-foreground md:block">Role-gated · admin</p>
-          <p data-testid="admin-user-email" className="text-sm font-medium">{user.email}</p>
+          <p data-testid="admin-user-email" className="text-sm font-medium">
+            {user.email}
+          </p>
         </header>
         <main className="p-6 lg:p-8">{children}</main>
       </div>

@@ -46,12 +46,29 @@ function LoginContent() {
       <form onSubmit={submit} className="mt-10 space-y-6">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" data-testid="login-email-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
+          <Input
+            id="email"
+            type="email"
+            data-testid="login-email-input"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
           <div className="relative">
-            <Input id="password" type={showPassword ? 'text' : 'password'} data-testid="login-password-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required className="pr-11" />
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              data-testid="login-password-input"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              className="pr-11"
+            />
             <button
               type="button"
               onClick={() => setShowPassword(value => !value)}
@@ -71,8 +88,14 @@ function LoginContent() {
         <p className="label-caps mb-3">Demo accounts</p>
         <div className="flex gap-3">
           <Button
-            type="button" variant="outline" size="sm" data-testid="login-fill-customer"
-            onClick={() => { setEmail('customer@storefront.dev'); setPassword('Customer@123'); }}
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="login-fill-customer"
+            onClick={() => {
+              setEmail('customer@storefront.dev');
+              setPassword('Customer@123');
+            }}
           >
             Customer
           </Button>
