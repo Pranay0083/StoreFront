@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Order } from '@/lib/types';
+import type { Order } from '@storefront/contracts';
 
 function OrderDetailContent() {
   const { id } = useParams<{ id: string }>();

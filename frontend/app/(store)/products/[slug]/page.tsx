@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
 import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Product, Review } from '@/lib/types';
+import type { Product, Review } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
 export default function ProductDetailPage() {

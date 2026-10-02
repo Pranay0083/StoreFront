@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { shippingFor } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
-import type { Order } from '@/lib/types';
+import type { Order } from '@storefront/contracts';
 
 declare global {
   interface Window { Razorpay: any }

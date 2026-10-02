@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { fmtINR } from '@/lib/api';
-import type { Product } from '@/lib/types';
+import type { Product } from '@storefront/contracts';
 
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const totalStock = product.sizes.reduce((s, v) => s + v.stock, 0);

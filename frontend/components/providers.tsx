@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
-import type { CartItem, User } from '@/lib/types';
+import type { CartItem, User } from '@storefront/contracts';
 
 interface AuthCtx {
   user: User | null | false;

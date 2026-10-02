@@ -1,6 +1,6 @@
 import { Ban, Check, RotateCcw } from 'lucide-react';
 import { fmtDateTime } from '@/lib/api';
-import type { Order } from '@/lib/types';
+import type { Order } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
 const FLOW = ['created', 'paid', 'packed', 'shipped', 'delivered'] as const;

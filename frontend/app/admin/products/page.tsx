@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { paiseToRupees, rupeesToPaise } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
-import type { Product } from '@/lib/types';
+import type { Product } from '@storefront/contracts';
 
 const CATEGORIES = ['Men', 'Women', 'Footwear', 'Accessories'];
 

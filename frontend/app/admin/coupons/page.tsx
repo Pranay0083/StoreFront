@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { paiseToRupees, rupeesToPaise } from '@storefront/contracts';
 import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Coupon } from '@/lib/types';
+import type { Coupon } from '@storefront/contracts';
 
 interface FormState {
   code: string; type: 'percent' | 'flat'; value: string; minSubtotal: string;

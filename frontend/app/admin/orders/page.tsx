@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { api, fmtDateTime, fmtINR } from '@/lib/api';
-import type { Order, OrderStatus } from '@/lib/types';
+import type { Order, OrderStatus } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
 const STATUSES: (OrderStatus | 'all')[] = ['all', 'created', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'];

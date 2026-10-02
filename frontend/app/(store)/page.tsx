@@ -8,7 +8,7 @@ import { ProductCard } from '@/components/product-card';
 import { ProductGridSkeleton } from '@/components/skeletons';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import type { Product } from '@/lib/types';
+import type { Product } from '@storefront/contracts';
 
 const HERO = 'https://images.unsplash.com/photo-1603189343302-e603f7add05a?w=1400&q=85&auto=format&fit=crop';
 const EDITORIAL = 'https://images.unsplash.com/photo-1664076458686-3449062080ac?w=1200&q=85&auto=format&fit=crop';
