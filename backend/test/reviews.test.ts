@@ -10,11 +10,26 @@ describe('reviews', () => {
     const a = await createUser({ name: 'Aarav' });
     const b = await createUser({ name: 'Meera' });
 
-    await t.http().post(`${API}/reviews`).set(bearer(a.token)).send({ productId: String(product._id), rating: 5, comment: 'Great' }).expect(201);
-    const second = await t.http().post(`${API}/reviews`).set(bearer(b.token)).send({ productId: String(product._id), rating: 4 }).expect(201);
+    await t
+      .http()
+      .post(`${API}/reviews`)
+      .set(bearer(a.token))
+      .send({ productId: String(product._id), rating: 5, comment: 'Great' })
+      .expect(201);
+    const second = await t
+      .http()
+      .post(`${API}/reviews`)
+      .set(bearer(b.token))
+      .send({ productId: String(product._id), rating: 4 })
+      .expect(201);
     expect(second.body).toEqual({ ok: true, rating: 4.5, numReviews: 2 });
 
-    const updated = await t.http().post(`${API}/reviews`).set(bearer(a.token)).send({ productId: String(product._id), rating: 3 }).expect(201);
+    const updated = await t
+      .http()
+      .post(`${API}/reviews`)
+      .set(bearer(a.token))
+      .send({ productId: String(product._id), rating: 3 })
+      .expect(201);
     expect(updated.body).toMatchObject({ rating: 3.5, numReviews: 2 });
 
     const list = await t.http().get(`${API}/reviews/product/${product._id}`).expect(200);

@@ -49,7 +49,11 @@ describe('auth', () => {
   });
 
   it('refreshes the session from the refresh cookie', async () => {
-    const reg = await t.http().post(`${API}/auth/register`).send({ name: 'Ravi', email: 'ravi@test.dev', password: 'secret123' }).expect(201);
+    const reg = await t
+      .http()
+      .post(`${API}/auth/register`)
+      .send({ name: 'Ravi', email: 'ravi@test.dev', password: 'secret123' })
+      .expect(201);
     const refreshCookie = cookieValue(reg.headers['set-cookie'], 'refresh_token')!;
     const res = await t.http().post(`${API}/auth/refresh`).set('Cookie', refreshCookie).expect(200);
     expect(res.body.user.email).toBe('ravi@test.dev');

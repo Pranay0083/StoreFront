@@ -37,7 +37,14 @@ export default function HomePage() {
       <section className="mx-auto max-w-7xl px-5 pt-8 sm:px-8 sm:pt-12">
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="relative order-2 aspect-[4/5] max-h-[80vh] w-full overflow-hidden lg:order-1 lg:col-span-7 lg:aspect-auto lg:min-h-[620px]">
-            <Image src={HERO} alt="AW/26 editorial" fill priority sizes="(max-width:1024px) 100vw, 58vw" className="object-cover object-top" />
+            <Image
+              src={HERO}
+              alt="AW/26 editorial"
+              fill
+              priority
+              sizes="(max-width:1024px) 100vw, 58vw"
+              className="object-cover object-top"
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
             <p className="absolute bottom-6 left-6 label-caps text-white">AW / 26 — The Considered Wardrobe</p>
           </div>
@@ -51,8 +58,8 @@ export default function HomePage() {
                 it matters.
               </h1>
               <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-                Twenty-four pieces. Four categories. Zero filler. Cut from cloth that earns its
-                keep and shipped through a state machine that never loses an order.
+                Twenty-four pieces. Four categories. Zero filler. Cut from cloth that earns its keep and shipped through a state machine
+                that never loses an order.
               </p>
               <div className="mt-9 flex flex-wrap gap-4">
                 <Button asChild size="lg" data-testid="hero-shop-button">
@@ -106,11 +113,13 @@ export default function HomePage() {
           <div>
             <p className="label-caps text-muted-foreground">The Women&apos;s edit</p>
             <h2 className="mt-4 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
-              Silk, wool, and<br />nothing you&apos;ll regret.
+              Silk, wool, and
+              <br />
+              nothing you&apos;ll regret.
             </h2>
             <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-              Bias-cut slips, double-faced coats and knitwear graded by hand. Every piece is
-              stocked shallow on purpose — when it&apos;s gone, it&apos;s gone.
+              Bias-cut slips, double-faced coats and knitwear graded by hand. Every piece is stocked shallow on purpose — when it&apos;s
+              gone, it&apos;s gone.
             </p>
             <Button asChild className="mt-8" data-testid="editorial-shop-women">
               <Link href="/products?category=Women">Shop Women</Link>
@@ -133,7 +142,13 @@ export default function HomePage() {
               className="group relative aspect-[3/4] overflow-hidden animate-fade-up"
               style={{ animationDelay: `${i * 80}ms` }}
             >
-              <Image src={c.image} alt={c.name} fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.05]" />
+              <Image
+                src={c.image}
+                alt={c.name}
+                fill
+                sizes="(max-width:1024px) 50vw, 25vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <p className="absolute bottom-5 left-5 font-serif text-2xl font-semibold text-white">{c.name}</p>
             </Link>
@@ -144,9 +159,17 @@ export default function HomePage() {
       <section className="border-t border-black/10 bg-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:grid-cols-3 sm:px-8">
           {[
-            { icon: Truck, title: 'Tracked fulfilment', text: 'Every order moves through an audited state machine — created to delivered.' },
+            {
+              icon: Truck,
+              title: 'Tracked fulfilment',
+              text: 'Every order moves through an audited state machine — created to delivered.',
+            },
             { icon: ShieldCheck, title: 'Secure payments', text: 'Razorpay checkout with idempotent, signature-verified confirmation.' },
-            { icon: RefreshCcw, title: '30-day returns', text: 'Cancel before shipping in one click. Refunds tracked in your order audit trail.' },
+            {
+              icon: RefreshCcw,
+              title: '30-day returns',
+              text: 'Cancel before shipping in one click. Refunds tracked in your order audit trail.',
+            },
           ].map(f => (
             <div key={f.title} className="flex gap-4">
               <f.icon className="h-6 w-6 shrink-0" strokeWidth={1.25} />

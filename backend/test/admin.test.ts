@@ -6,7 +6,14 @@ import { API, bearer, useTestApp } from './helpers/app';
 const t = useTestApp();
 
 async function paidOrder(token: string, productId: string, qty = 1) {
-  const order = (await t.http().post(`${API}/orders`).set(bearer(token)).send({ address: ADDRESS, items: [{ productId, size: 'M', qty }] }).expect(201)).body;
+  const order = (
+    await t
+      .http()
+      .post(`${API}/orders`)
+      .set(bearer(token))
+      .send({ address: ADDRESS, items: [{ productId, size: 'M', qty }] })
+      .expect(201)
+  ).body;
   await t.http().post(`${API}/payments/demo-confirm`).set(bearer(token)).send({ orderId: order._id }).expect(200);
   return order;
 }
@@ -25,10 +32,22 @@ describe('admin dashboard', () => {
     const coat = await createProduct({ title: 'Coat', price: 500_000, sizes: [{ size: 'M', stock: 3 }] });
     await paidOrder(buyer.token, String(shirt._id), 2);
     await paidOrder(buyer.token, String(coat._id));
-    await t.http().post(`${API}/orders`).set(bearer(buyer.token)).send({ address: ADDRESS, items: [{ productId: String(shirt._id), size: 'M', qty: 1 }] }).expect(201);
+    await t
+      .http()
+      .post(`${API}/orders`)
+      .set(bearer(buyer.token))
+      .send({ address: ADDRESS, items: [{ productId: String(shirt._id), size: 'M', qty: 1 }] })
+      .expect(201);
 
     const stats = await t.http().get(`${API}/admin/stats`).set(bearer(admin.token)).expect(200);
-    expect(stats.body).toMatchObject({ revenue: 300_000 + 500_000, paidOrders: 2, avgOrderValue: 400_000, totalOrders: 3, customers: 1, pendingOrders: 2 });
+    expect(stats.body).toMatchObject({
+      revenue: 300_000 + 500_000,
+      paidOrders: 2,
+      avgOrderValue: 400_000,
+      totalOrders: 3,
+      customers: 1,
+      pendingOrders: 2,
+    });
 
     const funnel = await t.http().get(`${API}/admin/funnel`).set(bearer(admin.token)).expect(200);
     expect(funnel.body).toEqual([
@@ -57,7 +76,14 @@ describe('admin dashboard', () => {
     const buyer = await createUser();
     const product = await createProduct();
     const paid = await paidOrder(buyer.token, String(product._id));
-    const fresh = (await t.http().post(`${API}/orders`).set(bearer(buyer.token)).send({ address: ADDRESS, items: [{ productId: String(product._id), size: 'M', qty: 1 }] }).expect(201)).body;
+    const fresh = (
+      await t
+        .http()
+        .post(`${API}/orders`)
+        .set(bearer(buyer.token))
+        .send({ address: ADDRESS, items: [{ productId: String(product._id), size: 'M', qty: 1 }] })
+        .expect(201)
+    ).body;
 
     const list = await t.http().get(`${API}/admin/orders?status=paid`).set(bearer(admin.token)).expect(200);
     expect(list.body).toMatchObject({ total: 1, page: 1, pages: 1 });

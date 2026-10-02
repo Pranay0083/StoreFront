@@ -54,12 +54,16 @@ describe('Migrator', () => {
   });
 
   it('refuses to run while another process holds the lock', async () => {
-    await db().collection('migration_locks').insertOne({ _id: 'migrations' as never, owner: 'other', acquiredAt: new Date() });
+    await db()
+      .collection('migration_locks')
+      .insertOne({ _id: 'migrations' as never, owner: 'other', acquiredAt: new Date() });
     await expect(new Migrator(db(), [recording('001-a', [])]).up()).rejects.toThrow(MigrationLockedError);
   });
 
   it('takes over a stale lock', async () => {
-    await db().collection('migration_locks').insertOne({ _id: 'migrations' as never, owner: 'dead', acquiredAt: new Date(Date.now() - 60 * 60 * 1000) });
+    await db()
+      .collection('migration_locks')
+      .insertOne({ _id: 'migrations' as never, owner: 'dead', acquiredAt: new Date(Date.now() - 60 * 60 * 1000) });
     expect(await new Migrator(db(), [recording('001-a', [])]).up()).toEqual(['001-a']);
   });
 

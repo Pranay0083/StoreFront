@@ -42,13 +42,21 @@ export default function DocsPage() {
         Build on STOREFRONT<span className="text-muted-foreground">.</span>
       </h1>
       <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground">
-        Three ways in: a REST API for programmatic access, an MCP server so any AI client can talk to the store,
-        and Aria — the on-site AI shopping concierge powered by Groq.
+        Three ways in: a REST API for programmatic access, an MCP server so any AI client can talk to the store, and Aria — the on-site AI
+        shopping concierge powered by Groq.
       </p>
 
       <nav className="mt-8 flex flex-wrap gap-3">
-        {[['#api', 'REST API'], ['#agent', 'AI Agent'], ['#mcp', 'MCP Server']].map(([href, label]) => (
-          <a key={href} href={href} className="label-caps border border-black/15 px-4 py-2 transition-colors hover:bg-black hover:text-white">
+        {[
+          ['#api', 'REST API'],
+          ['#agent', 'AI Agent'],
+          ['#mcp', 'MCP Server'],
+        ].map(([href, label]) => (
+          <a
+            key={href}
+            href={href}
+            className="label-caps border border-black/15 px-4 py-2 transition-colors hover:bg-black hover:text-white"
+          >
             {label}
           </a>
         ))}
@@ -57,9 +65,9 @@ export default function DocsPage() {
       <div className="mt-14 space-y-14">
         <Section id="api" label="01 — REST" title="REST API">
           <p>
-            All routes live under <code className="bg-secondary px-1.5 py-0.5 text-xs">{origin}/api/v1</code>. Authentication uses
-            JWT — sent as an httpOnly cookie or an <code className="bg-secondary px-1.5 py-0.5 text-xs">Authorization: Bearer</code> header.
-            Admin routes require an admin-role token.
+            All routes live under <code className="bg-secondary px-1.5 py-0.5 text-xs">{origin}/api/v1</code>. Authentication uses JWT —
+            sent as an httpOnly cookie or an <code className="bg-secondary px-1.5 py-0.5 text-xs">Authorization: Bearer</code> header. Admin
+            routes require an admin-role token.
           </p>
           <div className="space-y-2">
             <Endpoint method="POST" path="/api/v1/auth/register" desc="Create an account, returns JWT cookie" />
@@ -79,10 +87,9 @@ export default function DocsPage() {
 
         <Section id="agent" label="02 — AI" title="AI Agent (Aria)">
           <p>
-            Aria is the floating assistant in the bottom-right corner of every store page. She runs on Groq
-            with server-side tool calling against live store data: product search, per-size stock, order status
-            (scoped to the signed-in customer), cart context, and store policies. Every conversation is
-            persisted and reviewable by admins under <strong>Admin → Agent chats</strong>.
+            Aria is the floating assistant in the bottom-right corner of every store page. She runs on Groq with server-side tool calling
+            against live store data: product search, per-size stock, order status (scoped to the signed-in customer), cart context, and
+            store policies. Every conversation is persisted and reviewable by admins under <strong>Admin → Agent chats</strong>.
           </p>
           <p>You can also call the agent directly:</p>
           <Code>{`curl -X POST "${origin}/api/v1/agent/chat" \\
@@ -92,15 +99,15 @@ export default function DocsPage() {
     "message": "Recommend footwear under 3000 rupees"
   }'`}</Code>
           <p className="text-xs text-muted-foreground">
-            Pass a stable <code>sessionId</code> to keep multi-turn context. Signed-in requests (cookie/Bearer)
-            unlock order lookups for that customer.
+            Pass a stable <code>sessionId</code> to keep multi-turn context. Signed-in requests (cookie/Bearer) unlock order lookups for
+            that customer.
           </p>
         </Section>
 
         <Section id="mcp" label="03 — MCP" title="MCP Server">
           <p>
-            The store exposes a <strong>Model Context Protocol</strong> server over Streamable HTTP, so Claude Desktop,
-            Cursor, or any MCP client can query the catalog and order status as native tools.
+            The store exposes a <strong>Model Context Protocol</strong> server over Streamable HTTP, so Claude Desktop, Cursor, or any MCP
+            client can query the catalog and order status as native tools.
           </p>
           <p className="label-caps pt-1 text-muted-foreground">Endpoint</p>
           <Code>{`${origin}/mcp        (alias of ${origin}/api/v1/mcp)`}</Code>

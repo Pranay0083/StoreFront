@@ -8,10 +8,10 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      PORT: "4001"
-      HOST: "0.0.0.0"
+      PORT: '4001'
+      HOST: '0.0.0.0'
     ports:
-      - "4001:4001"
+      - '4001:4001'
 
   frontend:
     image: ghcr.io/pranay0083/storefront-frontend:latest
@@ -19,8 +19,8 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:4001}"
-        INTERNAL_API_URL: "http://backend:4001"
+        NEXT_PUBLIC_API_URL: '${NEXT_PUBLIC_API_URL:-http://localhost:4001}'
+        INTERNAL_API_URL: 'http://backend:4001'
     container_name: storefront-frontend
     restart: unless-stopped
     depends_on:
@@ -28,4 +28,4 @@ services:
     environment:
       - INTERNAL_API_URL=http://backend:4001
     ports:
-      - "3000:3000"
+      - '3000:3000'

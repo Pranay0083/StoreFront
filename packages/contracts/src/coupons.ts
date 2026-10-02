@@ -15,15 +15,13 @@ export const CouponInputSchema = z
       required_error: 'Coupon type is required',
       invalid_type_error: 'Type must be either percent or flat',
     }),
-    value: z.number({ required_error: 'Discount value is required' }).int('Discount value must be a whole number').positive('Discount value must be greater than 0'),
+    value: z
+      .number({ required_error: 'Discount value is required' })
+      .int('Discount value must be a whole number')
+      .positive('Discount value must be greater than 0'),
     minSubtotal: PaiseSchema.default(0),
     maxDiscount: PaiseSchema.positive('Maximum discount must be greater than 0').optional().nullable(),
-    usageLimit: z
-      .number()
-      .int('Usage limit must be a whole number')
-      .positive('Usage limit must be greater than 0')
-      .optional()
-      .nullable(),
+    usageLimit: z.number().int('Usage limit must be a whole number').positive('Usage limit must be greater than 0').optional().nullable(),
     active: z.boolean().default(true),
     expiresAt: z.string().datetime('Must be a valid ISO datetime').optional().nullable(),
   })

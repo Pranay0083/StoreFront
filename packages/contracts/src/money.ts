@@ -20,5 +20,4 @@ export function formatINR(paise: Paise | null | undefined): string {
 export const FREE_SHIPPING_THRESHOLD: Paise = 299_900;
 export const SHIPPING_FEE: Paise = 9_900;
 
-export const shippingFor = (subtotal: Paise): Paise =>
-  subtotal === 0 || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+export const shippingFor = (subtotal: Paise): Paise => (subtotal === 0 || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE);

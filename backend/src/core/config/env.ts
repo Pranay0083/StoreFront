@@ -35,4 +35,3 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   }
   return result.data;
 }
-

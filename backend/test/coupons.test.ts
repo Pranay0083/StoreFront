@@ -48,9 +48,19 @@ describe('admin coupon management', () => {
     const created = await t.http().post(`${API}/admin/coupons`).set(bearer(admin.token)).send(body).expect(201);
     expect(created.body).toMatchObject({ code: 'SUMMER20', type: 'percent', value: 20, usedCount: 0, active: true });
     await t.http().post(`${API}/admin/coupons`).set(bearer(admin.token)).send(body).expect(409);
-    await t.http().post(`${API}/admin/coupons`).set(bearer(admin.token)).send({ ...body, code: 'HUGE', value: 150 }).expect(400);
+    await t
+      .http()
+      .post(`${API}/admin/coupons`)
+      .set(bearer(admin.token))
+      .send({ ...body, code: 'HUGE', value: 150 })
+      .expect(400);
 
-    const updated = await t.http().put(`${API}/admin/coupons/${created.body._id}`).set(bearer(admin.token)).send({ active: false }).expect(200);
+    const updated = await t
+      .http()
+      .put(`${API}/admin/coupons/${created.body._id}`)
+      .set(bearer(admin.token))
+      .send({ active: false })
+      .expect(200);
     expect(updated.body.active).toBe(false);
 
     const list = await t.http().get(`${API}/admin/coupons`).set(bearer(admin.token)).expect(200);

@@ -37,7 +37,9 @@ export default function CartPage() {
                       <Link href={`/products/${item.slug}`} className="font-serif text-xl font-medium hover:underline">
                         {item.title}
                       </Link>
-                      <p className="mt-1 text-sm text-muted-foreground">Size {item.size} · {fmtINR(item.price)}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Size {item.size} · {fmtINR(item.price)}
+                      </p>
                     </div>
                     <button
                       data-testid={`cart-page-remove-${item.slug}`}
@@ -49,11 +51,17 @@ export default function CartPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center border border-black/15">
-                      <button onClick={() => updateQty(item.productId, item.size, item.qty - 1)} className="flex h-9 w-9 items-center justify-center hover:bg-black/5">
+                      <button
+                        onClick={() => updateQty(item.productId, item.size, item.qty - 1)}
+                        className="flex h-9 w-9 items-center justify-center hover:bg-black/5"
+                      >
                         <Minus className="h-3.5 w-3.5" />
                       </button>
                       <span className="w-10 text-center text-sm">{item.qty}</span>
-                      <button onClick={() => updateQty(item.productId, item.size, item.qty + 1)} className="flex h-9 w-9 items-center justify-center hover:bg-black/5">
+                      <button
+                        onClick={() => updateQty(item.productId, item.size, item.qty + 1)}
+                        className="flex h-9 w-9 items-center justify-center hover:bg-black/5"
+                      >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -67,10 +75,17 @@ export default function CartPage() {
           <aside className="h-fit border border-black/10 bg-white p-8">
             <p className="label-caps text-muted-foreground">Summary</p>
             <div className="mt-6 space-y-3 text-sm">
-              <div className="flex justify-between"><span>Subtotal</span><span data-testid="summary-subtotal">{fmtINR(subtotal)}</span></div>
-              <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? 'Free' : fmtINR(shipping)}</span></div>
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span data-testid="summary-subtotal">{fmtINR(subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span>{shipping === 0 ? 'Free' : fmtINR(shipping)}</span>
+              </div>
               <div className="flex justify-between border-t border-black/10 pt-3 text-base font-semibold">
-                <span>Total</span><span data-testid="summary-total">{fmtINR(subtotal + shipping)}</span>
+                <span>Total</span>
+                <span data-testid="summary-total">{fmtINR(subtotal + shipping)}</span>
               </div>
             </div>
             <Button asChild size="lg" className="mt-8 w-full" data-testid="cart-page-checkout-button">

@@ -6,7 +6,16 @@ const t = useTestApp();
 
 async function seedCatalog() {
   await createProduct({ title: 'Oxford Shirt', category: 'Men', price: 249_900, featured: true, rating: 4.5 });
-  await createProduct({ title: 'Linen Blazer', category: 'Men', price: 799_900, rating: 4.1, sizes: [{ size: 'M', stock: 0 }, { size: 'L', stock: 3 }] });
+  await createProduct({
+    title: 'Linen Blazer',
+    category: 'Men',
+    price: 799_900,
+    rating: 4.1,
+    sizes: [
+      { size: 'M', stock: 0 },
+      { size: 'L', stock: 3 },
+    ],
+  });
   await createProduct({ title: 'Silk Dress', category: 'Women', price: 649_900, featured: true, rating: 4.9 });
   await createProduct({ title: 'Canvas Sneakers', category: 'Footwear', price: 299_900, rating: 3.8, sizes: [{ size: 'UK 8', stock: 4 }] });
 }
@@ -63,7 +72,13 @@ describe('catalog', () => {
   it('restricts product management to admins', async () => {
     const customer = await createUser();
     const admin = await createUser({ role: 'admin' });
-    const body = { title: 'New Tee', category: 'Men', price: 99_900, images: ['https://example.com/a.jpg'], sizes: [{ size: 'M', stock: 5 }] };
+    const body = {
+      title: 'New Tee',
+      category: 'Men',
+      price: 99_900,
+      images: ['https://example.com/a.jpg'],
+      sizes: [{ size: 'M', stock: 5 }],
+    };
 
     await t.http().post(`${API}/products`).send(body).expect(401);
     await t.http().post(`${API}/products`).set(bearer(customer.token)).send(body).expect(403);

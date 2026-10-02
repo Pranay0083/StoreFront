@@ -39,7 +39,13 @@ function renderInline(text: string, keyPrefix: string) {
           {link[1]}
         </Link>
       ) : (
-        <a key={`${keyPrefix}-${i}`} href={href} target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2 hover:opacity-70">
+        <a
+          key={`${keyPrefix}-${i}`}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium underline underline-offset-2 hover:opacity-70"
+        >
           {link[1]}
         </a>
       );
@@ -140,8 +146,8 @@ export function AgentWidget() {
             {messages.length === 0 && (
               <div data-testid="agent-empty-state">
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Hi{user && typeof user === 'object' ? ` ${user.name.split(' ')[0]}` : ''} — I can help you find products,
-                  check sizes, track orders, and answer questions about shipping, returns, and payments.
+                  Hi{user && typeof user === 'object' ? ` ${user.name.split(' ')[0]}` : ''} — I can help you find products, check sizes,
+                  track orders, and answer questions about shipping, returns, and payments.
                 </p>
                 <div className="mt-5 space-y-2">
                   {SUGGESTIONS.map(s => (
@@ -166,11 +172,14 @@ export function AgentWidget() {
                 </div>
               ) : (
                 <div key={i} className="flex">
-                  <div data-testid="agent-message-assistant" className="max-w-[90%] border border-black/10 bg-secondary/60 px-3.5 py-2.5 text-sm leading-relaxed">
+                  <div
+                    data-testid="agent-message-assistant"
+                    className="max-w-[90%] border border-black/10 bg-secondary/60 px-3.5 py-2.5 text-sm leading-relaxed"
+                  >
                     <AssistantText content={m.content} />
                   </div>
                 </div>
-              )
+              ),
             )}
             {loading && (
               <div className="flex" data-testid="agent-typing-indicator">
@@ -184,7 +193,10 @@ export function AgentWidget() {
           </div>
 
           <form
-            onSubmit={e => { e.preventDefault(); send(input); }}
+            onSubmit={e => {
+              e.preventDefault();
+              send(input);
+            }}
             className="flex items-center gap-2 border-t border-black/10 p-3"
           >
             <input

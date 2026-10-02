@@ -34,7 +34,15 @@ export async function createProduct(overrides: Record<string, unknown> = {}) {
 }
 
 export async function createCoupon(overrides: Record<string, unknown> = {}) {
-  return Coupon.create({ code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 100_000, maxDiscount: 50_000, active: true, ...overrides });
+  return Coupon.create({
+    code: 'WELCOME10',
+    type: 'percent',
+    value: 10,
+    minSubtotal: 100_000,
+    maxDiscount: 50_000,
+    active: true,
+    ...overrides,
+  });
 }
 
 export const ADDRESS = {

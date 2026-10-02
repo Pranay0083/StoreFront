@@ -11,7 +11,10 @@ describe('agent tools', () => {
     const tools = t.container.services.agentTools;
 
     const byCategory = await tools.execute('search_products', { category: 'Women' }, {});
-    expect(byCategory).toMatchObject({ count: 1, products: [expect.objectContaining({ title: 'Silk Slip Dress', url: '/products/silk-slip-dress' })] });
+    expect(byCategory).toMatchObject({
+      count: 1,
+      products: [expect.objectContaining({ title: 'Silk Slip Dress', url: '/products/silk-slip-dress' })],
+    });
 
     const fallback = await tools.execute('search_products', { query: 'oxf' }, {});
     expect(fallback).toMatchObject({ count: 1, products: [expect.objectContaining({ title: 'Oxford Shirt' })] });
@@ -20,14 +23,27 @@ describe('agent tools', () => {
   it('looks up orders for signed-in customers and guests with matching email', async () => {
     const buyer = await createUser({ email: 'kabir@test.dev' });
     const product = await createProduct();
-    const order = (await t.http().post(`${API}/orders`).set(bearer(buyer.token)).send({ address: ADDRESS, items: [{ productId: String(product._id), size: 'M', qty: 1 }] }).expect(201)).body;
+    const order = (
+      await t
+        .http()
+        .post(`${API}/orders`)
+        .set(bearer(buyer.token))
+        .send({ address: ADDRESS, items: [{ productId: String(product._id), size: 'M', qty: 1 }] })
+        .expect(201)
+    ).body;
     const tools = t.container.services.agentTools;
 
-    expect(await tools.execute('get_order_status', {}, { userId: buyer.id })).toMatchObject({ order: { orderNumber: order.orderNumber, status: 'created' } });
-    expect(await tools.execute('get_order_status', { orderNumber: order.orderNumber.toLowerCase(), email: 'KABIR@test.dev' }, {})).toMatchObject({
+    expect(await tools.execute('get_order_status', {}, { userId: buyer.id })).toMatchObject({
+      order: { orderNumber: order.orderNumber, status: 'created' },
+    });
+    expect(
+      await tools.execute('get_order_status', { orderNumber: order.orderNumber.toLowerCase(), email: 'KABIR@test.dev' }, {}),
+    ).toMatchObject({
       order: { orderNumber: order.orderNumber },
     });
-    expect(await tools.execute('get_order_status', { orderNumber: order.orderNumber, email: 'someone@else.dev' }, {})).toHaveProperty('error');
+    expect(await tools.execute('get_order_status', { orderNumber: order.orderNumber, email: 'someone@else.dev' }, {})).toHaveProperty(
+      'error',
+    );
     expect(await tools.execute('get_my_orders', {}, {})).toHaveProperty('error');
     expect(await tools.execute('nope', {}, {})).toEqual({ error: 'Unknown tool nope' });
   });

@@ -17,7 +17,11 @@ async function setupOrder(withCoupon = false) {
       .http()
       .post(`${API}/orders`)
       .set(bearer(buyer.token))
-      .send({ address: ADDRESS, items: [{ productId: String(product._id), size: 'M', qty: 2 }], ...(withCoupon ? { couponCode: 'WELCOME10' } : {}) })
+      .send({
+        address: ADDRESS,
+        items: [{ productId: String(product._id), size: 'M', qty: 2 }],
+        ...(withCoupon ? { couponCode: 'WELCOME10' } : {}),
+      })
       .expect(201)
   ).body;
   return { buyer, product, order };
@@ -63,9 +67,18 @@ describe('payment webhook', () => {
   it('rejects bad signatures and processes each event once', async () => {
     const { order } = await setupOrder();
     await Order.updateOne({ _id: order._id }, { $set: { 'payment.razorpayOrderId': 'order_rzp_1' } });
-    const payload = JSON.stringify({ event: 'payment.captured', payload: { payment: { entity: { id: 'pay_1', order_id: 'order_rzp_1' } } } });
+    const payload = JSON.stringify({
+      event: 'payment.captured',
+      payload: { payment: { entity: { id: 'pay_1', order_id: 'order_rzp_1' } } },
+    });
 
-    await t.http().post(`${API}/payments/webhook`).set('Content-Type', 'application/json').set('x-razorpay-signature', 'bad').send(payload).expect(400);
+    await t
+      .http()
+      .post(`${API}/payments/webhook`)
+      .set('Content-Type', 'application/json')
+      .set('x-razorpay-signature', 'bad')
+      .send(payload)
+      .expect(400);
 
     const headers = { 'Content-Type': 'application/json', 'x-razorpay-signature': sign(payload), 'x-razorpay-event-id': 'evt_1' };
     const first = await t.http().post(`${API}/payments/webhook`).set(headers).send(payload).expect(200);

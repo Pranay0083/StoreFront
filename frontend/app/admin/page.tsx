@@ -9,7 +9,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { paiseToRupees } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
 
-interface Stats { revenue: number; paidOrders: number; avgOrderValue: number; totalOrders: number; customers: number; pendingOrders: number }
+interface Stats {
+  revenue: number;
+  paidOrders: number;
+  avgOrderValue: number;
+  totalOrders: number;
+  customers: number;
+  pendingOrders: number;
+}
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -19,19 +26,31 @@ export default function AdminDashboard() {
   const [lowStock, setLowStock] = useState<any[] | null>(null);
 
   useEffect(() => {
-    api<Stats>('/admin/stats').then(setStats).catch(() => {});
-    api<any[]>('/admin/revenue-by-day?days=30').then(setRevenue).catch(() => setRevenue([]));
-    api<any[]>('/admin/funnel').then(setFunnel).catch(() => setFunnel([]));
-    api<any[]>('/admin/top-products').then(setTop).catch(() => setTop([]));
-    api<any[]>('/admin/low-stock').then(setLowStock).catch(() => setLowStock([]));
+    api<Stats>('/admin/stats')
+      .then(setStats)
+      .catch(() => {});
+    api<any[]>('/admin/revenue-by-day?days=30')
+      .then(setRevenue)
+      .catch(() => setRevenue([]));
+    api<any[]>('/admin/funnel')
+      .then(setFunnel)
+      .catch(() => setFunnel([]));
+    api<any[]>('/admin/top-products')
+      .then(setTop)
+      .catch(() => setTop([]));
+    api<any[]>('/admin/low-stock')
+      .then(setLowStock)
+      .catch(() => setLowStock([]));
   }, []);
 
-  const kpis = stats ? [
-    { label: 'Revenue (all time)', value: fmtINR(stats.revenue), icon: IndianRupee, testId: 'kpi-revenue' },
-    { label: 'Paid orders', value: String(stats.paidOrders), icon: Package, testId: 'kpi-paid-orders' },
-    { label: 'Avg order value', value: fmtINR(stats.avgOrderValue), icon: TrendingUp, testId: 'kpi-aov' },
-    { label: 'Customers', value: String(stats.customers), icon: Users, testId: 'kpi-customers' },
-  ] : [];
+  const kpis = stats
+    ? [
+        { label: 'Revenue (all time)', value: fmtINR(stats.revenue), icon: IndianRupee, testId: 'kpi-revenue' },
+        { label: 'Paid orders', value: String(stats.paidOrders), icon: Package, testId: 'kpi-paid-orders' },
+        { label: 'Avg order value', value: fmtINR(stats.avgOrderValue), icon: TrendingUp, testId: 'kpi-aov' },
+        { label: 'Customers', value: String(stats.customers), icon: Users, testId: 'kpi-customers' },
+      ]
+    : [];
 
   const maxFunnel = funnel?.[0]?.count || 1;
 
@@ -76,7 +95,12 @@ export default function AdminDashboard() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d: string) => d.slice(5)} stroke="rgba(0,0,0,0.35)" />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${Math.round(paiseToRupees(v) / 1000)}k`} stroke="rgba(0,0,0,0.35)" width={40} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v: number) => `${Math.round(paiseToRupees(v) / 1000)}k`}
+                    stroke="rgba(0,0,0,0.35)"
+                    width={40}
+                  />
                   <Tooltip
                     formatter={(v: any) => [fmtINR(Number(v)), 'Revenue']}
                     contentStyle={{ borderRadius: 0, border: '1px solid rgba(0,0,0,0.15)', fontSize: 12 }}
@@ -139,22 +163,24 @@ export default function AdminDashboard() {
             <p className="label-caps text-muted-foreground">Low stock alerts (&lt; 5 units)</p>
           </div>
           <div className="mt-5 space-y-3">
-            {lowStock === null
-              ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
-              : lowStock.length === 0
-                ? <p className="text-sm text-muted-foreground">All stocked up.</p>
-                : lowStock.map((r, i) => (
-                    <div key={`${r._id}-${r.size}-${i}`} className="flex items-center gap-4 border-b border-black/5 pb-3 last:border-0">
-                      <div className="relative h-10 w-8 shrink-0 overflow-hidden bg-muted">
-                        {r.image && <Image src={r.image} alt="" fill sizes="32px" className="object-cover" />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium leading-tight">{r.title}</p>
-                        <p className="text-xs text-muted-foreground">Size {r.size}</p>
-                      </div>
-                      <Badge variant={r.stock === 0 ? 'destructive' : 'warning'}>{r.stock} left</Badge>
-                    </div>
-                  ))}
+            {lowStock === null ? (
+              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+            ) : lowStock.length === 0 ? (
+              <p className="text-sm text-muted-foreground">All stocked up.</p>
+            ) : (
+              lowStock.map((r, i) => (
+                <div key={`${r._id}-${r.size}-${i}`} className="flex items-center gap-4 border-b border-black/5 pb-3 last:border-0">
+                  <div className="relative h-10 w-8 shrink-0 overflow-hidden bg-muted">
+                    {r.image && <Image src={r.image} alt="" fill sizes="32px" className="object-cover" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium leading-tight">{r.title}</p>
+                    <p className="text-xs text-muted-foreground">Size {r.size}</p>
+                  </div>
+                  <Badge variant={r.stock === 0 ? 'destructive' : 'warning'}>{r.stock} left</Badge>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

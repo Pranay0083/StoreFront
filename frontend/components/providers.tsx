@@ -112,7 +112,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     setItems(prev =>
       qty < 1
         ? prev.filter(i => keyOf(i) !== `${productId}::${size}`)
-        : prev.map(i => (keyOf(i) === `${productId}::${size}` ? { ...i, qty: Math.min(20, qty) } : i))
+        : prev.map(i => (keyOf(i) === `${productId}::${size}` ? { ...i, qty: Math.min(20, qty) } : i)),
     );
   }, []);
 

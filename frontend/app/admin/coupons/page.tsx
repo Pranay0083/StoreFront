@@ -17,11 +17,26 @@ import { api, fmtDate, fmtINR } from '@/lib/api';
 import type { Coupon } from '@storefront/contracts';
 
 interface FormState {
-  code: string; type: 'percent' | 'flat'; value: string; minSubtotal: string;
-  maxDiscount: string; usageLimit: string; expiresAt: string; active: boolean;
+  code: string;
+  type: 'percent' | 'flat';
+  value: string;
+  minSubtotal: string;
+  maxDiscount: string;
+  usageLimit: string;
+  expiresAt: string;
+  active: boolean;
 }
 
-const emptyForm: FormState = { code: '', type: 'percent', value: '', minSubtotal: '0', maxDiscount: '', usageLimit: '', expiresAt: '', active: true };
+const emptyForm: FormState = {
+  code: '',
+  type: 'percent',
+  value: '',
+  minSubtotal: '0',
+  maxDiscount: '',
+  usageLimit: '',
+  expiresAt: '',
+  active: true,
+};
 
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[] | null>(null);
@@ -31,17 +46,27 @@ export default function AdminCouponsPage() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
-    api<Coupon[]>('/admin/coupons').then(setCoupons).catch(() => setCoupons([]));
+    api<Coupon[]>('/admin/coupons')
+      .then(setCoupons)
+      .catch(() => setCoupons([]));
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setOpen(true); };
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setOpen(true);
+  };
 
   const openEdit = (c: Coupon) => {
     setEditing(c);
     setForm({
-      code: c.code, type: c.type, value: String(c.type === 'flat' ? paiseToRupees(c.value) : c.value),
+      code: c.code,
+      type: c.type,
+      value: String(c.type === 'flat' ? paiseToRupees(c.value) : c.value),
       minSubtotal: String(paiseToRupees(c.minSubtotal ?? 0)),
       maxDiscount: c.maxDiscount ? String(paiseToRupees(c.maxDiscount)) : '',
       usageLimit: c.usageLimit ? String(c.usageLimit) : '',
@@ -115,7 +140,9 @@ export default function AdminCouponsPage() {
       <div className="mt-6 border border-black/10 bg-white">
         {coupons === null ? (
           <div className="space-y-3 p-6">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
           </div>
         ) : coupons.length === 0 ? (
           <p className="p-10 text-center text-sm text-muted-foreground">No coupons yet — create your first one.</p>
@@ -140,18 +167,37 @@ export default function AdminCouponsPage() {
                     <TableCell className="font-mono text-sm font-semibold">{c.code}</TableCell>
                     <TableCell className="text-sm">
                       {c.type === 'percent' ? `${c.value}%` : fmtINR(c.value)}
-                      {c.type === 'percent' && c.maxDiscount ? <span className="text-xs text-muted-foreground"> (max {fmtINR(c.maxDiscount)})</span> : null}
+                      {c.type === 'percent' && c.maxDiscount ? (
+                        <span className="text-xs text-muted-foreground"> (max {fmtINR(c.maxDiscount)})</span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-sm">{c.minSubtotal ? fmtINR(c.minSubtotal) : '—'}</TableCell>
-                    <TableCell className="text-sm">{c.usedCount}{c.usageLimit ? ` / ${c.usageLimit}` : ''}</TableCell>
+                    <TableCell className="text-sm">
+                      {c.usedCount}
+                      {c.usageLimit ? ` / ${c.usageLimit}` : ''}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{c.expiresAt ? fmtDate(c.expiresAt) : 'Never'}</TableCell>
-                    <TableCell><Badge variant={st.variant} data-testid={`coupon-status-${c.code}`}>{st.label}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant={st.variant} data-testid={`coupon-status-${c.code}`}>
+                        {st.label}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <button data-testid={`coupon-edit-${c.code}`} onClick={() => openEdit(c)} className="flex h-8 w-8 items-center justify-center hover:bg-black/5" aria-label="Edit">
+                        <button
+                          data-testid={`coupon-edit-${c.code}`}
+                          onClick={() => openEdit(c)}
+                          className="flex h-8 w-8 items-center justify-center hover:bg-black/5"
+                          aria-label="Edit"
+                        >
                           <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
                         </button>
-                        <button data-testid={`coupon-delete-${c.code}`} onClick={() => remove(c)} className="flex h-8 w-8 items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label="Delete">
+                        <button
+                          data-testid={`coupon-delete-${c.code}`}
+                          onClick={() => remove(c)}
+                          className="flex h-8 w-8 items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label="Delete"
+                        >
                           <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                         </button>
                       </div>
@@ -171,12 +217,20 @@ export default function AdminCouponsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Code</Label>
-                <Input data-testid="coupon-form-code" value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="SUMMER20" disabled={!!editing} />
+                <Input
+                  data-testid="coupon-form-code"
+                  value={form.code}
+                  onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                  placeholder="SUMMER20"
+                  disabled={!!editing}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select value={form.type} onValueChange={(v: 'percent' | 'flat') => setForm({ ...form, type: v })}>
-                  <SelectTrigger data-testid="coupon-form-type"><SelectValue /></SelectTrigger>
+                  <SelectTrigger data-testid="coupon-form-type">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="percent">Percent off</SelectItem>
                     <SelectItem value="flat">Flat ₹ off</SelectItem>
@@ -187,31 +241,67 @@ export default function AdminCouponsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{form.type === 'percent' ? 'Percent (%)' : 'Amount (₹)'}</Label>
-                <Input data-testid="coupon-form-value" type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder={form.type === 'percent' ? '10' : '500'} />
+                <Input
+                  data-testid="coupon-form-value"
+                  type="number"
+                  value={form.value}
+                  onChange={e => setForm({ ...form, value: e.target.value })}
+                  placeholder={form.type === 'percent' ? '10' : '500'}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Min order (₹)</Label>
-                <Input data-testid="coupon-form-min" type="number" value={form.minSubtotal} onChange={e => setForm({ ...form, minSubtotal: e.target.value })} />
+                <Input
+                  data-testid="coupon-form-min"
+                  type="number"
+                  value={form.minSubtotal}
+                  onChange={e => setForm({ ...form, minSubtotal: e.target.value })}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Max discount (₹)</Label>
-                <Input data-testid="coupon-form-max" type="number" value={form.maxDiscount} onChange={e => setForm({ ...form, maxDiscount: e.target.value })} placeholder="Optional" disabled={form.type === 'flat'} />
+                <Input
+                  data-testid="coupon-form-max"
+                  type="number"
+                  value={form.maxDiscount}
+                  onChange={e => setForm({ ...form, maxDiscount: e.target.value })}
+                  placeholder="Optional"
+                  disabled={form.type === 'flat'}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Usage limit</Label>
-                <Input data-testid="coupon-form-limit" type="number" value={form.usageLimit} onChange={e => setForm({ ...form, usageLimit: e.target.value })} placeholder="Unlimited" />
+                <Input
+                  data-testid="coupon-form-limit"
+                  type="number"
+                  value={form.usageLimit}
+                  onChange={e => setForm({ ...form, usageLimit: e.target.value })}
+                  placeholder="Unlimited"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 items-end gap-4">
               <div className="space-y-2">
                 <Label>Expires on</Label>
-                <Input data-testid="coupon-form-expires" type="date" value={form.expiresAt} onChange={e => setForm({ ...form, expiresAt: e.target.value })} />
+                <Input
+                  data-testid="coupon-form-expires"
+                  type="date"
+                  value={form.expiresAt}
+                  onChange={e => setForm({ ...form, expiresAt: e.target.value })}
+                />
               </div>
               <div className="flex items-center gap-2 pb-3">
-                <Checkbox id="c-active" data-testid="coupon-form-active" checked={form.active} onCheckedChange={v => setForm({ ...form, active: v === true })} />
-                <label htmlFor="c-active" className="text-sm">Active</label>
+                <Checkbox
+                  id="c-active"
+                  data-testid="coupon-form-active"
+                  checked={form.active}
+                  onCheckedChange={v => setForm({ ...form, active: v === true })}
+                />
+                <label htmlFor="c-active" className="text-sm">
+                  Active
+                </label>
               </div>
             </div>
             <Button data-testid="coupon-form-save" onClick={save} disabled={saving}>

@@ -54,7 +54,11 @@ export class OrderRepository {
   async page(filter: { status?: OrderStatus }, page: number, limit: number): Promise<{ orders: OrderRecord[]; total: number }> {
     const query: FilterQuery<OrderRecord> = filter.status ? { status: filter.status } : {};
     const [orders, total] = await Promise.all([
-      OrderModel.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean<OrderRecord[]>(),
+      OrderModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean<OrderRecord[]>(),
       OrderModel.countDocuments(query),
     ]);
     return { orders, total };

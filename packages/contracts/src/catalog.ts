@@ -6,10 +6,7 @@ export type ProductSort = (typeof PRODUCT_SORTS)[number];
 
 export const SizeVariantSchema = z.object({
   size: z.string({ required_error: 'Size name is required' }),
-  stock: z
-    .number({ required_error: 'Stock quantity is required' })
-    .int('Stock must be a whole number')
-    .min(0, 'Stock cannot be negative'),
+  stock: z.number({ required_error: 'Stock quantity is required' }).int('Stock must be a whole number').min(0, 'Stock cannot be negative'),
 });
 export type SizeVariant = z.infer<typeof SizeVariantSchema>;
 

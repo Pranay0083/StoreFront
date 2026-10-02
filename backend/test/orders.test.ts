@@ -7,14 +7,21 @@ import { API, bearer, useTestApp } from './helpers/app';
 const t = useTestApp();
 
 function placeOrder(token: string, body: Record<string, unknown>) {
-  return t.http().post(`${API}/orders`).set(bearer(token)).send({ address: ADDRESS, ...body });
+  return t
+    .http()
+    .post(`${API}/orders`)
+    .set(bearer(token))
+    .send({ address: ADDRESS, ...body });
 }
 
 describe('orders', () => {
   it('creates an order from current product prices and clears the cart', async () => {
     const buyer = await createUser();
     const product = await createProduct({ price: 100_000 });
-    await Cart.create({ userId: buyer.user._id, items: [{ productId: product._id, title: product.title, price: 100_000, size: 'M', qty: 2, slug: product.slug }] });
+    await Cart.create({
+      userId: buyer.user._id,
+      items: [{ productId: product._id, title: product.title, price: 100_000, size: 'M', qty: 2, slug: product.slug }],
+    });
 
     const res = await placeOrder(buyer.token, { items: [{ productId: String(product._id), size: 'M', qty: 2 }] }).expect(201);
     expect(res.body).toMatchObject({ subtotal: 200_000, shipping: 9_900, discount: 0, total: 209_900, status: 'created' });
@@ -28,7 +35,10 @@ describe('orders', () => {
     const buyer = await createUser();
     const product = await createProduct({ price: 400_000 });
     await createCoupon();
-    const res = await placeOrder(buyer.token, { items: [{ productId: String(product._id), size: 'M', qty: 1 }], couponCode: 'welcome10' }).expect(201);
+    const res = await placeOrder(buyer.token, {
+      items: [{ productId: String(product._id), size: 'M', qty: 1 }],
+      couponCode: 'welcome10',
+    }).expect(201);
     expect(res.body).toMatchObject({ subtotal: 400_000, discount: 40_000, shipping: 0, total: 360_000, couponCode: 'WELCOME10' });
   });
 

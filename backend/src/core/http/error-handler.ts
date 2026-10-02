@@ -19,6 +19,10 @@ export const notFoundHandler = (req: Request, _res: Response, next: NextFunction
 export const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
   const appErr = normalize(err);
   if (appErr.status >= 500) logger.error({ err, path: req.path }, 'Unhandled error');
-  const body: ApiErrorBody = { error: appErr.message, ...(appErr.code && { code: appErr.code }), ...(appErr.details && { details: appErr.details }) };
+  const body: ApiErrorBody = {
+    error: appErr.message,
+    ...(appErr.code && { code: appErr.code }),
+    ...(appErr.details && { details: appErr.details }),
+  };
   res.status(appErr.status).json(body);
 };
