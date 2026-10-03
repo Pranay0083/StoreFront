@@ -13,6 +13,7 @@ export const API_PREFIX = '/api/v1';
 export function buildApp(container: Container) {
   const { env, limiters } = container;
   const app = express();
+  app.set('trust proxy', env.TRUST_PROXY);
 
   app.use(helmet());
   app.use(limiters.global);

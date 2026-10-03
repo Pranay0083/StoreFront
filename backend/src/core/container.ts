@@ -12,6 +12,7 @@ import { AuthGuards } from '../modules/auth/auth.guards';
 import { authRoutes } from '../modules/auth/auth.routes';
 import { AuthService } from '../modules/auth/auth.service';
 import { LoginAttemptRepository } from '../modules/auth/login-attempt.repository';
+import { LoginThrottle } from '../modules/auth/login-throttle';
 import { AuthSessionRepository } from '../modules/auth/session.repository';
 import { TokenService } from '../modules/auth/token.service';
 import { UserRepository } from '../modules/auth/user.repository';
@@ -70,7 +71,7 @@ export function buildContainer(env: Env) {
 
   const services = {
     tokens,
-    auth: new AuthService(repositories.users, repositories.loginAttempts, repositories.authSessions, tokens),
+    auth: new AuthService(repositories.users, new LoginThrottle(repositories.loginAttempts), repositories.authSessions, tokens),
     catalog,
     reviews: new ReviewsService(repositories.reviews, repositories.products),
     cart,

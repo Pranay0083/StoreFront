@@ -1,7 +1,7 @@
 import type { ApiErrorBody } from '@storefront/contracts';
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
-import { AppError, NotFoundError } from '../errors';
+import { AppError, NotFoundError, TooManyRequestsError } from '../errors';
 import { logger } from '../logger';
 
 function normalize(err: unknown): AppError {
@@ -24,5 +24,6 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
     ...(appErr.code && { code: appErr.code }),
     ...(appErr.details && { details: appErr.details }),
   };
+  if (appErr instanceof TooManyRequestsError && appErr.retryAfterSeconds) res.set('Retry-After', String(appErr.retryAfterSeconds));
   res.status(appErr.status).json(body);
 };

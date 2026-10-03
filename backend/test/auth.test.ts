@@ -39,13 +39,13 @@ describe('auth', () => {
     await t.http().get(`${API}/auth/me`).expect(401);
   });
 
-  it('locks the account after five failed attempts', async () => {
+  it('throttles the account after repeated failed attempts', async () => {
     const { password } = await createUser({ email: 'meera@test.dev' });
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       await t.http().post(`${API}/auth/login`).send({ email: 'meera@test.dev', password: 'wrong-password' }).expect(401);
     }
-    const locked = await t.http().post(`${API}/auth/login`).send({ email: 'meera@test.dev', password }).expect(429);
-    expect(locked.body.error).toMatch(/Too many failed attempts/);
+    const throttled = await t.http().post(`${API}/auth/login`).send({ email: 'meera@test.dev', password }).expect(429);
+    expect(throttled.body.error).toMatch(/Too many failed attempts/);
   });
 
   it('refreshes the session from the refresh cookie', async () => {

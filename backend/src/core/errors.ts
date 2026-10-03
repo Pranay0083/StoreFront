@@ -49,7 +49,10 @@ export class ConflictError extends AppError {
 }
 
 export class TooManyRequestsError extends AppError {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly retryAfterSeconds?: number,
+  ) {
     super(429, message, undefined, 'TOO_MANY_REQUESTS');
   }
 }
