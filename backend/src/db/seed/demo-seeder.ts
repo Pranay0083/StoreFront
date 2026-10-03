@@ -1,4 +1,4 @@
-import { rupeesToPaise as inr, shippingFor } from '@storefront/contracts';
+import { rupeesToPaise as inr, shippingFor, type OrderStatus } from '@storefront/contracts';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { logger } from '../../core/logger';
@@ -260,13 +260,13 @@ async function seedCustomer(email: string, name: string, password: string) {
   return (await UserModel.findOne({ email })) ?? (await UserModel.create({ email, name, passwordHash: await bcrypt.hash(password, 10) }));
 }
 
-type OrderPath = Array<'created' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'>;
+type OrderPath = OrderStatus[];
 
 function pickOrderPath(daysAgo: number): OrderPath {
   const roll = Math.random();
   if (roll < 0.06) return ['created'];
   if (roll < 0.12) return ['created', 'cancelled'];
-  if (roll < 0.16) return ['created', 'paid', 'refunded'];
+  if (roll < 0.16) return ['created', 'paid', 'refund_requested', 'refunded'];
   if (daysAgo > 7) return ['created', 'paid', 'packed', 'shipped', 'delivered'];
   if (daysAgo > 3)
     return pick([

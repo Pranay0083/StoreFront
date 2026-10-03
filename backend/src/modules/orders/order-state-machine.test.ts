@@ -17,7 +17,8 @@ describe('OrderStateMachine', () => {
     ['paid', 'packed'],
     ['packed', 'shipped'],
     ['shipped', 'delivered'],
-    ['delivered', 'refunded'],
+    ['delivered', 'refund_requested'],
+    ['refund_requested', 'refunded'],
     ['created', 'cancelled'],
   ] as const)('allows %s → %s', (from, to) => {
     expect(() => OrderStateMachine.assert(from, to)).not.toThrow();
@@ -27,6 +28,8 @@ describe('OrderStateMachine', () => {
     ['created', 'shipped'],
     ['shipped', 'cancelled'],
     ['refunded', 'paid'],
+    ['paid', 'cancelled'],
+    ['paid', 'refunded'],
     ['delivered', 'created'],
   ] as const)('rejects %s → %s with a 409 conflict', (from, to) => {
     expect(() => OrderStateMachine.assert(from, to)).toThrowError(ConflictError);

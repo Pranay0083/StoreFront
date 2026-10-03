@@ -1,10 +1,9 @@
-import { REVENUE_STATUSES, type OrderStatus } from '@storefront/contracts';
+import { ADMIN_ORDER_ACTIONS, REVENUE_STATUSES, type OrderStatus } from '@storefront/contracts';
 import { logger } from '../../core/logger';
 import type { UserRepository } from '../auth/user.repository';
 import type { CartRepository } from '../cart/cart.repository';
 import type { ProductRepository } from '../catalog/product.repository';
 import type { ConversationRepository } from '../agent/conversation.repository';
-import { OrderStateMachine } from '../orders/order-state-machine';
 import type { OrderRepository } from '../orders/order.repository';
 import type { OrdersService } from '../orders/orders.service';
 
@@ -45,7 +44,7 @@ export class AdminService {
   async funnel() {
     const [carts, counts] = await Promise.all([this.carts.countNonEmpty(), this.orders.countByStatus()]);
     const placed = Object.values(counts).reduce((a, b) => a + b, 0);
-    const paid = REVENUE_STATUSES.reduce((a, s) => a + (counts[s] ?? 0), 0) + (counts.refunded ?? 0);
+    const paid = REVENUE_STATUSES.reduce((a, s) => a + (counts[s] ?? 0), 0) + (counts.refund_requested ?? 0) + (counts.refunded ?? 0);
     return [
       { stage: 'Active carts', count: carts + placed },
       { stage: 'Orders placed', count: placed },
@@ -64,7 +63,7 @@ export class AdminService {
 
   async listOrders(status: OrderStatus | undefined, page: number) {
     const { orders, total } = await this.orders.page({ status }, page, ORDERS_PAGE_SIZE);
-    return { orders, total, page, pages: Math.ceil(total / ORDERS_PAGE_SIZE), transitions: OrderStateMachine.transitions };
+    return { orders, total, page, pages: Math.ceil(total / ORDERS_PAGE_SIZE), transitions: ADMIN_ORDER_ACTIONS };
   }
 
   async bulkTransition(ids: string[], to: OrderStatus, adminId: string) {
