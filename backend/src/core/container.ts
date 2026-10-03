@@ -33,6 +33,10 @@ import { OrdersController } from '../modules/orders/orders.controller';
 import { ordersRoutes } from '../modules/orders/orders.routes';
 import { OrdersService } from '../modules/orders/orders.service';
 import { PaymentsController } from '../modules/payments/payments.controller';
+import { InventoryController } from '../modules/inventory/inventory.controller';
+import { InventoryMovementRepository, StockReservationRepository } from '../modules/inventory/inventory.repository';
+import { inventoryRoutes } from '../modules/inventory/inventory.routes';
+import { InventoryService } from '../modules/inventory/inventory.service';
 import { PaymentGatewayFactory } from '../modules/payments/gateways/payment-gateway.factory';
 import { paymentsRoutes } from '../modules/payments/payments.routes';
 import { PaymentsService } from '../modules/payments/payments.service';
@@ -43,6 +47,7 @@ import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
 import type { Env } from './config/env';
 import { createRateLimiters } from './http/rate-limit';
+import { TransactionRunner } from './persistence/transaction';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
 export function buildContainer(env: Env) {
@@ -58,10 +63,15 @@ export function buildContainer(env: Env) {
     orders: new OrderRepository(),
     webhookEvents: new WebhookEventRepository(),
     conversations: new ConversationRepository(),
+    inventoryMovements: new InventoryMovementRepository(),
+    stockReservations: new StockReservationRepository(),
   };
 
+  const tx = new TransactionRunner();
+
   const tokens = new TokenService(env.JWT_SECRET);
-  const catalog = new CatalogService(repositories.products);
+  const inventory = new InventoryService(repositories.products, repositories.inventoryMovements, repositories.stockReservations);
+  const catalog = new CatalogService(repositories.products, inventory, tx);
   const cart = new CartService(repositories.carts);
   const coupons = new CouponService(repositories.coupons);
   const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart);
@@ -76,6 +86,7 @@ export function buildContainer(env: Env) {
     tokens,
     auth: new AuthService(repositories.users, repositories.loginAttempts, tokens),
     catalog,
+    inventory,
     reviews: new ReviewsService(repositories.reviews, repositories.products),
     cart,
     coupons,
@@ -106,6 +117,7 @@ export function buildContainer(env: Env) {
     agent: new AgentController(services.agent),
     mcp: new McpController(services.agentTools),
     admin: new AdminController(services.admin),
+    inventory: new InventoryController(services.inventory),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -119,10 +131,11 @@ export function buildContainer(env: Env) {
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
+    ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin', adminRoutes(controllers.admin, guards)],
   ];
 
-  return { env, limiters, repositories, services, guards, controllers, routes };
+  return { env, limiters, tx, repositories, services, guards, controllers, routes };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

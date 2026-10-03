@@ -1,10 +1,12 @@
 import { rupeesToPaise as inr, shippingFor } from '@storefront/contracts';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import { logger } from '../../core/logger';
 import type { Env } from '../../core/config/env';
 import { UserModel } from '../../modules/auth/user.model';
 import { ProductModel } from '../../modules/catalog/product.model';
 import { CouponModel } from '../../modules/coupons/coupon.model';
+import { recordOpeningBalances } from '../../modules/inventory/opening-balances';
 import { OrderModel } from '../../modules/orders/order.model';
 import { ReviewModel } from '../../modules/reviews/review.model';
 
@@ -299,6 +301,7 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
   if ((await ProductModel.countDocuments()) > 0) return { catalogSeeded: false };
 
   const products = await ProductModel.insertMany(PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));
+  await recordOpeningBalances(mongoose.connection.db!, 'system:seed');
 
   const buyerNames = ['Aarav Shah', 'Meera Iyer', 'Kabir Rao', 'Ananya Das'];
   const buyers = [customer];
