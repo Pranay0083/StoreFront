@@ -62,7 +62,8 @@ jobs:
           NODE_ENV: production
           MONGO_URL: mongodb://127.0.0.1:27017
           DB_NAME: ci_storefront
-          JWT_SECRET: ci-secret-value
+          JWT_ACCESS_SECRET: ci-access-secret-0123456789abcdefghij
+          JWT_REFRESH_SECRET: ci-refresh-secret-0123456789abcdefghij
           PORT: 4001
           HOST: 127.0.0.1
         run: |

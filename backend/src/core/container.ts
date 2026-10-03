@@ -59,7 +59,7 @@ export function buildContainer(env: Env) {
     conversations: new ConversationRepository(),
   };
 
-  const tokens = new TokenService(env.JWT_SECRET);
+  const tokens = new TokenService({ access: env.JWT_ACCESS_SECRET, refresh: env.JWT_REFRESH_SECRET });
   const catalog = new CatalogService(repositories.products);
   const cart = new CartService(repositories.carts);
   const coupons = new CouponService(repositories.coupons);

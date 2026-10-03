@@ -13,7 +13,9 @@ export async function createUser(overrides: { email?: string; password?: string;
     role: overrides.role ?? 'customer',
     passwordHash: await bcrypt.hash(password, 4),
   });
-  const token = jwt.sign({ sub: String(user._id), email: user.email, type: 'access' }, process.env.JWT_SECRET!, { expiresIn: '15m' });
+  const token = jwt.sign({ sub: String(user._id), email: user.email, type: 'access' }, process.env.JWT_ACCESS_SECRET!, {
+    expiresIn: '15m',
+  });
   return { user, password, token, id: String(user._id) };
 }
 
