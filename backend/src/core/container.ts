@@ -12,6 +12,7 @@ import { AuthGuards } from '../modules/auth/auth.guards';
 import { authRoutes } from '../modules/auth/auth.routes';
 import { AuthService } from '../modules/auth/auth.service';
 import { LoginAttemptRepository } from '../modules/auth/login-attempt.repository';
+import { AuthSessionRepository } from '../modules/auth/session.repository';
 import { TokenService } from '../modules/auth/token.service';
 import { UserRepository } from '../modules/auth/user.repository';
 import { CartController } from '../modules/cart/cart.controller';
@@ -50,6 +51,7 @@ export function buildContainer(env: Env) {
   const repositories = {
     users: new UserRepository(),
     loginAttempts: new LoginAttemptRepository(),
+    authSessions: new AuthSessionRepository(),
     products: new ProductRepository(),
     reviews: new ReviewRepository(),
     carts: new CartRepository(),
@@ -68,7 +70,7 @@ export function buildContainer(env: Env) {
 
   const services = {
     tokens,
-    auth: new AuthService(repositories.users, repositories.loginAttempts, tokens),
+    auth: new AuthService(repositories.users, repositories.loginAttempts, repositories.authSessions, tokens),
     catalog,
     reviews: new ReviewsService(repositories.reviews, repositories.products),
     cart,

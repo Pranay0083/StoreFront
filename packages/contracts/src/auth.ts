@@ -37,3 +37,12 @@ export interface AuthResponse {
   user: User;
   token?: string;
 }
+
+export interface AuthSessionInfo {
+  id: string;
+  createdAt: string;
+  lastUsedAt: string;
+  ip?: string;
+  userAgent?: string;
+  current: boolean;
+}

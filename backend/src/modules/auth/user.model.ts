@@ -7,6 +7,7 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true },
     name: { type: String, required: true },
     role: { type: String, enum: ROLES, default: 'customer', required: true },
+    sessionsValidAfter: Date,
   },
   { timestamps: true },
 );

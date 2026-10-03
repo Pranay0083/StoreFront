@@ -30,6 +30,10 @@ export class UserRepository {
     await UserModel.updateOne({ _id: id }, { $set: { passwordHash } });
   }
 
+  async invalidateSessionsBefore(id: string, at: Date): Promise<void> {
+    await UserModel.updateOne({ _id: id }, { $set: { sessionsValidAfter: at } });
+  }
+
   countByRole(role: Role): Promise<number> {
     return UserModel.countDocuments({ role });
   }
