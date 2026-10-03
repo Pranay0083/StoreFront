@@ -1,18 +1,10 @@
 import crypto from 'node:crypto';
-import Razorpay from 'razorpay';
 import { BadRequestError, ConflictError } from '../../core/errors';
 import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
 import type { OrdersService } from '../orders/orders.service';
+import type { PaymentGateway } from './gateways/payment-gateway';
 import type { WebhookEventRepository } from './webhook-event.repository';
-
-export interface PaymentsConfig {
-  keyId: string;
-  keySecret: string;
-  webhookSecret: string;
-}
-
-export type PaymentsMode = 'razorpay' | 'demo';
 
 export interface VerifyPaymentInput {
   orderId: string;
@@ -30,54 +22,46 @@ export interface WebhookInput {
 
 export class PaymentsService {
   constructor(
-    private readonly config: PaymentsConfig,
+    private readonly gateway: PaymentGateway,
     private readonly orders: OrdersService,
     private readonly webhookEvents: WebhookEventRepository,
   ) {}
 
-  get mode(): PaymentsMode {
-    return this.config.keyId && this.config.keySecret ? 'razorpay' : 'demo';
+  get mode() {
+    return this.gateway.name;
   }
 
   publicConfig() {
-    return { mode: this.mode, keyId: this.mode === 'razorpay' ? this.config.keyId : null };
+    return this.gateway.publicConfig();
   }
 
   async createPayment(orderId: string, user: AuthUser) {
     const order = await this.orders.getOwnedDocument(orderId, user.id);
     if (order.status !== 'created') throw new ConflictError(`Order is already ${order.status}`);
-    if (this.mode === 'demo') {
-      order.set('payment.provider', 'demo');
-      await order.save();
-      return { mode: 'demo' as const, orderId: String(order._id), amount: order.total };
-    }
-    const razorOrder = await this.razorpay().orders.create({
-      amount: order.total,
-      currency: 'INR',
-      receipt: order.orderNumber.slice(0, 40),
-      payment_capture: true,
-    });
-    order.set('payment.provider', 'razorpay');
-    order.set('payment.razorpayOrderId', razorOrder.id);
+    const session = await this.gateway.createPayment({ orderId: String(order._id), orderNumber: order.orderNumber, amount: order.total });
+    order.set('payment.provider', session.provider);
+    if (session.gatewayOrderId) order.set('payment.razorpayOrderId', session.gatewayOrderId);
     await order.save();
-    logger.info({ orderId: order._id, razorpayOrderId: razorOrder.id }, 'Payment session created');
+    if (session.provider === 'demo') return { mode: 'demo' as const, orderId: String(order._id), amount: order.total };
+    logger.info({ orderId: order._id, razorpayOrderId: session.gatewayOrderId }, 'Payment session created');
     return {
       mode: 'razorpay' as const,
-      keyId: this.config.keyId,
-      razorpayOrderId: razorOrder.id,
-      amount: razorOrder.amount,
-      currency: 'INR',
+      keyId: this.gateway.publicConfig().keyId,
+      razorpayOrderId: session.gatewayOrderId,
+      amount: session.amount,
+      currency: session.currency,
       orderId: String(order._id),
     };
   }
 
   async verify(input: VerifyPaymentInput, user: AuthUser) {
     const order = await this.orders.getOwnedDocument(input.orderId, user.id);
-    const expected = crypto
-      .createHmac('sha256', this.config.keySecret)
-      .update(`${input.razorpay_order_id}|${input.razorpay_payment_id}`)
-      .digest('hex');
-    if (expected !== input.razorpay_signature) {
+    const valid = this.gateway.verifyPayment({
+      gatewayOrderId: input.razorpay_order_id,
+      paymentId: input.razorpay_payment_id,
+      signature: input.razorpay_signature,
+    });
+    if (!valid) {
       logger.warn({ orderId: order._id }, 'Invalid payment signature received');
       throw new BadRequestError('Invalid payment signature');
     }
@@ -96,26 +80,30 @@ export class PaymentsService {
 
   async handleWebhook({ rawBody, signature, eventId, payload }: WebhookInput): Promise<{ status: 'processed' | 'duplicate_ignored' }> {
     if (!signature || !rawBody) throw new BadRequestError('Missing signature');
-    const expected = crypto.createHmac('sha256', this.config.webhookSecret).update(rawBody).digest('hex');
-    if (expected !== signature) throw new BadRequestError('Invalid webhook signature');
+    if (!this.gateway.verifyWebhook(rawBody, signature)) throw new BadRequestError('Invalid webhook signature');
 
     const id = eventId || crypto.createHash('sha256').update(rawBody).digest('hex');
     if (!(await this.webhookEvents.recordOnce(id, payload.event))) return { status: 'duplicate_ignored' };
 
-    if (payload.event === 'payment.captured') {
-      const payment = payload.payload?.payment?.entity;
-      const order = payment ? await this.orders.findByRazorpayOrderId(payment.order_id) : null;
-      if (order && payment) {
-        await this.orders.markPaid(order, 'system:webhook', { razorpayPaymentId: payment.id });
-        logger.info({ orderId: order._id, razorpayPaymentId: payment.id }, 'Payment captured via webhook');
-      } else {
-        logger.warn({ razorpayOrderId: payment?.order_id }, 'Webhook received for unknown order');
-      }
+    try {
+      await this.dispatchWebhook(payload);
+    } catch (err) {
+      // Forget the event so the provider's retry is processed instead of being dropped as a duplicate.
+      await this.webhookEvents.forget(id);
+      throw err;
     }
     return { status: 'processed' };
   }
 
-  private razorpay() {
-    return new Razorpay({ key_id: this.config.keyId, key_secret: this.config.keySecret });
+  private async dispatchWebhook(payload: WebhookInput['payload']): Promise<void> {
+    if (payload.event !== 'payment.captured') return;
+    const payment = payload.payload?.payment?.entity;
+    const order = payment ? await this.orders.findByRazorpayOrderId(payment.order_id) : null;
+    if (!order || !payment) {
+      logger.warn({ razorpayOrderId: payment?.order_id }, 'Webhook received for unknown order');
+      return;
+    }
+    await this.orders.markPaid(order, 'system:webhook', { razorpayPaymentId: payment.id });
+    logger.info({ orderId: order._id, razorpayPaymentId: payment.id }, 'Payment captured via webhook');
   }
 }

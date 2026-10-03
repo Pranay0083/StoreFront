@@ -33,6 +33,7 @@ import { OrdersController } from '../modules/orders/orders.controller';
 import { ordersRoutes } from '../modules/orders/orders.routes';
 import { OrdersService } from '../modules/orders/orders.service';
 import { PaymentsController } from '../modules/payments/payments.controller';
+import { PaymentGatewayFactory } from '../modules/payments/gateways/payment-gateway.factory';
 import { paymentsRoutes } from '../modules/payments/payments.routes';
 import { PaymentsService } from '../modules/payments/payments.service';
 import { WebhookEventRepository } from '../modules/payments/webhook-event.repository';
@@ -65,6 +66,11 @@ export function buildContainer(env: Env) {
   const coupons = new CouponService(repositories.coupons);
   const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart);
   const agentTools = new AgentTools(catalog, repositories.orders, repositories.users);
+  const paymentGateway = PaymentGatewayFactory.create({
+    keyId: env.RAZORPAY_KEY_ID,
+    keySecret: env.RAZORPAY_KEY_SECRET,
+    webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
+  });
 
   const services = {
     tokens,
@@ -74,11 +80,7 @@ export function buildContainer(env: Env) {
     cart,
     coupons,
     orders,
-    payments: new PaymentsService(
-      { keyId: env.RAZORPAY_KEY_ID, keySecret: env.RAZORPAY_KEY_SECRET, webhookSecret: env.RAZORPAY_WEBHOOK_SECRET },
-      orders,
-      repositories.webhookEvents,
-    ),
+    payments: new PaymentsService(paymentGateway, orders, repositories.webhookEvents),
     agentTools,
     agent: new AgentService({ apiKey: env.GROQ_API_KEY, model: env.GROQ_MODEL }, agentTools, repositories.conversations),
     admin: new AdminService(
