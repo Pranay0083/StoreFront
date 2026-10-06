@@ -8,6 +8,7 @@ import { LoginSchema, RegisterSchema, SessionIdParamsSchema } from './auth.schem
 
 export function authRoutes(controller: AuthController, guards: AuthGuards, limiters: RateLimiters): Router {
   const router = Router();
+  router.get('/csrf', handler(controller.csrfToken));
   router.post('/register', limiters.auth, validate({ body: RegisterSchema }), handler(controller.register));
   router.post('/login', limiters.auth, validate({ body: LoginSchema }), handler(controller.login));
   router.post('/logout', handler(controller.logout));

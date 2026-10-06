@@ -43,11 +43,15 @@ import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
 import type { Env } from './config/env';
+import { CookiePolicy } from './http/cookies';
+import { CsrfProtection } from './http/csrf';
 import { createRateLimiters } from './http/rate-limit';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
 export function buildContainer(env: Env) {
   const limiters = createRateLimiters(env);
+  const cookies = new CookiePolicy(env);
+  const csrf = new CsrfProtection(env.CSRF_SECRET, cookies, ['/payments/webhook', '/mcp']);
 
   const repositories = {
     users: new UserRepository(),
@@ -97,7 +101,7 @@ export function buildContainer(env: Env) {
   const guards = new AuthGuards(services.auth);
 
   const controllers = {
-    auth: new AuthController(services.auth),
+    auth: new AuthController(services.auth, cookies, csrf),
     catalog: new CatalogController(services.catalog),
     reviews: new ReviewsController(services.reviews),
     cart: new CartController(services.cart),
@@ -123,7 +127,7 @@ export function buildContainer(env: Env) {
     ['/admin', adminRoutes(controllers.admin, guards)],
   ];
 
-  return { env, limiters, repositories, services, guards, controllers, routes };
+  return { env, limiters, cookies, csrf, repositories, services, guards, controllers, routes };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

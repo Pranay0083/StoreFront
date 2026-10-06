@@ -1,17 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { AuthSessionModel } from '../src/modules/auth/session.model';
 import { createUser } from './helpers/factories';
 import { API, bearer, useTestApp } from './helpers/app';
-import { cookieFrom } from './helpers/cookies';
+import { cookieFrom, fetchCsrf, type CsrfPair } from './helpers/cookies';
 
 const t = useTestApp();
+let csrf: CsrfPair;
+beforeAll(async () => {
+  csrf = await fetchCsrf(t);
+});
 
 async function signIn(email: string, password: string) {
   const res = await t.http().post(`${API}/auth/login`).send({ email, password }).expect(200);
   return { token: res.body.token as string, refresh: cookieFrom(res, 'refresh_token')! };
 }
 
-const refresh = (cookie: string) => t.http().post(`${API}/auth/refresh`).set('Cookie', cookie);
+const withCsrf = (cookie: string) => ({ Cookie: [cookie, csrf.cookie].join('; '), 'X-CSRF-Token': csrf.token });
+const refresh = (cookie: string) => t.http().post(`${API}/auth/refresh`).set(withCsrf(cookie));
 
 describe('refresh token rotation', () => {
   it('rotates the refresh token on every use and stores only fingerprints', async () => {
@@ -62,7 +67,7 @@ describe('logout', () => {
   it('revokes the current family', async () => {
     const { password } = await createUser({ email: 'bye@test.dev' });
     const session = await signIn('bye@test.dev', password);
-    const res = await t.http().post(`${API}/auth/logout`).set('Cookie', session.refresh).expect(200);
+    const res = await t.http().post(`${API}/auth/logout`).set(withCsrf(session.refresh)).expect(200);
     expect(cookieFrom(res, 'refresh_token')).toBe('refresh_token=');
     await refresh(session.refresh).expect(401);
     expect((await AuthSessionModel.findOne().lean())!.revokedReason).toBe('logout');

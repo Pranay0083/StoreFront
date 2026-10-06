@@ -6,9 +6,10 @@ import pinoHttp from 'pino-http';
 
 import type { Container } from './core/container';
 import { errorHandler, notFoundHandler } from './core/http/error-handler';
+import { API_PREFIX } from './core/http/paths';
 import { logger } from './core/logger';
 
-export const API_PREFIX = '/api/v1';
+export { API_PREFIX };
 
 export function buildApp(container: Container) {
   const { env, limiters } = container;
@@ -32,6 +33,7 @@ export function buildApp(container: Container) {
 
   const api = express.Router();
   api.get('/', (_req, res) => res.json({ status: 'ok', service: 'storefront-api' }));
+  api.use(container.csrf.middleware);
   for (const [path, router] of container.routes) api.use(path, router);
 
   app.use(API_PREFIX, api);

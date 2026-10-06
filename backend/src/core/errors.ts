@@ -36,6 +36,12 @@ export class ForbiddenError extends AppError {
   }
 }
 
+export class CsrfError extends AppError {
+  constructor() {
+    super(403, 'Missing or invalid CSRF token', undefined, 'CSRF_INVALID');
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(message = 'Not found') {
     super(404, message, undefined, 'NOT_FOUND');

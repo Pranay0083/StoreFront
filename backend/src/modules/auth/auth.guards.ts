@@ -1,15 +1,15 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { ForbiddenError } from '../../core/errors';
+import { ACCESS_COOKIE } from '../../core/http/cookies';
 import type { AuthService } from './auth.service';
 
-export const ACCESS_COOKIE = 'access_token';
-export const REFRESH_COOKIE = 'refresh_token';
+export { ACCESS_COOKIE, REFRESH_COOKIE } from '../../core/http/cookies';
 
+/** An explicit Bearer header wins over cookies so API clients are never mistaken for a browser session. */
 function extractToken(req: Request): string | undefined {
-  const cookie = req.cookies?.[ACCESS_COOKIE] as string | undefined;
-  if (cookie) return cookie;
   const header = req.headers.authorization;
-  return header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+  if (header?.startsWith('Bearer ')) return header.slice(7);
+  return req.cookies?.[ACCESS_COOKIE] as string | undefined;
 }
 
 export class AuthGuards {

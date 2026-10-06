@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createUser } from './helpers/factories';
+import { fetchCsrf } from './helpers/cookies';
 import { API, bearer, useTestApp } from './helpers/app';
 
 const t = useTestApp();
@@ -55,7 +56,12 @@ describe('auth', () => {
       .send({ name: 'Ravi', email: 'ravi@test.dev', password: 'secret123' })
       .expect(201);
     const refreshCookie = cookieValue(reg.headers['set-cookie'], 'refresh_token')!;
-    const res = await t.http().post(`${API}/auth/refresh`).set('Cookie', refreshCookie).expect(200);
+    const csrf = await fetchCsrf(t);
+    const res = await t
+      .http()
+      .post(`${API}/auth/refresh`)
+      .set({ Cookie: `${refreshCookie}; ${csrf.cookie}`, 'X-CSRF-Token': csrf.token })
+      .expect(200);
     expect(res.body.user.email).toBe('ravi@test.dev');
     await t.http().post(`${API}/auth/refresh`).expect(401);
   });
