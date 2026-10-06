@@ -17,7 +17,6 @@ export function buildApp(container: Container) {
   app.set('trust proxy', env.TRUST_PROXY);
 
   app.use(helmet());
-  app.use(limiters.global);
   app.use(pinoHttp({ logger }));
 
   app.use(cors({ origin: [env.FRONTEND_URL, 'http://localhost:3000'], credentials: true }));
@@ -32,6 +31,7 @@ export function buildApp(container: Container) {
   app.use(cookieParser());
 
   const api = express.Router();
+  api.use(limiters.middleware);
   api.get('/', (_req, res) => res.json({ status: 'ok', service: 'storefront-api' }));
   api.use(container.csrf.middleware);
   for (const [path, router] of container.routes) api.use(path, router);

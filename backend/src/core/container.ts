@@ -45,11 +45,15 @@ import { ReviewsService } from '../modules/reviews/reviews.service';
 import type { Env } from './config/env';
 import { CookiePolicy } from './http/cookies';
 import { CsrfProtection } from './http/csrf';
-import { createRateLimiters } from './http/rate-limit';
+import { createRateLimiters, memoryStores, type RateLimitStoreFactory } from './http/rate-limit';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
-export function buildContainer(env: Env) {
-  const limiters = createRateLimiters(env);
+export interface Infrastructure {
+  rateLimitStores: RateLimitStoreFactory;
+}
+
+export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStores: memoryStores }) {
+  const limiters = createRateLimiters(env, infra.rateLimitStores);
   const cookies = new CookiePolicy(env);
   const csrf = new CsrfProtection(env.CSRF_SECRET, cookies, ['/payments/webhook', '/mcp']);
 
@@ -114,7 +118,7 @@ export function buildContainer(env: Env) {
   };
 
   const routes: Array<[path: string, router: Router]> = [
-    ['/auth', authRoutes(controllers.auth, guards, limiters)],
+    ['/auth', authRoutes(controllers.auth, guards)],
     ['/products', catalogRoutes(controllers.catalog, guards)],
     ['/reviews', reviewsRoutes(controllers.reviews, guards)],
     ['/cart', cartRoutes(controllers.cart, guards)],
