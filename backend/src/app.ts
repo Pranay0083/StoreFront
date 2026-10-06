@@ -1,12 +1,11 @@
 import cookieParser from 'cookie-parser';
-import cors from 'cors';
 import express from 'express';
-import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 
 import type { Container } from './core/container';
 import { errorHandler, notFoundHandler } from './core/http/error-handler';
 import { API_PREFIX } from './core/http/paths';
+import { corsPolicy, securityHeaders } from './core/http/security';
 import { logger } from './core/logger';
 
 export { API_PREFIX };
@@ -15,11 +14,12 @@ export function buildApp(container: Container) {
   const { env, limiters } = container;
   const app = express();
   app.set('trust proxy', env.TRUST_PROXY);
+  app.disable('x-powered-by');
 
-  app.use(helmet());
+  app.use(securityHeaders(env));
   app.use(pinoHttp({ logger }));
 
-  app.use(cors({ origin: [env.FRONTEND_URL, 'http://localhost:3000'], credentials: true }));
+  app.use(corsPolicy(env));
   app.use(
     express.json({
       limit: '2mb',
