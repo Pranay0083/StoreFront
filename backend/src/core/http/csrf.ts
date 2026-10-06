@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { CsrfError } from '../errors';
-import { ACCESS_COOKIE, CookiePolicy, CSRF_COOKIE, REFRESH_COOKIE } from './cookies';
+import { ACCESS_COOKIE, type CookiePolicy, CSRF_COOKIE, REFRESH_COOKIE } from './cookies';
 
 export const CSRF_HEADER = 'x-csrf-token';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
