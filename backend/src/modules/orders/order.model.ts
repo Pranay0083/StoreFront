@@ -1,4 +1,4 @@
-import { ORDER_STATUSES, type Address, type OrderStatus } from '@storefront/contracts';
+import { ORDER_STATUSES, REFUND_STATES, type Address, type OrderStatus, type RefundState } from '@storefront/contracts';
 import mongoose, { Schema, type HydratedDocument, type Types } from 'mongoose';
 
 export interface OrderItemRecord {
@@ -24,6 +24,19 @@ export interface OrderPaymentRecord {
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   status: string;
+  capturedAt?: Date;
+}
+
+export interface OrderRefundRecord {
+  status: RefundState;
+  amount: number;
+  reason: string;
+  requestedBy: string;
+  requestedAt: Date;
+  previousStatus: OrderStatus;
+  gatewayRefundId?: string;
+  completedAt?: Date;
+  failureReason?: string;
 }
 
 export interface OrderRecord {
@@ -40,7 +53,11 @@ export interface OrderRecord {
   status: OrderStatus;
   statusHistory: StatusEventRecord[];
   payment: OrderPaymentRecord;
+  refund?: OrderRefundRecord;
   paidAt?: Date;
+  deliveredAt?: Date;
+  reservedUntil?: Date;
+  version: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -83,8 +100,29 @@ const orderSchema = new Schema<OrderRecord>(
       razorpayOrderId: String,
       razorpayPaymentId: String,
       status: { type: String, default: 'pending' },
+      capturedAt: Date,
+    },
+    refund: {
+      type: new Schema(
+        {
+          status: { type: String, enum: REFUND_STATES, required: true },
+          amount: { type: Number, required: true },
+          reason: { type: String, required: true },
+          requestedBy: { type: String, required: true },
+          requestedAt: { type: Date, required: true },
+          previousStatus: { type: String, enum: ORDER_STATUSES, required: true },
+          gatewayRefundId: String,
+          completedAt: Date,
+          failureReason: String,
+        },
+        { _id: false },
+      ),
+      required: false,
     },
     paidAt: Date,
+    deliveredAt: Date,
+    reservedUntil: Date,
+    version: { type: Number, default: 0, required: true },
   },
   { timestamps: true },
 );
@@ -92,5 +130,7 @@ const orderSchema = new Schema<OrderRecord>(
 orderSchema.index({ userId: 1, createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ 'payment.razorpayOrderId': 1 });
+orderSchema.index({ 'payment.razorpayPaymentId': 1 }, { sparse: true });
+orderSchema.index({ 'refund.gatewayRefundId': 1 }, { sparse: true });
 
 export const OrderModel = mongoose.model<OrderRecord>('Order', orderSchema);

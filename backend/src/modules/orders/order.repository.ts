@@ -2,7 +2,9 @@ import { REVENUE_STATUSES, type OrderStatus } from '@storefront/contracts';
 import type { FilterQuery, Types } from 'mongoose';
 import { OrderModel, type OrderDocument, type OrderRecord } from './order.model';
 
-export type NewOrder = Omit<OrderRecord, '_id' | 'userId' | 'createdAt' | 'updatedAt' | 'payment' | 'paidAt'> & { userId: string };
+export type NewOrder = Omit<OrderRecord, '_id' | 'userId' | 'createdAt' | 'updatedAt' | 'payment' | 'paidAt' | 'version'> & {
+  userId: string;
+};
 
 export interface RevenueSummary {
   revenue: number;
