@@ -75,7 +75,7 @@ export class AdminService {
         continue;
       }
       try {
-        await this.ordersService.transition(id, to, `admin:${adminId}`, 'Bulk action');
+        await this.ordersService.adminTransition(id, to, adminId, 'Bulk action');
         results.updated++;
       } catch (e) {
         results.rejected.push({ id: order.orderNumber, reason: (e as Error).message });

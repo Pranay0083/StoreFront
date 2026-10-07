@@ -1,6 +1,7 @@
 import type { CouponInput, CouponUpdate, Paise } from '@storefront/contracts';
 import { BadRequestError, ConflictError, NotFoundError } from '../../core/errors';
 import { logger } from '../../core/logger';
+import type { Session } from '../../core/persistence/transaction';
 import type { CouponRecord } from './coupon.model';
 import { assertCouponRedeemable, calculateDiscount } from './coupon.policy';
 import type { CouponRepository } from './coupon.repository';
@@ -20,8 +21,18 @@ export class CouponService {
     return { coupon, discount: calculateDiscount(coupon, subtotal) };
   }
 
-  recordRedemption(code: string): Promise<void> {
-    return this.coupons.incrementUsage(code);
+  /** Reserves one use of the coupon for an order inside the checkout transaction. */
+  async redeem(code: string, orderId: string, userId: string, session: Session): Promise<void> {
+    if (!(await this.coupons.tryIncrementUsage(code, session))) throw new BadRequestError('This coupon has been fully redeemed');
+    await this.coupons.recordRedemption({ couponCode: code, orderId, userId }, session);
+  }
+
+  /** Gives the use back when an unpaid order is cancelled. Idempotent per order. */
+  async releaseRedemption(orderId: string, session: Session): Promise<boolean> {
+    const code = await this.coupons.releaseRedemption(orderId, session);
+    if (!code) return false;
+    await this.coupons.decrementUsage(code, session);
+    return true;
   }
 
   list(): Promise<CouponRecord[]> {

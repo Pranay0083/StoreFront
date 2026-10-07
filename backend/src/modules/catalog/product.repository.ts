@@ -22,8 +22,10 @@ export class ProductRepository {
     return ProductModel.countDocuments(filter);
   }
 
-  findById(id: string): Promise<ProductRecord | null> {
-    return ProductModel.findById(id).lean<ProductRecord>();
+  findById(id: string, session?: Session): Promise<ProductRecord | null> {
+    return ProductModel.findById(id)
+      .session(session ?? null)
+      .lean<ProductRecord>();
   }
 
   findBySlug(slug: string): Promise<ProductRecord | null> {
@@ -93,9 +95,5 @@ export class ProductRepository {
 
   async setRating(id: string, rating: number, numReviews: number): Promise<void> {
     await ProductModel.updateOne({ _id: id }, { $set: { rating, numReviews } });
-  }
-
-  async adjustStock(productId: string, size: string, delta: number): Promise<void> {
-    await ProductModel.updateOne({ _id: productId, 'sizes.size': size }, { $inc: { 'sizes.$.stock': delta } });
   }
 }

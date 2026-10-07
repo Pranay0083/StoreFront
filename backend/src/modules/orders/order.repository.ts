@@ -1,10 +1,9 @@
 import { REVENUE_STATUSES, type OrderStatus } from '@storefront/contracts';
 import type { FilterQuery, Types } from 'mongoose';
-import { OrderModel, type OrderDocument, type OrderRecord } from './order.model';
-
-export type NewOrder = Omit<OrderRecord, '_id' | 'userId' | 'createdAt' | 'updatedAt' | 'payment' | 'paidAt' | 'version'> & {
-  userId: string;
-};
+import { ConflictError } from '../../core/errors';
+import type { Session } from '../../core/persistence/transaction';
+import { Order, type OrderProps } from './order.aggregate';
+import { OrderModel, type OrderRecord } from './order.model';
 
 export interface RevenueSummary {
   revenue: number;
@@ -20,25 +19,98 @@ export interface TopProductRow {
   revenue: number;
 }
 
+export class OrderConcurrencyError extends ConflictError {
+  constructor(orderId: string) {
+    super(`Order ${orderId} was modified concurrently, please retry`);
+  }
+}
+
+const compact = <T extends object>(obj: T): T => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+
+const OPTIONAL_STATE_FIELDS = ['refund', 'paidAt', 'deliveredAt', 'reservedUntil'] as const;
+
+export function toOrderProps(r: OrderRecord): OrderProps {
+  return compact({
+    id: String(r._id),
+    orderNumber: r.orderNumber,
+    userId: String(r.userId),
+    items: r.items.map(i =>
+      compact({ productId: String(i.productId), title: i.title, image: i.image, price: i.price, size: i.size, qty: i.qty, slug: i.slug }),
+    ),
+    address: r.address,
+    subtotal: r.subtotal,
+    shipping: r.shipping,
+    discount: r.discount ?? 0,
+    couponCode: r.couponCode ?? undefined,
+    total: r.total,
+    status: r.status,
+    statusHistory: r.statusHistory.map(e => ({ from: e.from ?? null, to: e.to, by: e.by, note: e.note ?? '', at: e.at })),
+    payment: compact({
+      provider: r.payment?.provider ?? 'demo',
+      razorpayOrderId: r.payment?.razorpayOrderId ?? undefined,
+      razorpayPaymentId: r.payment?.razorpayPaymentId ?? undefined,
+      status: r.payment?.status === 'captured' ? ('captured' as const) : ('pending' as const),
+      capturedAt: r.payment?.capturedAt ?? undefined,
+    }),
+    refund: r.refund ? compact({ ...r.refund }) : undefined,
+    paidAt: r.paidAt ?? undefined,
+    deliveredAt: r.deliveredAt ?? undefined,
+    reservedUntil: r.reservedUntil ?? undefined,
+    version: r.version ?? 0,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  });
+}
+
 export class OrderRepository {
-  async create(order: NewOrder): Promise<OrderDocument> {
-    return OrderModel.create(order);
+  async insert(order: Order, session?: Session): Promise<void> {
+    const { id, ...rest } = order.snapshot();
+    await OrderModel.create([{ _id: id, ...rest }], { session });
+  }
+
+  load(id: string, session?: Session): Promise<Order | null> {
+    return this.loadOne({ _id: id }, session);
+  }
+
+  loadByGatewayOrderId(gatewayOrderId: string, session?: Session): Promise<Order | null> {
+    return this.loadOne({ 'payment.razorpayOrderId': gatewayOrderId }, session);
+  }
+
+  loadByGatewayRefundId(gatewayRefundId: string, session?: Session): Promise<Order | null> {
+    return this.loadOne({ 'refund.gatewayRefundId': gatewayRefundId }, session);
+  }
+
+  loadByPaymentId(paymentId: string, session?: Session): Promise<Order | null> {
+    return this.loadOne({ 'payment.razorpayPaymentId': paymentId }, session);
+  }
+
+  /** Persists the aggregate only if nobody else changed it since it was loaded (optimistic concurrency). */
+  async save(order: Order, session?: Session): Promise<void> {
+    const p = order.snapshot();
+    const set: Record<string, unknown> = { status: p.status, statusHistory: p.statusHistory, payment: compact({ ...p.payment }) };
+    const unset: Record<string, 1> = {};
+    for (const key of OPTIONAL_STATE_FIELDS) {
+      if (p[key] === undefined) unset[key] = 1;
+      else set[key] = key === 'refund' ? compact({ ...p.refund! }) : p[key];
+    }
+    const res = await OrderModel.updateOne(
+      { _id: p.id, version: p.version === 0 ? { $in: [0, null] } : p.version },
+      { $set: set, ...(Object.keys(unset).length && { $unset: unset }), $inc: { version: 1 } },
+      { session },
+    );
+    if (res.matchedCount === 0) throw new OrderConcurrencyError(p.id);
+    order.markPersisted();
+  }
+
+  private async loadOne(filter: FilterQuery<OrderRecord>, session?: Session): Promise<Order | null> {
+    const record = await OrderModel.findOne(filter)
+      .session(session ?? null)
+      .lean<OrderRecord>();
+    return record ? Order.rehydrate(toOrderProps(record)) : null;
   }
 
   findById(id: string): Promise<OrderRecord | null> {
     return OrderModel.findById(id).lean<OrderRecord>();
-  }
-
-  findDocumentById(id: string): Promise<OrderDocument | null> {
-    return OrderModel.findById(id);
-  }
-
-  findDocumentByRazorpayOrderId(razorpayOrderId: string): Promise<OrderDocument | null> {
-    return OrderModel.findOne({ 'payment.razorpayOrderId': razorpayOrderId });
-  }
-
-  async save(order: OrderDocument): Promise<OrderDocument> {
-    return order.save();
   }
 
   listForUser(userId: string, limit = 50): Promise<OrderRecord[]> {

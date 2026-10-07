@@ -110,6 +110,16 @@ export class InventoryService {
     return true;
   }
 
+  /** Read-only availability check within the caller's snapshot; lets a caller decide before taking any stock. */
+  async canReserve(items: StockItem[], session: Session): Promise<boolean> {
+    for (const item of items) {
+      const product = await this.products.findStockLevels(item.productId, session);
+      const stock = product?.sizes.find(s => s.size === item.size)?.stock ?? 0;
+      if (stock < item.qty) return false;
+    }
+    return true;
+  }
+
   async hasReservation(orderId: string, session?: Session): Promise<boolean> {
     return (await this.reservations.findByOrder(orderId, session)) !== null;
   }

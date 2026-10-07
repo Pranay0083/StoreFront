@@ -68,7 +68,7 @@ describe('Order aggregate', () => {
     const order = paidOrder();
     order.pack('admin:a');
     order.ship('admin:a');
-    order.deliver('admin:a', at(DAY));
+    order.deliver('admin:a', '', at(DAY));
     expect(order.status).toBe('delivered');
     expect(order.snapshot().deliveredAt).toEqual(at(DAY));
     expect(order.snapshot().statusHistory.map(e => e.to)).toEqual(['created', 'paid', 'packed', 'shipped', 'delivered']);
@@ -116,7 +116,7 @@ describe('Order aggregate', () => {
     const order = paidOrder();
     order.pack('a');
     order.ship('a');
-    order.deliver('a', t0);
+    order.deliver('a', '', t0);
     expect(() => order.requestRefund({ by: 'user:u1', reason: 'Late' }, at(8 * DAY))).toThrow(/7-day refund window/);
     order.requestRefund({ by: 'user:u1', reason: 'Fine' }, at(6 * DAY));
     expect(order.status).toBe('refund_requested');

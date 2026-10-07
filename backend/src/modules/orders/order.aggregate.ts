@@ -189,16 +189,16 @@ export class Order {
     this.requestRefund({ by: payment.by, reason: 'Payment received after the order was cancelled' }, now);
   }
 
-  pack(by: string, now = new Date()): void {
-    this.transition('packed', by, '', now);
+  pack(by: string, note = '', now = new Date()): void {
+    this.transition('packed', by, note, now);
   }
 
-  ship(by: string, now = new Date()): void {
-    this.transition('shipped', by, '', now);
+  ship(by: string, note = '', now = new Date()): void {
+    this.transition('shipped', by, note, now);
   }
 
-  deliver(by: string, now = new Date()): void {
-    this.transition('delivered', by, '', now);
+  deliver(by: string, note = '', now = new Date()): void {
+    this.transition('delivered', by, note, now);
     this.props.deliveredAt = now;
   }
 

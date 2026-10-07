@@ -1,3 +1,4 @@
+import { REFUND_WINDOW_DAYS } from '@storefront/contracts';
 import type { Router } from 'express';
 import { AdminController } from '../modules/admin/admin.controller';
 import { adminRoutes } from '../modules/admin/admin.routes';
@@ -25,6 +26,7 @@ import { ProductRepository } from '../modules/catalog/product.repository';
 import { CouponRepository } from '../modules/coupons/coupon.repository';
 import { CouponsController } from '../modules/coupons/coupons.controller';
 import { adminCouponsRoutes, couponsRoutes } from '../modules/coupons/coupons.routes';
+import { registerCouponHandlers } from '../modules/coupons/coupons.handlers';
 import { CouponService } from '../modules/coupons/coupons.service';
 import { McpController } from '../modules/mcp/mcp.controller';
 import { mcpRoutes } from '../modules/mcp/mcp.routes';
@@ -32,7 +34,9 @@ import { OrderRepository } from '../modules/orders/order.repository';
 import { OrdersController } from '../modules/orders/orders.controller';
 import { ordersRoutes } from '../modules/orders/orders.routes';
 import { OrdersService } from '../modules/orders/orders.service';
+import { IntervalReservationSweeper, type ReservationExpiryScheduler } from '../modules/orders/reservation-sweeper';
 import { PaymentsController } from '../modules/payments/payments.controller';
+import { registerInventoryHandlers } from '../modules/inventory/inventory.handlers';
 import { InventoryController } from '../modules/inventory/inventory.controller';
 import { InventoryMovementRepository, StockReservationRepository } from '../modules/inventory/inventory.repository';
 import { inventoryRoutes } from '../modules/inventory/inventory.routes';
@@ -48,6 +52,10 @@ import { ReviewsService } from '../modules/reviews/reviews.service';
 import type { Env } from './config/env';
 import { createRateLimiters } from './http/rate-limit';
 import { TransactionRunner } from './persistence/transaction';
+import { EventBus } from './events/event-bus';
+import { PollingOutboxRelay, type OutboxRelay } from './events/outbox-relay';
+import { OutboxStore } from './events/outbox.store';
+import { logger } from './logger';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
 export function buildContainer(env: Env) {
@@ -68,19 +76,40 @@ export function buildContainer(env: Env) {
   };
 
   const tx = new TransactionRunner();
+  const outbox = new OutboxStore();
+  const eventBus = new EventBus();
+  const relay: OutboxRelay = new PollingOutboxRelay(outbox, eventBus, logger, { pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS });
 
   const tokens = new TokenService(env.JWT_SECRET);
   const inventory = new InventoryService(repositories.products, repositories.inventoryMovements, repositories.stockReservations);
   const catalog = new CatalogService(repositories.products, inventory, tx);
   const cart = new CartService(repositories.carts);
   const coupons = new CouponService(repositories.coupons);
-  const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart);
+  const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart, inventory, outbox, relay, tx, {
+    reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
+    refundWindowDays: REFUND_WINDOW_DAYS,
+  });
   const agentTools = new AgentTools(catalog, repositories.orders, repositories.users);
   const paymentGateway = PaymentGatewayFactory.create({
     keyId: env.RAZORPAY_KEY_ID,
     keySecret: env.RAZORPAY_KEY_SECRET,
     webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
   });
+
+  registerInventoryHandlers(eventBus, { products: repositories.products, outbox, logger, lowStockThreshold: env.LOW_STOCK_THRESHOLD });
+  registerCouponHandlers(eventBus, { coupons, tx });
+
+  const reservationSweeper: ReservationExpiryScheduler = new IntervalReservationSweeper(orders, env.RESERVATION_SWEEP_INTERVAL_MS, logger);
+  const background = {
+    start() {
+      relay.start();
+      reservationSweeper.start();
+    },
+    async stop() {
+      await reservationSweeper.stop();
+      await relay.stop();
+    },
+  };
 
   const services = {
     tokens,
@@ -92,6 +121,9 @@ export function buildContainer(env: Env) {
     coupons,
     orders,
     payments: new PaymentsService(paymentGateway, orders, repositories.webhookEvents),
+    outbox,
+    relay,
+    reservationSweeper,
     agentTools,
     agent: new AgentService({ apiKey: env.GROQ_API_KEY, model: env.GROQ_MODEL }, agentTools, repositories.conversations),
     admin: new AdminService(
@@ -135,7 +167,7 @@ export function buildContainer(env: Env) {
     ['/admin', adminRoutes(controllers.admin, guards)],
   ];
 
-  return { env, limiters, tx, repositories, services, guards, controllers, routes };
+  return { env, limiters, tx, eventBus, background, repositories, services, guards, controllers, routes };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

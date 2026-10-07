@@ -9,9 +9,19 @@ try {
   const env = loadEnv();
   await connectDB(env.MONGO_URL, env.DB_NAME);
   logger.info({ db: env.DB_NAME }, 'Connected to MongoDB');
-  buildApp(buildContainer(env)).listen(env.PORT, env.HOST, () => {
+  const container = buildContainer(env);
+  const server = buildApp(container).listen(env.PORT, env.HOST, () => {
     logger.info(`storefront-api listening on ${env.HOST}:${env.PORT}`);
   });
+  container.background.start();
+
+  const shutdown = (signal: string) => {
+    logger.info({ signal }, 'Shutting down');
+    server.close();
+    container.background.stop().finally(() => process.exit(0));
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 } catch (err) {
   console.error('[fatal] Failed to start storefront-api\n', err instanceof Error ? err.message : err);
   process.exit(1);

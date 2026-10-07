@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { BadRequestError, ConflictError } from '../../core/errors';
+import { BadRequestError, ConflictError, NotFoundError } from '../../core/errors';
 import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
 import type { OrdersService } from '../orders/orders.service';
@@ -13,11 +13,19 @@ export interface VerifyPaymentInput {
   razorpay_signature: string;
 }
 
+export interface RazorpayWebhookPayload {
+  event?: string;
+  payload?: {
+    payment?: { entity?: { id: string; order_id: string } };
+    refund?: { entity?: { id: string; payment_id: string; status?: string; error_description?: string | null } };
+  };
+}
+
 export interface WebhookInput {
   rawBody?: Buffer;
   signature?: string;
   eventId?: string;
-  payload: { event?: string; payload?: { payment?: { entity?: { id: string; order_id: string } } } };
+  payload: RazorpayWebhookPayload;
 }
 
 export class PaymentsService {
@@ -36,45 +44,55 @@ export class PaymentsService {
   }
 
   async createPayment(orderId: string, user: AuthUser) {
-    const order = await this.orders.getOwnedDocument(orderId, user.id);
+    const order = await this.orders.getOwned(orderId, user.id);
     if (order.status !== 'created') throw new ConflictError(`Order is already ${order.status}`);
-    const session = await this.gateway.createPayment({ orderId: String(order._id), orderNumber: order.orderNumber, amount: order.total });
-    order.set('payment.provider', session.provider);
-    if (session.gatewayOrderId) order.set('payment.razorpayOrderId', session.gatewayOrderId);
-    await order.save();
-    if (session.provider === 'demo') return { mode: 'demo' as const, orderId: String(order._id), amount: order.total };
-    logger.info({ orderId: order._id, razorpayOrderId: session.gatewayOrderId }, 'Payment session created');
+    const reservedUntil = order.snapshot().reservedUntil;
+    if (reservedUntil && reservedUntil.getTime() <= Date.now()) throw new ConflictError('The payment window for this order has expired');
+
+    const session = await this.gateway.createPayment({ orderId: order.id, orderNumber: order.orderNumber, amount: order.total });
+    await this.orders.attachPaymentSession(order.id, session.provider, session.gatewayOrderId);
+    if (session.provider === 'demo') return { mode: 'demo' as const, orderId: order.id, amount: order.total };
+
+    logger.info({ orderId: order.id, razorpayOrderId: session.gatewayOrderId }, 'Payment session created');
     return {
       mode: 'razorpay' as const,
       keyId: this.gateway.publicConfig().keyId,
       razorpayOrderId: session.gatewayOrderId,
       amount: session.amount,
       currency: session.currency,
-      orderId: String(order._id),
+      orderId: order.id,
     };
   }
 
   async verify(input: VerifyPaymentInput, user: AuthUser) {
-    const order = await this.orders.getOwnedDocument(input.orderId, user.id);
-    const valid = this.gateway.verifyPayment({
-      gatewayOrderId: input.razorpay_order_id,
-      paymentId: input.razorpay_payment_id,
-      signature: input.razorpay_signature,
-    });
+    const order = await this.orders.getOwned(input.orderId, user.id);
+    const valid =
+      order.payment.razorpayOrderId === input.razorpay_order_id &&
+      this.gateway.verifyPayment({
+        gatewayOrderId: input.razorpay_order_id,
+        paymentId: input.razorpay_payment_id,
+        signature: input.razorpay_signature,
+      });
     if (!valid) {
-      logger.warn({ orderId: order._id }, 'Invalid payment signature received');
+      logger.warn({ orderId: order.id }, 'Invalid payment signature received');
       throw new BadRequestError('Invalid payment signature');
     }
-    const result = await this.orders.markPaid(order, 'system:razorpay-verify', { razorpayPaymentId: input.razorpay_payment_id });
-    logger.info({ orderId: order._id, alreadyProcessed: result.alreadyProcessed }, 'Payment verified');
+    const result = await this.orders.confirmPayment(
+      { orderId: order.id },
+      { by: 'system:razorpay-verify', paymentId: input.razorpay_payment_id, provider: this.gateway.name },
+    );
+    logger.info({ orderId: order.id, alreadyProcessed: result.alreadyProcessed }, 'Payment verified');
     return { ok: true, alreadyProcessed: result.alreadyProcessed, order: result.order };
   }
 
   async demoConfirm(orderId: string, user: AuthUser) {
     if (this.mode !== 'demo') throw new BadRequestError('Demo payments are disabled');
-    const order = await this.orders.getOwnedDocument(orderId, user.id);
+    const order = await this.orders.getOwned(orderId, user.id);
     if (order.status !== 'created' && order.status !== 'paid') throw new ConflictError(`Order is already ${order.status}`);
-    const result = await this.orders.markPaid(order, 'system:demo-pay', { razorpayPaymentId: `demo_pay_${order._id}` });
+    const result = await this.orders.confirmPayment(
+      { orderId },
+      { by: 'system:demo-pay', paymentId: `demo_pay_${orderId}`, provider: 'demo' },
+    );
     return { ok: true, alreadyProcessed: result.alreadyProcessed, order: result.order };
   }
 
@@ -95,15 +113,22 @@ export class PaymentsService {
     return { status: 'processed' };
   }
 
-  private async dispatchWebhook(payload: WebhookInput['payload']): Promise<void> {
+  private async dispatchWebhook(payload: RazorpayWebhookPayload): Promise<void> {
     if (payload.event !== 'payment.captured') return;
     const payment = payload.payload?.payment?.entity;
-    const order = payment ? await this.orders.findByRazorpayOrderId(payment.order_id) : null;
-    if (!order || !payment) {
-      logger.warn({ razorpayOrderId: payment?.order_id }, 'Webhook received for unknown order');
-      return;
+    if (!payment) return;
+    try {
+      const result = await this.orders.confirmPayment(
+        { gatewayOrderId: payment.order_id },
+        { by: 'system:webhook', paymentId: payment.id, provider: this.gateway.name },
+      );
+      logger.info(
+        { orderId: result.order.id, razorpayPaymentId: payment.id, alreadyProcessed: result.alreadyProcessed },
+        'Payment captured via webhook',
+      );
+    } catch (err) {
+      if (!(err instanceof NotFoundError)) throw err;
+      logger.warn({ razorpayOrderId: payment.order_id }, 'Webhook received for unknown order');
     }
-    await this.orders.markPaid(order, 'system:webhook', { razorpayPaymentId: payment.id });
-    logger.info({ orderId: order._id, razorpayPaymentId: payment.id }, 'Payment captured via webhook');
   }
 }
