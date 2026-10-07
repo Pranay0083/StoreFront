@@ -266,9 +266,12 @@ export class TieredAction extends CartDiscountAction {
     return tier ? this.discountAtTier(tier, scopeAmount) : 0;
   }
 
+  static describeReward(tier: Tier): string {
+    return tier.percentOff !== undefined ? `${tier.percentOff}% off` : `${formatINR(tier.amountOff ?? 0)} off`;
+  }
+
   static describeTier(tier: Tier): string {
-    const reward = tier.percentOff !== undefined ? `${tier.percentOff}% off` : `${formatINR(tier.amountOff ?? 0)} off`;
-    return `${reward} over ${formatINR(tier.minSubtotal)}`;
+    return `${TieredAction.describeReward(tier)} over ${formatINR(tier.minSubtotal)}`;
   }
 
   summary(): string {
