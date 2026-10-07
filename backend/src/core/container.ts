@@ -40,6 +40,14 @@ import { ReviewRepository } from '../modules/reviews/review.repository';
 import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
+import { ActivePromotionCache } from '../modules/pricing/active-promotion.cache';
+import { PricingController, PromotionsController } from '../modules/pricing/pricing.controller';
+import { MongoCustomerHistory, MongoPricingCatalog } from '../modules/pricing/pricing.ports';
+import { adminPromotionsRoutes, pricingRoutes } from '../modules/pricing/pricing.routes';
+import { PricingService } from '../modules/pricing/pricing.service';
+import { PromotionRepository } from '../modules/pricing/promotion.repository';
+import { PromotionsService } from '../modules/pricing/promotions.service';
+import { QuoteRepository } from '../modules/pricing/quote.model';
 import type { Env } from './config/env';
 import { createRateLimiters } from './http/rate-limit';
 
@@ -57,6 +65,8 @@ export function buildContainer(env: Env) {
     orders: new OrderRepository(),
     webhookEvents: new WebhookEventRepository(),
     conversations: new ConversationRepository(),
+    promotions: new PromotionRepository(),
+    quotes: new QuoteRepository(),
   };
 
   const tokens = new TokenService(env.JWT_SECRET);
@@ -65,6 +75,14 @@ export function buildContainer(env: Env) {
   const coupons = new CouponService(repositories.coupons);
   const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart);
   const agentTools = new AgentTools(catalog, repositories.orders, repositories.users);
+  const promotionCache = new ActivePromotionCache(repositories.promotions);
+  const pricing = new PricingService(
+    new MongoPricingCatalog(),
+    new MongoCustomerHistory(),
+    promotionCache,
+    repositories.promotions,
+    repositories.quotes,
+  );
 
   const services = {
     tokens,
@@ -89,6 +107,9 @@ export function buildContainer(env: Env) {
       repositories.products,
       repositories.conversations,
     ),
+    promotionCache,
+    pricing,
+    promotions: new PromotionsService(repositories.promotions, promotionCache, pricing),
   };
 
   const guards = new AuthGuards(services.auth);
@@ -104,6 +125,8 @@ export function buildContainer(env: Env) {
     agent: new AgentController(services.agent),
     mcp: new McpController(services.agentTools),
     admin: new AdminController(services.admin),
+    pricing: new PricingController(services.pricing),
+    promotions: new PromotionsController(services.promotions),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -116,7 +139,9 @@ export function buildContainer(env: Env) {
     ['/payments', paymentsRoutes(controllers.payments, guards)],
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
+    ['/pricing', pricingRoutes(controllers.pricing, guards)],
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
+    ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin', adminRoutes(controllers.admin, guards)],
   ];
 

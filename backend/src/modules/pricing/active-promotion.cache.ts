@@ -13,10 +13,12 @@ export class PromotionIndex {
   private readonly byProductId = new Map<string, Set<CompiledPromotion>>();
   private readonly bySlug = new Map<string, Set<CompiledPromotion>>();
   private readonly byCategory = new Map<string, Set<CompiledPromotion>>();
+  private readonly byCode = new Map<string, CompiledPromotion>();
 
   constructor(readonly promotions: readonly CompiledPromotion[]) {
     const add = (map: Map<string, Set<CompiledPromotion>>, key: string, p: CompiledPromotion) => map.set(key, (map.get(key) ?? new Set()).add(p));
     for (const p of promotions) {
+      if (p.def.code) this.byCode.set(p.def.code, p);
       const selectors = p.action.selectors();
       if (!selectors.length) this.global.add(p);
       for (const s of selectors) {
@@ -27,9 +29,16 @@ export class PromotionIndex {
     }
   }
 
-  /** Cart-wide promotions plus those whose selectors reference any of the products; preserves priority order. */
-  candidatesFor(products: readonly SelectableProduct[]): CompiledPromotion[] {
+  /**
+   * Cart-wide promotions, promotions whose selectors reference any of the products, and the
+   * promotions behind any supplied codes; preserves priority order.
+   */
+  candidatesFor(products: readonly SelectableProduct[], codes: readonly string[] = []): CompiledPromotion[] {
     const hit = new Set(this.global);
+    for (const code of codes) {
+      const p = this.byCode.get(code.trim().toUpperCase());
+      if (p) hit.add(p);
+    }
     for (const product of products) {
       for (const p of this.byProductId.get(product.productId) ?? []) hit.add(p);
       for (const p of this.bySlug.get(product.slug) ?? []) hit.add(p);
