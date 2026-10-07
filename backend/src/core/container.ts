@@ -51,6 +51,8 @@ import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
 import type { Env } from './config/env';
+import { idempotent } from './http/idempotency/idempotency.middleware';
+import { IdempotencyStore } from './http/idempotency/idempotency.store';
 import { createRateLimiters } from './http/rate-limit';
 import { TransactionRunner } from './persistence/transaction';
 import { EventBus } from './events/event-bus';
@@ -141,6 +143,7 @@ export function buildContainer(env: Env) {
   };
 
   const guards = new AuthGuards(services.auth);
+  const idempotency = idempotent(new IdempotencyStore());
 
   const controllers = {
     auth: new AuthController(services.auth),
@@ -162,8 +165,8 @@ export function buildContainer(env: Env) {
     ['/reviews', reviewsRoutes(controllers.reviews, guards)],
     ['/cart', cartRoutes(controllers.cart, guards)],
     ['/coupons', couponsRoutes(controllers.coupons, guards)],
-    ['/orders', ordersRoutes(controllers.orders, guards)],
-    ['/payments', paymentsRoutes(controllers.payments, guards)],
+    ['/orders', ordersRoutes(controllers.orders, guards, idempotency)],
+    ['/payments', paymentsRoutes(controllers.payments, guards, idempotency)],
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
