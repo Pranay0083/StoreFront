@@ -7,14 +7,20 @@ import { AdminOrdersQuerySchema, BulkTransitionSchema, LowStockQuerySchema, Reve
 
 export function adminRoutes(controller: AdminController, guards: AuthGuards): Router {
   const router = Router();
-  router.use(guards.requireAdmin);
-  router.get('/stats', handler(controller.stats));
-  router.get('/revenue-by-day', validate({ query: RevenueQuerySchema }), handler(controller.revenueByDay));
-  router.get('/funnel', handler(controller.funnel));
-  router.get('/top-products', handler(controller.topProducts));
-  router.get('/low-stock', validate({ query: LowStockQuerySchema }), handler(controller.lowStock));
-  router.get('/orders', validate({ query: AdminOrdersQuerySchema }), handler(controller.orders));
-  router.post('/orders/bulk-transition', validate({ body: BulkTransitionSchema }), handler(controller.bulkTransition));
-  router.get('/conversations', handler(controller.conversations));
+  const dashboard = guards.requirePermission('dashboard:read');
+  router.use(guards.requireStaff);
+  router.get('/stats', dashboard, handler(controller.stats));
+  router.get('/revenue-by-day', dashboard, validate({ query: RevenueQuerySchema }), handler(controller.revenueByDay));
+  router.get('/funnel', dashboard, handler(controller.funnel));
+  router.get('/top-products', dashboard, handler(controller.topProducts));
+  router.get('/low-stock', dashboard, validate({ query: LowStockQuerySchema }), handler(controller.lowStock));
+  router.get('/orders', guards.requirePermission('orders:read'), validate({ query: AdminOrdersQuerySchema }), handler(controller.orders));
+  router.post(
+    '/orders/bulk-transition',
+    guards.requirePermission('orders:manage'),
+    validate({ body: BulkTransitionSchema }),
+    handler(controller.bulkTransition),
+  );
+  router.get('/conversations', guards.requirePermission('chats:read'), handler(controller.conversations));
   return router;
 }

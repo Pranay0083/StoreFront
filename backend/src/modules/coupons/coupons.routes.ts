@@ -13,7 +13,7 @@ export function couponsRoutes(controller: CouponsController, guards: AuthGuards)
 
 export function adminCouponsRoutes(controller: CouponsController, guards: AuthGuards): Router {
   const router = Router();
-  router.use(guards.requireAdmin);
+  router.use(guards.requirePermission('promotions:write'));
   router.get('/', handler(controller.list));
   router.post('/', validate({ body: CouponInputSchema }), handler(controller.create));
   router.put('/:id', validate({ body: CouponUpdateSchema }), handler(controller.update));

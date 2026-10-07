@@ -1,4 +1,4 @@
-import type { AuthSessionInfo, LoginInput, RegisterInput, User } from '@storefront/contracts';
+import { permissionsFor, type AuthSessionInfo, type LoginInput, type RegisterInput, type User } from '@storefront/contracts';
 import bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import { ConflictError, NotFoundError, UnauthorizedError } from '../../core/errors';
@@ -32,7 +32,13 @@ export interface Session {
 let dummy: Promise<string> | undefined;
 const dummyHash = () => (dummy ??= bcrypt.hash('storefront-timing-equaliser', BCRYPT_ROUNDS));
 
-export const toPublicUser = (u: UserRecord): User => ({ id: String(u._id), email: u.email, name: u.name, role: u.role });
+export const toPublicUser = (u: UserRecord): User => ({
+  id: String(u._id),
+  email: u.email,
+  name: u.name,
+  role: u.role,
+  permissions: permissionsFor(u.role),
+});
 
 export class AuthService {
   constructor(
