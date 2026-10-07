@@ -3,6 +3,7 @@
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { StockNote } from '@/components/cart-sheet';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { shippingFor } from '@storefront/contracts';
@@ -40,6 +41,7 @@ export default function CartPage() {
                       <p className="mt-1 text-sm text-muted-foreground">
                         Size {item.size} · {fmtINR(item.price)}
                       </p>
+                      <StockNote item={item} />
                     </div>
                     <button
                       data-testid={`cart-page-remove-${item.slug}`}
@@ -60,7 +62,8 @@ export default function CartPage() {
                       <span className="w-10 text-center text-sm">{item.qty}</span>
                       <button
                         onClick={() => updateQty(item.productId, item.size, item.qty + 1)}
-                        className="flex h-9 w-9 items-center justify-center hover:bg-black/5"
+                        disabled={item.stock !== undefined && item.qty >= item.stock}
+                        className="flex h-9 w-9 items-center justify-center hover:bg-black/5 disabled:opacity-30"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>

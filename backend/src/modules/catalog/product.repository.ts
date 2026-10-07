@@ -25,6 +25,10 @@ export class ProductRepository {
     return ProductModel.findById(id).lean<ProductRecord>();
   }
 
+  findManyByIds(ids: string[]): Promise<ProductRecord[]> {
+    return ProductModel.find({ _id: { $in: ids } }).lean<ProductRecord[]>();
+  }
+
   findBySlug(slug: string): Promise<ProductRecord | null> {
     return ProductModel.findOne({ slug }).lean<ProductRecord>();
   }

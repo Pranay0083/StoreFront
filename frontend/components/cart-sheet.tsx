@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
-import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
+import { FREE_SHIPPING_THRESHOLD, type CartItem } from '@storefront/contracts';
 import { fmtINR } from '@/lib/api';
 
 export function CartSheet() {
@@ -53,6 +53,7 @@ export function CartSheet() {
                       <div>
                         <p className="text-sm font-medium">{item.title}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">Size {item.size}</p>
+                        <StockNote item={item} />
                       </div>
                       <button
                         data-testid={`cart-item-remove-${item.slug}`}
@@ -78,7 +79,8 @@ export function CartSheet() {
                         <button
                           data-testid={`cart-item-increase-${item.slug}`}
                           onClick={() => updateQty(item.productId, item.size, item.qty + 1)}
-                          className="flex h-7 w-7 items-center justify-center hover:bg-black/5"
+                          disabled={item.stock !== undefined && item.qty >= item.stock}
+                          className="flex h-7 w-7 items-center justify-center hover:bg-black/5 disabled:opacity-30"
                         >
                           <Plus className="h-3 w-3" />
                         </button>
@@ -112,5 +114,14 @@ export function CartSheet() {
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+export function StockNote({ item }: { item: Pick<CartItem, 'qty' | 'stock' | 'available'> }) {
+  if (item.stock === undefined || item.available !== false) return null;
+  return (
+    <p className="mt-1 text-xs font-medium text-destructive">
+      {item.stock === 0 ? 'Out of stock' : `Only ${item.stock} left — reduce quantity`}
+    </p>
   );
 }

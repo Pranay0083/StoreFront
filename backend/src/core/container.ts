@@ -72,7 +72,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
 
   const tokens = new TokenService({ access: env.JWT_ACCESS_SECRET, refresh: env.JWT_REFRESH_SECRET });
   const catalog = new CatalogService(repositories.products);
-  const cart = new CartService(repositories.carts);
+  const cart = new CartService(repositories.carts, repositories.products);
   const coupons = new CouponService(repositories.coupons);
   const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart);
   const agentTools = new AgentTools(catalog, repositories.orders, repositories.users);
