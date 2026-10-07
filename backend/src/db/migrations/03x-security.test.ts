@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { connectDB, disconnectDB } from '../../core/config/db';
 import { loginThrottle } from './031-login-throttle';
 import { cartLines } from './032-cart-lines';
+import { reviewAggregates } from './033-review-aggregates';
 
 const db = () => mongoose.connection.db!;
 
@@ -48,5 +49,29 @@ describe('auth & security migrations', () => {
       .find({ 'items.0': { $exists: true } })
       .toArray();
     expect(cart.items).toEqual([{ productId, size: 'M', qty: 2 }]);
+  });
+
+  it('033 backfills rating sums from reviews and legacy aggregates', async () => {
+    const reviewed = new mongoose.Types.ObjectId();
+    const legacy = new mongoose.Types.ObjectId();
+    await db()
+      .collection('products')
+      .insertMany([
+        { _id: reviewed, slug: 'reviewed', rating: 0, numReviews: 0 },
+        { _id: legacy, slug: 'legacy', rating: 4.5, numReviews: 2 },
+      ]);
+    await db()
+      .collection('reviews')
+      .insertMany([
+        { productId: reviewed, rating: 5 },
+        { productId: reviewed, rating: 4 },
+        { productId: reviewed, rating: 4 },
+      ]);
+
+    await reviewAggregates.up(db());
+
+    expect(await db().collection('reviews').countDocuments({ verifiedPurchase: false })).toBe(3);
+    expect(await db().collection('products').findOne({ _id: reviewed })).toMatchObject({ ratingSum: 13, numReviews: 3, rating: 4.3 });
+    expect(await db().collection('products').findOne({ _id: legacy })).toMatchObject({ ratingSum: 9, numReviews: 2, rating: 4.5 });
   });
 });

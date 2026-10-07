@@ -38,6 +38,7 @@ import { PaymentsController } from '../modules/payments/payments.controller';
 import { paymentsRoutes } from '../modules/payments/payments.routes';
 import { PaymentsService } from '../modules/payments/payments.service';
 import { WebhookEventRepository } from '../modules/payments/webhook-event.repository';
+import { DeliveredOrderPurchaseVerifier } from '../modules/reviews/purchase-verifier';
 import { ReviewRepository } from '../modules/reviews/review.repository';
 import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
@@ -81,7 +82,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     tokens,
     auth: new AuthService(repositories.users, new LoginThrottle(repositories.loginAttempts), repositories.authSessions, tokens),
     catalog,
-    reviews: new ReviewsService(repositories.reviews, repositories.products),
+    reviews: new ReviewsService(repositories.reviews, repositories.products, new DeliveredOrderPurchaseVerifier()),
     cart,
     coupons,
     orders,

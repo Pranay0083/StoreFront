@@ -4,5 +4,6 @@ import { amountsToPaise } from './002-amounts-to-paise';
 import { authSessions } from './030-auth-sessions';
 import { loginThrottle } from './031-login-throttle';
 import { cartLines } from './032-cart-lines';
+import { reviewAggregates } from './033-review-aggregates';
 
-export const migrations: readonly Migration[] = [ensureIndexes, amountsToPaise, authSessions, loginThrottle, cartLines];
+export const migrations: readonly Migration[] = [ensureIndexes, amountsToPaise, authSessions, loginThrottle, cartLines, reviewAggregates];

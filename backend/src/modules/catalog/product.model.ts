@@ -15,6 +15,8 @@ const productSchema = new Schema(
     featured: { type: Boolean, default: false },
     rating: { type: Number, default: 0 },
     numReviews: { type: Number, default: 0 },
+    /** Sum of all review ratings, so the average can be maintained incrementally. */
+    ratingSum: { type: Number },
   },
   { timestamps: true },
 );
