@@ -4,6 +4,7 @@ import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
 import type { OrdersService } from '../orders/orders.service';
 import type { PaymentGateway } from './gateways/payment-gateway';
+import type { RefundSaga } from './refund.saga';
 import type { WebhookEventRepository } from './webhook-event.repository';
 
 export interface VerifyPaymentInput {
@@ -33,6 +34,7 @@ export class PaymentsService {
     private readonly gateway: PaymentGateway,
     private readonly orders: OrdersService,
     private readonly webhookEvents: WebhookEventRepository,
+    private readonly refunds: RefundSaga,
   ) {}
 
   get mode() {
@@ -114,21 +116,41 @@ export class PaymentsService {
   }
 
   private async dispatchWebhook(payload: RazorpayWebhookPayload): Promise<void> {
-    if (payload.event !== 'payment.captured') return;
-    const payment = payload.payload?.payment?.entity;
-    if (!payment) return;
     try {
-      const result = await this.orders.confirmPayment(
-        { gatewayOrderId: payment.order_id },
-        { by: 'system:webhook', paymentId: payment.id, provider: this.gateway.name },
-      );
-      logger.info(
-        { orderId: result.order.id, razorpayPaymentId: payment.id, alreadyProcessed: result.alreadyProcessed },
-        'Payment captured via webhook',
-      );
+      switch (payload.event) {
+        case 'payment.captured':
+          return await this.onPaymentCaptured(payload);
+        case 'refund.processed':
+        case 'refund.failed':
+          return await this.onRefundSettled(payload);
+      }
     } catch (err) {
       if (!(err instanceof NotFoundError)) throw err;
-      logger.warn({ razorpayOrderId: payment.order_id }, 'Webhook received for unknown order');
+      logger.warn({ event: payload.event, error: err.message }, 'Webhook received for unknown order');
+    }
+  }
+
+  private async onPaymentCaptured(payload: RazorpayWebhookPayload): Promise<void> {
+    const payment = payload.payload?.payment?.entity;
+    if (!payment) return;
+    const result = await this.orders.confirmPayment(
+      { gatewayOrderId: payment.order_id },
+      { by: 'system:webhook', paymentId: payment.id, provider: this.gateway.name },
+    );
+    logger.info(
+      { orderId: result.order.id, razorpayPaymentId: payment.id, alreadyProcessed: result.alreadyProcessed },
+      'Payment captured via webhook',
+    );
+  }
+
+  private async onRefundSettled(payload: RazorpayWebhookPayload): Promise<void> {
+    const refund = payload.payload?.refund?.entity;
+    if (!refund) return;
+    const locator = await this.refunds.locateByGatewayRefund(refund.id, refund.payment_id);
+    if (payload.event === 'refund.processed') {
+      await this.refunds.complete(locator, refund.id, 'system:webhook');
+    } else {
+      await this.refunds.fail(locator, refund.error_description || 'Refund failed at the payment provider', 'system:webhook');
     }
   }
 }

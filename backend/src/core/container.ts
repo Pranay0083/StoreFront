@@ -43,6 +43,7 @@ import { inventoryRoutes } from '../modules/inventory/inventory.routes';
 import { InventoryService } from '../modules/inventory/inventory.service';
 import { PaymentGatewayFactory } from '../modules/payments/gateways/payment-gateway.factory';
 import { paymentsRoutes } from '../modules/payments/payments.routes';
+import { RefundSaga } from '../modules/payments/refund.saga';
 import { PaymentsService } from '../modules/payments/payments.service';
 import { WebhookEventRepository } from '../modules/payments/webhook-event.repository';
 import { ReviewRepository } from '../modules/reviews/review.repository';
@@ -98,6 +99,8 @@ export function buildContainer(env: Env) {
 
   registerInventoryHandlers(eventBus, { products: repositories.products, outbox, logger, lowStockThreshold: env.LOW_STOCK_THRESHOLD });
   registerCouponHandlers(eventBus, { coupons, tx });
+  const refunds = new RefundSaga(orders, inventory, paymentGateway, logger);
+  refunds.register(eventBus);
 
   const reservationSweeper: ReservationExpiryScheduler = new IntervalReservationSweeper(orders, env.RESERVATION_SWEEP_INTERVAL_MS, logger);
   const background = {
@@ -120,7 +123,8 @@ export function buildContainer(env: Env) {
     cart,
     coupons,
     orders,
-    payments: new PaymentsService(paymentGateway, orders, repositories.webhookEvents),
+    refunds,
+    payments: new PaymentsService(paymentGateway, orders, repositories.webhookEvents, refunds),
     outbox,
     relay,
     reservationSweeper,
