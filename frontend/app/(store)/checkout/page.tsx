@@ -3,7 +3,7 @@
 import { Lock } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth, useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
   const [couponInput, setCouponInput] = useState('');
   const [applying, setApplying] = useState(false);
+  const checkoutAttempt = useRef<{ body: string; key: string } | null>(null);
 
   const shipping = shippingFor(subtotal);
   const discount = coupon?.discount ?? 0;
@@ -77,10 +78,15 @@ export default function CheckoutPage() {
   };
 
   const payWithRazorpay = async (order: Order) => {
-    const setup = await api<any>('/payments/create', { method: 'POST', body: JSON.stringify({ orderId: order._id }) });
+    const setup = await api<any>('/payments/create', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': `payment-session:${order._id}` },
+      body: JSON.stringify({ orderId: order._id }),
+    });
     if (setup.mode === 'demo') {
       const result = await api<{ order: Order }>('/payments/demo-confirm', {
         method: 'POST',
+        headers: { 'Idempotency-Key': `demo-confirm:${order._id}` },
         body: JSON.stringify({ orderId: order._id }),
       });
       return finishPayment(result.order);
@@ -129,13 +135,17 @@ export default function CheckoutPage() {
     }
     setPaying(true);
     try {
+      const body = JSON.stringify({
+        items: items.map(i => ({ productId: i.productId, size: i.size, qty: i.qty })),
+        address,
+        ...(coupon ? { couponCode: coupon.code } : {}),
+      });
+      // Retrying the same checkout reuses its key, so a timeout or double click never places two orders.
+      if (checkoutAttempt.current?.body !== body) checkoutAttempt.current = { body, key: crypto.randomUUID() };
       const order = await api<Order>('/orders', {
         method: 'POST',
-        body: JSON.stringify({
-          items: items.map(i => ({ productId: i.productId, size: i.size, qty: i.qty })),
-          address,
-          ...(coupon ? { couponCode: coupon.code } : {}),
-        }),
+        headers: { 'Idempotency-Key': checkoutAttempt.current.key },
+        body,
       });
       await payWithRazorpay(order);
     } catch (e: any) {

@@ -11,10 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { api, fmtDateTime, fmtINR } from '@/lib/api';
-import type { Order, OrderStatus } from '@storefront/contracts';
+import { ADMIN_ORDER_ACTIONS, ORDER_STATUSES, type Order, type OrderStatus } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
-const STATUSES: (OrderStatus | 'all')[] = ['all', 'created', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'];
+const STATUSES: (OrderStatus | 'all')[] = ['all', ...ORDER_STATUSES];
+const BULK_TARGETS = [...new Set(Object.values(ADMIN_ORDER_ACTIONS).flat())];
+const label = (s: string) => s.replace('_', ' ');
 
 export default function AdminOrdersPage() {
   const [data, setData] = useState<{ orders: Order[]; total: number; pages: number; transitions: Record<string, string[]> } | null>(null);
@@ -89,7 +91,7 @@ export default function AdminOrdersPage() {
               status === s ? 'border-black bg-black text-white' : 'border-black/15 hover:border-black',
             )}
           >
-            {s}
+            {label(s)}
           </button>
         ))}
       </div>
@@ -106,9 +108,9 @@ export default function AdminOrdersPage() {
                 <SelectValue placeholder="Move to…" />
               </SelectTrigger>
               <SelectContent>
-                {['paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'].map(s => (
+                {BULK_TARGETS.map(s => (
                   <SelectItem key={s} value={s}>
-                    {s}
+                    {label(s)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -193,7 +195,7 @@ export default function AdminOrdersPage() {
                               data-testid={`order-transition-${order.orderNumber}-${t}`}
                               onClick={() => transition([order._id], t)}
                             >
-                              {order.status} → {t}
+                              {label(order.status)} → {label(t)}
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuContent>

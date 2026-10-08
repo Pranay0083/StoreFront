@@ -1,10 +1,12 @@
-import { rupeesToPaise as inr, shippingFor } from '@storefront/contracts';
+import { rupeesToPaise as inr, shippingFor, type OrderStatus } from '@storefront/contracts';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import { logger } from '../../core/logger';
 import type { Env } from '../../core/config/env';
 import { UserModel } from '../../modules/auth/user.model';
 import { ProductModel } from '../../modules/catalog/product.model';
 import { CouponModel } from '../../modules/coupons/coupon.model';
+import { recordOpeningBalances } from '../../modules/inventory/opening-balances';
 import { OrderModel } from '../../modules/orders/order.model';
 import { ReviewModel } from '../../modules/reviews/review.model';
 
@@ -258,13 +260,13 @@ async function seedCustomer(email: string, name: string, password: string) {
   return (await UserModel.findOne({ email })) ?? (await UserModel.create({ email, name, passwordHash: await bcrypt.hash(password, 10) }));
 }
 
-type OrderPath = Array<'created' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'>;
+type OrderPath = OrderStatus[];
 
 function pickOrderPath(daysAgo: number): OrderPath {
   const roll = Math.random();
   if (roll < 0.06) return ['created'];
   if (roll < 0.12) return ['created', 'cancelled'];
-  if (roll < 0.16) return ['created', 'paid', 'refunded'];
+  if (roll < 0.16) return ['created', 'paid', 'refund_requested', 'refunded'];
   if (daysAgo > 7) return ['created', 'paid', 'packed', 'shipped', 'delivered'];
   if (daysAgo > 3)
     return pick([
@@ -299,6 +301,7 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
   if ((await ProductModel.countDocuments()) > 0) return { catalogSeeded: false };
 
   const products = await ProductModel.insertMany(PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));
+  await recordOpeningBalances(mongoose.connection.db!, 'system:seed');
 
   const buyerNames = ['Aarav Shah', 'Meera Iyer', 'Kabir Rao', 'Ananya Das'];
   const buyers = [customer];

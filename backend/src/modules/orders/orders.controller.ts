@@ -1,4 +1,4 @@
-import type { CreateOrderInput } from '@storefront/contracts';
+import type { CreateOrderInput, RefundRequestInput } from '@storefront/contracts';
 import type { Response } from 'express';
 import type { AuthedReq, IdParams } from '../../core/http/types';
 import type { OrdersService } from './orders.service';
@@ -20,5 +20,9 @@ export class OrdersController {
 
   cancel = async (req: AuthedReq<unknown, unknown, IdParams>, res: Response) => {
     res.json(await this.orders.cancel(req.params.id, req.user));
+  };
+
+  requestRefund = async (req: AuthedReq<RefundRequestInput, unknown, IdParams>, res: Response) => {
+    res.json(await this.orders.requestRefund(req.params.id, req.user, req.body.reason));
   };
 }

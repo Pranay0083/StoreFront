@@ -1,22 +1,52 @@
 import { z } from 'zod';
 import type { Paise } from './money';
 
-export const ORDER_STATUSES = ['created', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
+export const ORDER_STATUSES = ['created', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refund_requested', 'refunded'] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+/**
+ * Full lifecycle. `cancelled` is reserved for orders that were never paid; any paid order leaves
+ * through the refund saga (`refund_requested` → `refunded`), whose compensation path returns the
+ * order to the status it had before the refund was requested.
+ */
 export const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   created: ['paid', 'cancelled'],
-  paid: ['packed', 'cancelled', 'refunded'],
-  packed: ['shipped', 'cancelled'],
+  paid: ['packed', 'refund_requested'],
+  packed: ['shipped', 'refund_requested'],
   shipped: ['delivered'],
-  delivered: ['refunded'],
-  cancelled: ['refunded'],
+  delivered: ['refund_requested'],
+  cancelled: ['refund_requested'],
+  refund_requested: ['refunded', 'paid', 'packed', 'delivered', 'cancelled'],
   refunded: [],
 };
 
 export const canTransition = (from: OrderStatus, to: OrderStatus): boolean => ORDER_TRANSITIONS[from].includes(to);
 
+/** Transitions an operator may trigger by hand; payment and refund settlement are driven by the gateway. */
+export const ADMIN_ORDER_ACTIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
+  created: ['cancelled'],
+  paid: ['packed', 'refund_requested'],
+  packed: ['shipped', 'refund_requested'],
+  shipped: ['delivered'],
+  delivered: ['refund_requested'],
+  cancelled: [],
+  refund_requested: [],
+  refunded: [],
+};
+
+/** Statuses from which a customer may cancel; paid orders are cancelled by refunding them. */
+export const CUSTOMER_CANCELLABLE_STATUSES: readonly OrderStatus[] = ['created', 'paid', 'packed'];
+
+export const REFUND_WINDOW_DAYS = 7;
+
 export const REVENUE_STATUSES: readonly OrderStatus[] = ['paid', 'packed', 'shipped', 'delivered'];
+
+export const RefundRequestSchema = z
+  .object({
+    reason: z.string().trim().min(3, 'Please tell us why you want a refund').max(500, 'Reason is too long'),
+  })
+  .strict();
+export type RefundRequestInput = z.infer<typeof RefundRequestSchema>;
 
 export const AddressSchema = z
   .object({
@@ -85,6 +115,22 @@ export interface OrderPayment {
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   status: string;
+  capturedAt?: string;
+}
+
+export const REFUND_STATES = ['requested', 'processing', 'pending', 'processed', 'failed'] as const;
+export type RefundState = (typeof REFUND_STATES)[number];
+
+export interface OrderRefund {
+  status: RefundState;
+  amount: Paise;
+  reason: string;
+  requestedBy: string;
+  requestedAt: string;
+  previousStatus: OrderStatus;
+  gatewayRefundId?: string;
+  completedAt?: string;
+  failureReason?: string;
 }
 
 export interface Order {
@@ -101,6 +147,9 @@ export interface Order {
   status: OrderStatus;
   statusHistory: StatusEvent[];
   payment: OrderPayment;
+  refund?: OrderRefund;
   paidAt?: string;
+  deliveredAt?: string;
+  reservedUntil?: string;
   createdAt: string;
 }

@@ -87,7 +87,7 @@ describe('admin dashboard', () => {
 
     const list = await t.http().get(`${API}/admin/orders?status=paid`).set(bearer(admin.token)).expect(200);
     expect(list.body).toMatchObject({ total: 1, page: 1, pages: 1 });
-    expect(list.body.transitions.paid).toEqual(['packed', 'cancelled', 'refunded']);
+    expect(list.body.transitions.paid).toEqual(['packed', 'refund_requested']);
 
     const res = await t
       .http()

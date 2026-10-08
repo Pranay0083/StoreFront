@@ -46,6 +46,15 @@ export function OrderTimeline({ order }: { order: Order }) {
         })}
       </div>
 
+      {order.status === 'refund_requested' && (
+        <div
+          data-testid="order-refund-banner"
+          className="mt-6 flex items-center gap-3 border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          <RotateCcw className="h-4 w-4" />A refund of the full amount is being processed to your original payment method.
+        </div>
+      )}
+
       {isTerminalBranch && (
         <div
           data-testid="order-terminal-banner"

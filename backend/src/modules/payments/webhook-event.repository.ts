@@ -13,4 +13,8 @@ export class WebhookEventRepository {
       throw e;
     }
   }
+
+  async forget(eventId: string): Promise<void> {
+    await WebhookEventModel.deleteOne({ eventId });
+  }
 }

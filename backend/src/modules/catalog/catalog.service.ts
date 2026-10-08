@@ -1,6 +1,8 @@
 import type { Category, ProductInput, ProductListQuery } from '@storefront/contracts';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import { logger } from '../../core/logger';
+import type { TransactionRunner } from '../../core/persistence/transaction';
+import type { InventoryService } from '../inventory/inventory.service';
 import type { ProductRecord } from './product.model';
 import { ProductQueryBuilder } from './product-query.builder';
 import type { ProductRepository } from './product.repository';
@@ -12,7 +14,11 @@ export const slugify = (s: string) =>
     .replace(/(^-|-$)/g, '');
 
 export class CatalogService {
-  constructor(private readonly products: ProductRepository) {}
+  constructor(
+    private readonly products: ProductRepository,
+    private readonly inventory: InventoryService,
+    private readonly tx: TransactionRunner,
+  ) {}
 
   async list(query: ProductListQuery): Promise<{ items: ProductRecord[]; total: number; page: number; pages: number }> {
     const spec = ProductQueryBuilder.fromListQuery(query).build();
@@ -41,13 +47,20 @@ export class CatalogService {
   async create(input: ProductInput, actorId: string): Promise<ProductRecord> {
     const slug = input.slug || slugify(input.title);
     if (await this.products.existsBySlug(slug)) throw new ConflictError('Slug already exists');
-    const product = await this.products.create({ ...input, slug });
+    const product = await this.tx.run(async session => {
+      const created = await this.products.create({ ...input, slug }, session);
+      await this.inventory.recordOpeningStock(String(created._id), created.sizes, `admin:${actorId}`, session);
+      return created;
+    });
     logger.info({ adminId: actorId, productId: product._id, slug }, 'Product created');
     return product;
   }
 
   async update(id: string, patch: Partial<ProductInput>, actorId: string): Promise<ProductRecord> {
-    const product = await this.products.update(id, patch);
+    const product = await this.tx.run(async session => {
+      if (patch.sizes) await this.inventory.setStockLevels(id, patch.sizes, `admin:${actorId}`, session);
+      return this.products.update(id, patch, session);
+    });
     if (!product) throw new NotFoundError('Product not found');
     logger.info({ adminId: actorId, productId: id }, 'Product updated');
     return product;

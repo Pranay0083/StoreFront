@@ -16,6 +16,10 @@ const EnvSchema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().default(''),
   GROQ_API_KEY: z.string().default(''),
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
+  RESERVATION_TTL_MINUTES: z.coerce.number().positive().default(15),
+  RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
+  LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
   SEED_DEMO_DATA: z
     .enum(['true', 'false'])
     .default('true')
