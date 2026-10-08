@@ -8,7 +8,7 @@ export const loginThrottle: Migration = {
     await attempts.deleteMany({});
     const exists = await db.listCollections({ name: 'loginattempts' }).hasNext();
     if (exists && (await attempts.indexExists('identifier_1'))) await attempts.dropIndex('identifier_1');
-    await attempts.createIndex({ identifier: 1 }, { unique: true });
+    await attempts.createIndex({ key: 1 }, { unique: true });
     await attempts.createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 });
   },
 };

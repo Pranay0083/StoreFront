@@ -34,7 +34,7 @@ export class LoginThrottle {
 
   async assertAllowed(ip: string, email: string, now = new Date()): Promise<void> {
     const keys = this.policies.map(p => this.key(p, ip, email));
-    const records = new Map((await this.attempts.findMany(keys)).map(r => [r.identifier, r]));
+    const records = new Map((await this.attempts.findMany(keys)).map(r => [r.key, r]));
     let waitMs = 0;
     for (const [i, policy] of this.policies.entries()) {
       const record = records.get(keys[i]);

@@ -45,7 +45,7 @@ describe('login throttling', () => {
     await login('patient@test.dev', password).expect(429);
     await LoginAttemptModel.updateMany({}, { $set: { lastFailureAt: new Date(Date.now() - 60_000) } });
     await login('patient@test.dev', password).expect(200);
-    expect(await LoginAttemptModel.exists({ identifier: 'ip:203.0.113.10|email:patient@test.dev' })).toBeNull();
+    expect(await LoginAttemptModel.exists({ key: 'ip:203.0.113.10|email:patient@test.dev' })).toBeNull();
   });
 
   it('throttles an account under attack from many IPs', async () => {

@@ -24,7 +24,8 @@ describe('auth & security migrations', () => {
 
     expect(await attempts.countDocuments()).toBe(0);
     const indexes = await attempts.indexes();
-    expect(indexes.find(i => i.key.identifier)).toMatchObject({ unique: true });
+    expect(indexes.find(i => i.name === 'identifier_1')).toBeUndefined();
+    expect(indexes.find(i => i.key.key)).toMatchObject({ unique: true });
     expect(indexes.find(i => i.key.expireAt)).toMatchObject({ expireAfterSeconds: 0 });
   });
 
