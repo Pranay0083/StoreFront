@@ -87,8 +87,8 @@ function OrderDetailContent() {
       setOrder(updated);
       setRefundOpen(false);
       toast.success('Refund requested');
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e) {
+      toast.error((e as Error).message);
     } finally {
       setRequesting(false);
     }
