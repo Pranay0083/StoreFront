@@ -34,6 +34,7 @@ export function buildApp(container: Container) {
   api.use(limiters.middleware);
   api.get('/', (_req, res) => res.json({ status: 'ok', service: 'storefront-api' }));
   api.use(container.csrf.middleware);
+  api.use(container.http.auditTrail);
   for (const [path, router] of container.routes) api.use(path, router);
 
   app.use(API_PREFIX, api);

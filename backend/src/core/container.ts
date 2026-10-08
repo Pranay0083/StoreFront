@@ -1,7 +1,12 @@
 import type { Router } from 'express';
 import { AdminController } from '../modules/admin/admin.controller';
 import { adminRoutes } from '../modules/admin/admin.routes';
+import { AdminUsersService } from '../modules/admin/admin-users.service';
 import { AdminService } from '../modules/admin/admin.service';
+import { AuditLogRepository } from '../modules/admin/audit-log.repository';
+import { auditTrail } from '../modules/admin/audit-trail';
+import { AuditService } from '../modules/admin/audit.service';
+import { StaffController } from '../modules/admin/staff.controller';
 import { AgentController } from '../modules/agent/agent.controller';
 import { agentRoutes } from '../modules/agent/agent.routes';
 import { AgentService } from '../modules/agent/agent.service';
@@ -69,6 +74,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     orders: new OrderRepository(),
     webhookEvents: new WebhookEventRepository(),
     conversations: new ConversationRepository(),
+    auditLogs: new AuditLogRepository(),
   };
 
   const tokens = new TokenService({ access: env.JWT_ACCESS_SECRET, refresh: env.JWT_REFRESH_SECRET });
@@ -78,8 +84,12 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
   const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart);
   const agentTools = new AgentTools(catalog, repositories.orders, repositories.users);
 
+  const audit = new AuditService(repositories.auditLogs);
+
   const services = {
     tokens,
+    audit,
+    adminUsers: new AdminUsersService(repositories.users),
     auth: new AuthService(repositories.users, new LoginThrottle(repositories.loginAttempts), repositories.authSessions, tokens),
     catalog,
     reviews: new ReviewsService(repositories.reviews, repositories.products, new DeliveredOrderPurchaseVerifier()),
@@ -116,6 +126,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     agent: new AgentController(services.agent),
     mcp: new McpController(services.agentTools),
     admin: new AdminController(services.admin),
+    staff: new StaffController(services.audit, services.adminUsers),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -129,10 +140,12 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
-    ['/admin', adminRoutes(controllers.admin, guards)],
+    ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
 
-  return { env, limiters, cookies, csrf, repositories, services, guards, controllers, routes };
+  const http = { auditTrail: auditTrail(audit) };
+
+  return { env, limiters, cookies, csrf, http, repositories, services, guards, controllers, routes };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

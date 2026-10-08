@@ -3,9 +3,19 @@ import { handler } from '../../core/http/handler';
 import { validate } from '../../core/http/validate';
 import type { AuthGuards } from '../auth/auth.guards';
 import type { AdminController } from './admin.controller';
-import { AdminOrdersQuerySchema, BulkTransitionSchema, LowStockQuerySchema, RevenueQuerySchema } from './admin.schemas';
+import {
+  AdminOrdersQuerySchema,
+  AdminUsersQuerySchema,
+  AuditLogQuerySchema,
+  BulkTransitionSchema,
+  LowStockQuerySchema,
+  RevenueQuerySchema,
+  UpdateUserRoleSchema,
+  UserIdParamsSchema,
+} from './admin.schemas';
+import type { StaffController } from './staff.controller';
 
-export function adminRoutes(controller: AdminController, guards: AuthGuards): Router {
+export function adminRoutes(controller: AdminController, staff: StaffController, guards: AuthGuards): Router {
   const router = Router();
   const dashboard = guards.requirePermission('dashboard:read');
   router.use(guards.requireStaff);
@@ -22,5 +32,13 @@ export function adminRoutes(controller: AdminController, guards: AuthGuards): Ro
     handler(controller.bulkTransition),
   );
   router.get('/conversations', guards.requirePermission('chats:read'), handler(controller.conversations));
+  router.get('/audit-log', guards.requirePermission('audit:read'), validate({ query: AuditLogQuerySchema }), handler(staff.auditLog));
+  router.get('/users', guards.requirePermission('users:manage'), validate({ query: AdminUsersQuerySchema }), handler(staff.users));
+  router.patch(
+    '/users/:id/role',
+    guards.requirePermission('users:manage'),
+    validate({ params: UserIdParamsSchema, body: UpdateUserRoleSchema }),
+    handler(staff.updateRole),
+  );
   return router;
 }

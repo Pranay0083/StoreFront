@@ -5,5 +5,14 @@ import { authSessions } from './030-auth-sessions';
 import { loginThrottle } from './031-login-throttle';
 import { cartLines } from './032-cart-lines';
 import { reviewAggregates } from './033-review-aggregates';
+import { auditLog } from './034-audit-log';
 
-export const migrations: readonly Migration[] = [ensureIndexes, amountsToPaise, authSessions, loginThrottle, cartLines, reviewAggregates];
+export const migrations: readonly Migration[] = [
+  ensureIndexes,
+  amountsToPaise,
+  authSessions,
+  loginThrottle,
+  cartLines,
+  reviewAggregates,
+  auditLog,
+];

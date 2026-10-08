@@ -1,7 +1,9 @@
 import { ORDER_STATUSES } from '@storefront/contracts';
 import { z } from 'zod';
 
-export { BulkTransitionSchema } from '@storefront/contracts';
+export { AdminUsersQuerySchema, AuditLogQuerySchema, BulkTransitionSchema, UpdateUserRoleSchema } from '@storefront/contracts';
+
+export const UserIdParamsSchema = z.object({ id: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid user id') });
 
 export const RevenueQuerySchema = z.object({
   days: z.coerce
