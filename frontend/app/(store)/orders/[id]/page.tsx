@@ -4,19 +4,33 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { CUSTOMER_CANCELLABLE_STATUSES, REFUND_WINDOW_DAYS, type Order } from '@storefront/contracts';
 import { toast } from 'sonner';
 import { OrderTimeline } from '@/components/order-timeline';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Order } from '@storefront/contracts';
+import { Textarea } from '@/components/ui/textarea';
+import { api, fmtDate, fmtDateTime, fmtINR } from '@/lib/api';
+
+const DAY_MS = 86_400_000;
+const REFUND_LABELS: Record<NonNullable<Order['refund']>['status'], string> = {
+  requested: 'Requested',
+  processing: 'Submitted to payment provider',
+  pending: 'Processing with your bank',
+  processed: 'Refunded',
+  failed: 'Failed',
+};
 
 function OrderDetailContent() {
   const { id } = useParams<{ id: string }>();
   const search = useSearchParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [requesting, setRequesting] = useState(false);
 
   const load = useCallback(() => {
     api<Order>(`/orders/${id}`)
@@ -29,6 +43,12 @@ function OrderDetailContent() {
     if (search.get('paid')) toast.success('Order confirmed — thank you.');
   }, [load, search]);
 
+  useEffect(() => {
+    if (order?.status !== 'refund_requested') return;
+    const timer = setInterval(load, 3_000);
+    return () => clearInterval(timer);
+  }, [order?.status, load]);
+
   if (!order) {
     return (
       <div className="mx-auto max-w-4xl space-y-6 px-5 py-12 sm:px-8">
@@ -39,18 +59,38 @@ function OrderDetailContent() {
     );
   }
 
-  const cancellable = order.status === 'created' || order.status === 'paid';
+  const cancellable = CUSTOMER_CANCELLABLE_STATUSES.includes(order.status);
+  const paidAlready = order.status !== 'created';
+  const deliveredAt = order.deliveredAt ? new Date(order.deliveredAt).getTime() : null;
+  const refundable = order.status === 'delivered' && deliveredAt !== null && Date.now() - deliveredAt <= REFUND_WINDOW_DAYS * DAY_MS;
 
   const cancel = async () => {
     setCancelling(true);
     try {
-      await api(`/orders/${order._id}/cancel`, { method: 'POST' });
-      toast.success('Order cancelled');
-      load();
+      const updated = await api<Order>(`/orders/${order._id}/cancel`, { method: 'POST' });
+      setOrder(updated);
+      toast.success(paidAlready ? 'Order cancelled — your refund is on its way' : 'Order cancelled');
     } catch (e: any) {
       toast.error(e.message);
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const requestRefund = async () => {
+    setRequesting(true);
+    try {
+      const updated = await api<Order>(`/orders/${order._id}/refund`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: refundReason }),
+      });
+      setOrder(updated);
+      setRefundOpen(false);
+      toast.success('Refund requested');
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setRequesting(false);
     }
   };
 
@@ -68,7 +108,12 @@ function OrderDetailContent() {
           <StatusBadge status={order.status} testId="order-detail-status" />
           {cancellable && (
             <Button variant="destructive" size="sm" data-testid="order-cancel-button" onClick={cancel} disabled={cancelling}>
-              {cancelling ? 'Cancelling…' : 'Cancel order'}
+              {cancelling ? 'Cancelling…' : paidAlready ? 'Cancel & refund' : 'Cancel order'}
+            </Button>
+          )}
+          {refundable && (
+            <Button variant="outline" size="sm" data-testid="order-refund-button" onClick={() => setRefundOpen(true)}>
+              Request refund
             </Button>
           )}
         </div>
@@ -140,8 +185,38 @@ function OrderDetailContent() {
               <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{order.payment.razorpayPaymentId}</p>
             )}
           </div>
+          {order.refund && (
+            <div className="border border-black/10 bg-white p-6" data-testid="order-refund-card">
+              <p className="label-caps mb-4 text-muted-foreground">Refund</p>
+              <p className="text-sm font-medium">
+                {fmtINR(order.refund.amount)} · {REFUND_LABELS[order.refund.status]}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Requested {fmtDateTime(order.refund.requestedAt)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{order.refund.reason}</p>
+              {order.refund.failureReason && <p className="mt-2 text-sm text-destructive">{order.refund.failureReason}</p>}
+            </div>
+          )}
         </div>
       </div>
+
+      <Dialog open={refundOpen} onOpenChange={setRefundOpen}>
+        <DialogContent data-testid="order-refund-dialog">
+          <DialogTitle>Request a refund</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Refunds are available for {REFUND_WINDOW_DAYS} days after delivery and go back to your original payment method.
+          </p>
+          <Textarea
+            data-testid="order-refund-reason"
+            placeholder="Tell us what went wrong"
+            value={refundReason}
+            onChange={e => setRefundReason(e.target.value)}
+            maxLength={500}
+          />
+          <Button data-testid="order-refund-submit" onClick={requestRefund} disabled={requesting || refundReason.trim().length < 3}>
+            {requesting ? 'Submitting…' : 'Submit request'}
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
