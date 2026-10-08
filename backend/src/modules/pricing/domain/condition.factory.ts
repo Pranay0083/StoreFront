@@ -29,7 +29,12 @@ export function buildCondition(spec: ConditionSpec | undefined | null): Conditio
     case 'customerSegment':
       return new CustomerSegmentCondition(spec.segment);
     case 'dateWindow':
-      return new DateWindow(spec.from ? new Date(spec.from) : undefined, spec.to ? new Date(spec.to) : undefined, spec.daysOfWeek, spec.hours);
+      return new DateWindow(
+        spec.from ? new Date(spec.from) : undefined,
+        spec.to ? new Date(spec.to) : undefined,
+        spec.daysOfWeek,
+        spec.hours,
+      );
     case 'paymentMethod':
       return new PaymentMethodCondition(spec.methods);
   }

@@ -10,7 +10,13 @@ describe('promotion contracts', () => {
       conditions: [
         { type: 'minSubtotal', amount: 100_000 },
         { type: 'not', condition: { type: 'customerSegment', segment: 'guest' } },
-        { type: 'any', conditions: [{ type: 'paymentMethod', methods: ['upi'] }, { type: 'dateWindow', daysOfWeek: [5] }] },
+        {
+          type: 'any',
+          conditions: [
+            { type: 'paymentMethod', methods: ['upi'] },
+            { type: 'dateWindow', daysOfWeek: [5] },
+          ],
+        },
       ],
     };
     expect(ConditionSpecSchema.parse(spec)).toEqual(spec);

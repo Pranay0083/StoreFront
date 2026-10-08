@@ -125,7 +125,7 @@ export function optimizeBundles<P>(
 
   const greedyPath: number[] = [];
   let greedySavings = 0;
-  for (let progressed = true; progressed; ) {
+  for (let progressed = true; progressed;) {
     progressed = false;
     const idx = apps.findIndex(feasible);
     if (idx >= 0) {
@@ -178,7 +178,12 @@ export function optimizeBundles<P>(
     dfs(acc, k + 1, ub - held * rho[k]);
     state[k] = held;
   };
-  if (K > 0) dfs(0, 0, state.reduce((s, n, k) => s + n * rho[k], 0));
+  if (K > 0)
+    dfs(
+      0,
+      0,
+      state.reduce((s, n, k) => s + n * rho[k], 0),
+    );
 
   const materialize = (planPath: number[]): BundleApplication<P>[] => {
     const remaining = new Map<number, number>();

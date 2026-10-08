@@ -16,7 +16,8 @@ export class PromotionIndex {
   private readonly byCode = new Map<string, CompiledPromotion>();
 
   constructor(readonly promotions: readonly CompiledPromotion[]) {
-    const add = (map: Map<string, Set<CompiledPromotion>>, key: string, p: CompiledPromotion) => map.set(key, (map.get(key) ?? new Set()).add(p));
+    const add = (map: Map<string, Set<CompiledPromotion>>, key: string, p: CompiledPromotion) =>
+      map.set(key, (map.get(key) ?? new Set()).add(p));
     for (const p of promotions) {
       if (p.def.code) this.byCode.set(p.def.code, p);
       const selectors = p.action.selectors();

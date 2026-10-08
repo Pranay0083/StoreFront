@@ -68,7 +68,12 @@ const TierSchema = z
 export const ActionSpecSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('fixedBundle'), components: z.array(BundleComponentSchema).min(1).max(4), price: positivePaise }).strict(),
   z
-    .object({ type: z.literal('mixAndMatch'), selector: ProductSelectorSchema, quantity: z.number().int().min(2).max(6), price: positivePaise })
+    .object({
+      type: z.literal('mixAndMatch'),
+      selector: ProductSelectorSchema,
+      quantity: z.number().int().min(2).max(6),
+      price: positivePaise,
+    })
     .strict(),
   z
     .object({
@@ -144,7 +149,11 @@ const activationMessage = { message: 'Code promotions need a code, and automatic
 const windowRule = (p: { startsAt?: string; endsAt?: string }) => !p.startsAt || !p.endsAt || p.startsAt < p.endsAt;
 const windowMessage = { message: 'endsAt must be after startsAt', path: ['endsAt'] };
 
-export const PromotionInputSchema = z.object(promotionFields).strict().refine(activationRule, activationMessage).refine(windowRule, windowMessage);
+export const PromotionInputSchema = z
+  .object(promotionFields)
+  .strict()
+  .refine(activationRule, activationMessage)
+  .refine(windowRule, windowMessage);
 export type PromotionInput = z.infer<typeof PromotionInputSchema>;
 
 export const PromotionUpdateSchema = z

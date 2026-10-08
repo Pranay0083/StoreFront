@@ -75,7 +75,13 @@ export class PromotionRepository {
    * else changed the promotion first (optimistic concurrency); returns null when that check fails
    * or the promotion does not exist.
    */
-  async update(id: string, patch: PromotionUpdate, by: string, expectedVersion?: number, unset: readonly string[] = []): Promise<PromotionRecord | null> {
+  async update(
+    id: string,
+    patch: PromotionUpdate,
+    by: string,
+    expectedVersion?: number,
+    unset: readonly string[] = [],
+  ): Promise<PromotionRecord | null> {
     return mongoose.connection.transaction(async session => {
       const record = await PromotionModel.findOneAndUpdate(
         { _id: id, ...(expectedVersion !== undefined && { version: expectedVersion }) },

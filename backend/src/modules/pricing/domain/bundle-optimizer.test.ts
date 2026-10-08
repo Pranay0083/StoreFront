@@ -25,7 +25,10 @@ function bruteForce(lines: readonly EffectiveLine[], offers: readonly BundleCand
         return ok;
       });
     };
-    return fill(0, slots.map(s => s.qty));
+    return fill(
+      0,
+      slots.map(s => s.qty),
+    );
   };
 
   const search = (from: number): number => {
@@ -56,7 +59,11 @@ function bruteForce(lines: readonly EffectiveLine[], offers: readonly BundleCand
   return search(0);
 }
 
-function assertPlanIsValid(lines: readonly EffectiveLine[], result: ReturnType<typeof optimizeBundles<string>>, offers: BundleCandidate<string>[]) {
+function assertPlanIsValid(
+  lines: readonly EffectiveLine[],
+  result: ReturnType<typeof optimizeBundles<string>>,
+  offers: BundleCandidate<string>[],
+) {
   const consumed = lines.map(() => 0);
   let total = 0;
   for (const app of result.applications) {
@@ -84,8 +91,26 @@ describe('optimizeBundles', () => {
     const lines = withoutMarkdown([a, b, c, d]);
     const offers = [
       offer('any-2-ab', new MixAndMatchAction({ slugs: ['a', 'b'] }, 2, 110_000)),
-      offer('a+c', new FixedBundlePriceAction([{ selector: { slugs: ['a'] }, qty: 1 }, { selector: { slugs: ['c'] }, qty: 1 }], 140_000)),
-      offer('b+d', new FixedBundlePriceAction([{ selector: { slugs: ['b'] }, qty: 1 }, { selector: { slugs: ['d'] }, qty: 1 }], 140_000)),
+      offer(
+        'a+c',
+        new FixedBundlePriceAction(
+          [
+            { selector: { slugs: ['a'] }, qty: 1 },
+            { selector: { slugs: ['c'] }, qty: 1 },
+          ],
+          140_000,
+        ),
+      ),
+      offer(
+        'b+d',
+        new FixedBundlePriceAction(
+          [
+            { selector: { slugs: ['b'] }, qty: 1 },
+            { selector: { slugs: ['d'] }, qty: 1 },
+          ],
+          140_000,
+        ),
+      ),
     ];
     const result = optimizeBundles(lines, offers);
     expect(result.greedySavings).toBe(90_000);
@@ -107,7 +132,10 @@ describe('optimizeBundles', () => {
   });
 
   it('groups buy-x-get-y units so the most valuable items end up free', () => {
-    const lines = withoutMarkdown([line({ slug: 'belt', unitPrice: 179_900, qty: 3 }), line({ slug: 'beanie', unitPrice: 129_900, qty: 3 })]);
+    const lines = withoutMarkdown([
+      line({ slug: 'belt', unitPrice: 179_900, qty: 3 }),
+      line({ slug: 'beanie', unitPrice: 129_900, qty: 3 }),
+    ]);
     const offers = [offer('b2g1', new BuyXGetYAction({ slugs: ['belt', 'beanie'] }, 2, 1, 100))];
     const result = optimizeBundles(lines, offers);
     expect(result.applications).toHaveLength(2);
@@ -122,7 +150,9 @@ describe('optimizeBundles', () => {
   });
 
   it('falls back to the greedy incumbent when the node budget runs out', () => {
-    const lines = withoutMarkdown(Array.from({ length: 12 }, (_, i) => line({ slug: `s${i}`, category: 'Men', unitPrice: 50_000 + i * 7_000, qty: 3 })));
+    const lines = withoutMarkdown(
+      Array.from({ length: 12 }, (_, i) => line({ slug: `s${i}`, category: 'Men', unitPrice: 50_000 + i * 7_000, qty: 3 })),
+    );
     const offers = [
       offer('any-3', new MixAndMatchAction({ categories: ['Men'] }, 3, 120_000)),
       offer('b2g1', new BuyXGetYAction({ categories: ['Men'] }, 2, 1, 100)),
@@ -154,7 +184,9 @@ const actionArb: fc.Arbitrary<ConsumingAction> = fc.oneof(
 );
 
 const scenarioArb = fc.record({
-  products: fc.tuple(...PRODUCTS.map(() => fc.record({ category: fc.constantFrom(...CATEGORIES), price: priceArb, qty: fc.integer({ min: 0, max: 3 }) }))),
+  products: fc.tuple(
+    ...PRODUCTS.map(() => fc.record({ category: fc.constantFrom(...CATEGORIES), price: priceArb, qty: fc.integer({ min: 0, max: 3 }) })),
+  ),
   actions: fc.array(actionArb, { minLength: 1, maxLength: 4 }),
 });
 

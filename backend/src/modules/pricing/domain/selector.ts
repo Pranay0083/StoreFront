@@ -10,7 +10,9 @@ export interface SelectableProduct {
 export function matchesSelector(selector: ProductSelector | undefined, product: SelectableProduct): boolean {
   if (!selector) return true;
   return Boolean(
-    selector.productIds?.includes(product.productId) || selector.slugs?.includes(product.slug) || selector.categories?.includes(product.category),
+    selector.productIds?.includes(product.productId) ||
+    selector.slugs?.includes(product.slug) ||
+    selector.categories?.includes(product.category),
   );
 }
 

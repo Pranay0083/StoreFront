@@ -91,7 +91,8 @@ export class PromotionsService {
     const activation = patch.activation ?? existing.activation;
     const dropCode = activation === 'auto' && patch.code === undefined && Boolean(existing.code);
     const code = dropCode ? undefined : (patch.code ?? existing.code ?? undefined);
-    if ((activation === 'code') !== Boolean(code)) throw new BadRequestError('Code promotions need a code, and automatic promotions must not have one');
+    if ((activation === 'code') !== Boolean(code))
+      throw new BadRequestError('Code promotions need a code, and automatic promotions must not have one');
     const startsAt = patch.startsAt ? new Date(patch.startsAt) : existing.startsAt;
     const endsAt = patch.endsAt ? new Date(patch.endsAt) : existing.endsAt;
     if (startsAt && endsAt && startsAt >= endsAt) throw new BadRequestError('endsAt must be after startsAt');

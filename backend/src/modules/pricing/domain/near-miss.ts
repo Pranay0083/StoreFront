@@ -41,7 +41,8 @@ export function suggestNearMisses(input: NearMissInput): PricingSuggestion[] {
 function addItemSuggestions({ lines, bundleOffers, currentPlan, pool }: NearMissInput): PricingSuggestion[] {
   if (!bundleOffers.length || lines.reduce((s, l) => s + l.qty, 0) > MAX_UNITS_FOR_WHAT_IF) return [];
   const baseline = currentPlan.reduce((s, a) => s + a.savings, 0);
-  const timesUsed = (plan: readonly BundleApplication<CompiledPromotion>[], promo: CompiledPromotion) => plan.filter(a => a.promotion === promo).length;
+  const timesUsed = (plan: readonly BundleApplication<CompiledPromotion>[], promo: CompiledPromotion) =>
+    plan.filter(a => a.promotion === promo).length;
 
   const candidatesPool = [...lines, ...pool.filter(p => !lines.some(l => sameVariant(l, p)))];
   const out: Array<PricingSuggestion & { net: number }> = [];
@@ -56,7 +57,8 @@ function addItemSuggestions({ lines, bundleOffers, currentPlan, pool }: NearMiss
         const result = optimizeBundles(addUnits(lines, candidate, units), bundleOffers, WHAT_IF_OPTIONS);
         const extra = result.savings - baseline;
         const added = units * candidate.effectiveUnitPrice;
-        if (timesUsed(result.applications, offer.promotion) <= timesUsed(currentPlan, offer.promotion) || extra <= 0 || extra < added) continue;
+        if (timesUsed(result.applications, offer.promotion) <= timesUsed(currentPlan, offer.promotion) || extra <= 0 || extra < added)
+          continue;
         const net = extra - added;
         if (!best || net > best.net || (net === best.net && added < best.addedCost)) {
           const pitch = net === 0 ? "it's effectively free" : `your total drops by ${formatINR(net)}`;

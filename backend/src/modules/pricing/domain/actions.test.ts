@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildAction } from './action.factory';
-import { BuyXGetYAction, ClearanceAction, FixedBundlePriceAction, FlashMarkdownAction, MixAndMatchAction, PercentOffAction, TieredAction } from './actions';
+import {
+  BuyXGetYAction,
+  ClearanceAction,
+  FixedBundlePriceAction,
+  FlashMarkdownAction,
+  MixAndMatchAction,
+  PercentOffAction,
+  TieredAction,
+} from './actions';
 import { CompiledPromotion, type PromotionDefinition } from './promotion';
 import { line } from './test-fixtures';
 
@@ -93,7 +101,9 @@ describe('compiled promotions', () => {
     expect(new CompiledPromotion(base).stage).toBe('code');
     expect(new CompiledPromotion({ ...base, activation: 'auto', code: undefined }).stage).toBe('cart');
     expect(new CompiledPromotion({ ...base, action: { type: 'freeShipping' } }).stage).toBe('shipping');
-    expect(new CompiledPromotion({ ...base, action: { type: 'markdown', selector: { categories: ['Men'] }, percentOff: 5 } }).stage).toBe('markdown');
+    expect(new CompiledPromotion({ ...base, action: { type: 'markdown', selector: { categories: ['Men'] }, percentOff: 5 } }).stage).toBe(
+      'markdown',
+    );
   });
 
   it('reports why it is not live', () => {

@@ -192,7 +192,13 @@ export class DateWindow extends Condition {
   }
 }
 
-const METHOD_LABELS: Record<PaymentMethod, string> = { upi: 'UPI', card: 'card', netbanking: 'netbanking', wallet: 'wallet', demo: 'demo pay' };
+const METHOD_LABELS: Record<PaymentMethod, string> = {
+  upi: 'UPI',
+  card: 'card',
+  netbanking: 'netbanking',
+  wallet: 'wallet',
+  demo: 'demo pay',
+};
 
 export class PaymentMethodCondition extends Condition {
   constructor(readonly methods: readonly PaymentMethod[]) {

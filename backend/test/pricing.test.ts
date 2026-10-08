@@ -23,8 +23,18 @@ async function createPromotion(token: string, body: Record<string, unknown>) {
 async function catalog() {
   const shirt = await createProduct({ title: 'Oxford Shirt', price: 249_900 });
   const jeans = await createProduct({ title: 'Denim Jeans', price: 459_900 });
-  const belt = await createProduct({ title: 'Leather Belt', price: 179_900, category: 'Accessories', sizes: [{ size: 'One Size', stock: 9 }] });
-  const beanie = await createProduct({ title: 'Wool Beanie', price: 129_900, category: 'Accessories', sizes: [{ size: 'One Size', stock: 9 }] });
+  const belt = await createProduct({
+    title: 'Leather Belt',
+    price: 179_900,
+    category: 'Accessories',
+    sizes: [{ size: 'One Size', stock: 9 }],
+  });
+  const beanie = await createProduct({
+    title: 'Wool Beanie',
+    price: 129_900,
+    category: 'Accessories',
+    sizes: [{ size: 'One Size', stock: 9 }],
+  });
   return { shirt, jeans, belt, beanie };
 }
 
@@ -59,7 +69,13 @@ describe('POST /pricing/quote', () => {
       .send({ items: [item(shirt), item(jeans)], codes: ['welcome10'] })
       .expect(200);
     const quote = res.body as PriceQuote;
-    expect(quote.breakdown).toMatchObject({ listSubtotal: 709_800, bundleDiscount: 109_900, codeDiscount: 50_000, shipping: 0, total: 549_900 });
+    expect(quote.breakdown).toMatchObject({
+      listSubtotal: 709_800,
+      bundleDiscount: 109_900,
+      codeDiscount: 50_000,
+      shipping: 0,
+      total: 549_900,
+    });
     expect(quote.breakdown.applied.map(a => a.name)).toEqual(['Weekend Uniform', 'Welcome 10']);
     expect(quote.contentHash).toMatch(/^[a-f0-9]{64}$/);
     expect(new Date(quote.expiresAt).getTime()).toBeGreaterThan(Date.now() + 9 * 60_000);
@@ -122,7 +138,14 @@ describe('POST /pricing/quote', () => {
       .send({ items: [item(belt, 'One Size', 2)] })
       .expect(200);
     const b = res.body.breakdown as PriceBreakdown;
-    expect(b.suggestions[0]).toMatchObject({ kind: 'add-item', slug: beanie.slug, size: 'One Size', qty: 1, addedCost: 129_900, extraSavings: 129_900 });
+    expect(b.suggestions[0]).toMatchObject({
+      kind: 'add-item',
+      slug: beanie.slug,
+      size: 'One Size',
+      qty: 1,
+      addedCost: 129_900,
+      extraSavings: 129_900,
+    });
   });
 
   it('validates the cart against the catalog', async () => {
@@ -177,8 +200,17 @@ describe('GET /pricing/products/:id/bundles', () => {
         price: 599_900,
       },
     });
-    await createPromotion(token, { name: 'Draft', status: 'draft', action: { type: 'mixAndMatch', selector: { categories: ['Men'] }, quantity: 2, price: 1 } });
-    await createPromotion(token, { name: 'Secret', activation: 'code', code: 'SECRET', action: { type: 'mixAndMatch', selector: { categories: ['Men'] }, quantity: 2, price: 1 } });
+    await createPromotion(token, {
+      name: 'Draft',
+      status: 'draft',
+      action: { type: 'mixAndMatch', selector: { categories: ['Men'] }, quantity: 2, price: 1 },
+    });
+    await createPromotion(token, {
+      name: 'Secret',
+      activation: 'code',
+      code: 'SECRET',
+      action: { type: 'mixAndMatch', selector: { categories: ['Men'] }, quantity: 2, price: 1 },
+    });
 
     const res = await t.http().get(`${API}/pricing/products/${shirt._id}/bundles`).expect(200);
     expect(res.body.offers).toHaveLength(1);
@@ -205,7 +237,10 @@ describe('admin promotions', () => {
 
   it('creates, versions, updates with If-Match and archives promotions', async () => {
     const token = await admin();
-    const created = await createPromotion(token, { name: 'Any 3', action: { type: 'mixAndMatch', selector: { categories: ['Men'] }, quantity: 3, price: 499_900 } });
+    const created = await createPromotion(token, {
+      name: 'Any 3',
+      action: { type: 'mixAndMatch', selector: { categories: ['Men'] }, quantity: 3, price: 499_900 },
+    });
     expect(created.version).toBe(1);
 
     const got = await t.http().get(`${API}/admin/promotions/${created._id}`).set(bearer(token)).expect(200);
@@ -228,11 +263,7 @@ describe('admin promotions', () => {
       .send({ priority: 5 });
     expect(stale.status).toBe(409);
 
-    const badCode = await t
-      .http()
-      .put(`${API}/admin/promotions/${created._id}`)
-      .set(bearer(token))
-      .send({ activation: 'code' });
+    const badCode = await t.http().put(`${API}/admin/promotions/${created._id}`).set(bearer(token)).send({ activation: 'code' });
     expect(badCode.status).toBe(400);
 
     const versions = await t.http().get(`${API}/admin/promotions/${created._id}/versions`).set(bearer(token)).expect(200);
@@ -262,7 +293,11 @@ describe('admin promotions', () => {
   it('invalidates the promotion cache on writes', async () => {
     const token = await admin();
     const { shirt } = await catalog();
-    const quote = () => t.http().post(`${API}/pricing/quote`).send({ items: [item(shirt)] });
+    const quote = () =>
+      t
+        .http()
+        .post(`${API}/pricing/quote`)
+        .send({ items: [item(shirt)] });
     expect((await quote()).body.breakdown.discountTotal).toBe(0);
     const promo = await createPromotion(token, { name: 'Ten off', action: { type: 'percentOff', percent: 10 } });
     expect((await quote()).body.breakdown.cartDiscount).toBe(24_990);
@@ -276,7 +311,13 @@ describe('admin promotions', () => {
     await createPromotion(token, {
       name: 'Friday draft',
       status: 'draft',
-      conditions: { type: 'all', conditions: [{ type: 'dateWindow', daysOfWeek: [5] }, { type: 'customerSegment', segment: 'firstOrder' }] },
+      conditions: {
+        type: 'all',
+        conditions: [
+          { type: 'dateWindow', daysOfWeek: [5] },
+          { type: 'customerSegment', segment: 'firstOrder' },
+        ],
+      },
       action: { type: 'percentOff', percent: 20 },
     });
     const simulate = (body: Record<string, unknown>) =>

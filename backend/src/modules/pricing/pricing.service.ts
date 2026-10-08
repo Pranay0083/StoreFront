@@ -73,7 +73,10 @@ const sortKeys = (value: unknown): unknown => {
   }
   return value;
 };
-const sha256 = (value: unknown) => createHash('sha256').update(JSON.stringify(sortKeys(value))).digest('hex');
+const sha256 = (value: unknown) =>
+  createHash('sha256')
+    .update(JSON.stringify(sortKeys(value)))
+    .digest('hex');
 
 /** Merges duplicate variants and sorts lines so the same cart always prices (and hashes) identically. */
 function normalizeItems(items: readonly PricingItem[]): PricingItem[] {
@@ -165,7 +168,14 @@ export class PricingService implements PricingEngine {
     const quoteId = randomUUID();
     const contentHash = hashBreakdown(breakdown);
     const expiresAt = new Date(this.clock().getTime() + QUOTE_TTL_MS);
-    await this.quotes.create({ _id: quoteId, userId: caller.userId ?? null, cartHash: hashCart(cart, caller), contentHash, breakdown, expiresAt });
+    await this.quotes.create({
+      _id: quoteId,
+      userId: caller.userId ?? null,
+      cartHash: hashCart(cart, caller),
+      contentHash,
+      breakdown,
+      expiresAt,
+    });
     return { quoteId, contentHash, expiresAt: expiresAt.toISOString(), breakdown };
   }
 
@@ -206,7 +216,13 @@ export class PricingService implements PricingEngine {
     for (const promo of (await this.cache.index()).touching(selectable)) {
       const action = promo.consumingAction();
       if (!action || promo.requiresCode || !promo.isLive(now)) continue;
-      const base = { promotionId: promo.id, name: promo.name, description: promo.def.description, actionType: promo.def.action.type, summary: action.summary() };
+      const base = {
+        promotionId: promo.id,
+        name: promo.name,
+        description: promo.def.description,
+        actionType: promo.def.action.type,
+        summary: action.summary(),
+      };
 
       if (action instanceof FixedBundlePriceAction) {
         const components = await this.resolveComponents(action, product);

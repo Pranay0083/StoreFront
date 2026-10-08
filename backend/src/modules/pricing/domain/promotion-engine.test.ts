@@ -99,7 +99,9 @@ describe('PromotionEngine', () => {
     const result = engine.price(request([a, b, c, d]), [big, pair('a+c', 'a', 'c'), pair('b+d', 'b', 'd')]);
     expect(result.bundleDiscount).toBe(120_000);
     expect(result.optimizer).toMatchObject({ bundleSavings: 120_000, greedySavings: 90_000 });
-    expect(result.explanations).toContain('Our optimizer found a bundle combination that saves ₹300 more than applying the single biggest offer first.');
+    expect(result.explanations).toContain(
+      'Our optimizer found a bundle combination that saves ₹300 more than applying the single biggest offer first.',
+    );
   });
 
   it('keeps only the better offer from a stack group and says why', () => {
@@ -121,7 +123,9 @@ describe('PromotionEngine', () => {
     const b = engine.price(request([shirt, jeans]), [combo, tiered, mega]);
     expect(b.applied.map(a => a.promotionId)).toEqual(['mega']);
     expect(b.total).toBe(567_840);
-    expect(b.explanations).toContain('"Mega sale" can\'t be combined with other offers, and on its own it saves ₹320.60 more than the best combination.');
+    expect(b.explanations).toContain(
+      '"Mega sale" can\'t be combined with other offers, and on its own it saves ₹320.60 more than the best combination.',
+    );
 
     const weak = promo({ id: 'weak', name: 'Weak sale', exclusive: true, action: { type: 'percentOff', percent: 5 } });
     const c = engine.price(request([shirt, jeans]), [combo, weak]);
@@ -148,7 +152,12 @@ describe('PromotionEngine', () => {
   });
 
   it('gives first orders free shipping via a customer segment rule', () => {
-    const firstShip = promo({ id: 'first-ship', name: 'First order ships free', conditions: { type: 'customerSegment', segment: 'firstOrder' }, action: { type: 'freeShipping' } });
+    const firstShip = promo({
+      id: 'first-ship',
+      name: 'First order ships free',
+      conditions: { type: 'customerSegment', segment: 'firstOrder' },
+      action: { type: 'freeShipping' },
+    });
     const first = engine.price(request([shirt], { customer: { id: 'u2', signedIn: true, isFirstOrder: true } }), [firstShip]);
     expect(first).toMatchObject({ shipping: 9_900, shippingDiscount: 9_900, total: 249_900 });
     expect(engine.price(request([shirt]), [firstShip]).shippingDiscount).toBe(0);
@@ -186,10 +195,18 @@ describe('PromotionEngine', () => {
   it('nudges customers who are close to a tier or free shipping', () => {
     const tier = engine.price(request([qty(jeans, 2)]), [tiered]);
     expect(tier.suggestions).toEqual([
-      { kind: 'spend-more', promotionId: 'spend-more', message: 'Spend ₹802 more to get 5% off with "Spend more, save more".', addedCost: 80_200, extraSavings: 50_000 },
+      {
+        kind: 'spend-more',
+        promotionId: 'spend-more',
+        message: 'Spend ₹802 more to get 5% off with "Spend more, save more".',
+        addedCost: 80_200,
+        extraSavings: 50_000,
+      },
     ]);
     const ship = engine.price(request([qty(beanie, 2)]), []);
-    expect(ship.suggestions).toEqual([{ kind: 'spend-more', message: 'Add ₹401 more to get free shipping.', addedCost: 40_100, extraSavings: 9_900 }]);
+    expect(ship.suggestions).toEqual([
+      { kind: 'spend-more', message: 'Add ₹401 more to get free shipping.', addedCost: 40_100, extraSavings: 9_900 },
+    ]);
   });
 });
 
@@ -200,7 +217,11 @@ const PROMOS = [
   welcome,
   bogo,
   promo({ id: 'any3-men', action: { type: 'mixAndMatch', selector: { categories: ['Men'] }, quantity: 3, price: 699_900 } }),
-  promo({ id: 'acc-10', stackGroup: 'order-discount', action: { type: 'percentOff', selector: { categories: ['Accessories'] }, percent: 10 } }),
+  promo({
+    id: 'acc-10',
+    stackGroup: 'order-discount',
+    action: { type: 'percentOff', selector: { categories: ['Accessories'] }, percent: 10 },
+  }),
   promo({ id: 'flat-1000', exclusive: true, action: { type: 'flatOff', amount: 100_000 } }),
   promo({ id: 'free-ship', conditions: { type: 'minSubtotal', amount: 150_000 }, action: { type: 'freeShipping' } }),
   promo({ id: 'flash', action: { type: 'markdown', selector: { categories: ['Footwear', 'Women'] }, percentOff: 15 } }),
@@ -211,10 +232,13 @@ describe('PromotionEngine properties', () => {
   it('always reconciles to the paisa, never goes negative and never raises the price', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.record({ product: fc.nat(CATALOG.length - 1), qty: fc.integer({ min: 1, max: 3 }), stock: fc.integer({ min: 0, max: 20 }) }), {
-          minLength: 1,
-          maxLength: 6,
-        }),
+        fc.array(
+          fc.record({ product: fc.nat(CATALOG.length - 1), qty: fc.integer({ min: 1, max: 3 }), stock: fc.integer({ min: 0, max: 20 }) }),
+          {
+            minLength: 1,
+            maxLength: 6,
+          },
+        ),
         fc.subarray(PROMOS),
         fc.subarray(['WELCOME10', 'BOGUS']),
         (picks, promos, codes) => {

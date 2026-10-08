@@ -12,18 +12,22 @@ describe('allocate (largest remainder)', () => {
 
   it('always sums exactly and never exceeds a weight', () => {
     fc.assert(
-      fc.property(fc.array(fc.integer({ min: 0, max: 5_000_000 }), { minLength: 1, maxLength: 12 }), fc.double({ min: 0, max: 1, noNaN: true }), (weights, ratio) => {
-        const sum = weights.reduce((s, w) => s + w, 0);
-        fc.pre(sum > 0);
-        const total = Math.floor(sum * ratio);
-        const parts = allocate(total, weights);
-        expect(parts.reduce((s, p) => s + p, 0)).toBe(total);
-        parts.forEach((p, i) => {
-          expect(Number.isInteger(p)).toBe(true);
-          expect(p).toBeGreaterThanOrEqual(0);
-          expect(p).toBeLessThanOrEqual(weights[i]);
-        });
-      }),
+      fc.property(
+        fc.array(fc.integer({ min: 0, max: 5_000_000 }), { minLength: 1, maxLength: 12 }),
+        fc.double({ min: 0, max: 1, noNaN: true }),
+        (weights, ratio) => {
+          const sum = weights.reduce((s, w) => s + w, 0);
+          fc.pre(sum > 0);
+          const total = Math.floor(sum * ratio);
+          const parts = allocate(total, weights);
+          expect(parts.reduce((s, p) => s + p, 0)).toBe(total);
+          parts.forEach((p, i) => {
+            expect(Number.isInteger(p)).toBe(true);
+            expect(p).toBeGreaterThanOrEqual(0);
+            expect(p).toBeLessThanOrEqual(weights[i]);
+          });
+        },
+      ),
     );
   });
 
@@ -44,7 +48,9 @@ describe('selectors', () => {
   });
 
   it('describes selectors for humans', () => {
-    expect(describeSelector({ slugs: ['oxford-cotton-shirt'], categories: ['Accessories'] })).toBe('Oxford Cotton Shirt or Accessories items');
+    expect(describeSelector({ slugs: ['oxford-cotton-shirt'], categories: ['Accessories'] })).toBe(
+      'Oxford Cotton Shirt or Accessories items',
+    );
     expect(describeSelector(undefined)).toBe('any item');
   });
 });

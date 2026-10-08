@@ -1,5 +1,11 @@
 import { formatINR, type Paise, type PaymentMethod, type PriceBreakdown, type RejectedCode } from '@storefront/contracts';
-import { type BundleApplication, type BundleCandidate, optimizeBundles, type OptimizerOptions, type OptimizerResult } from './bundle-optimizer';
+import {
+  type BundleApplication,
+  type BundleCandidate,
+  optimizeBundles,
+  type OptimizerOptions,
+  type OptimizerResult,
+} from './bundle-optimizer';
 import { computeMarkdowns, type MarkdownResult } from './markdown';
 import { suggestNearMisses } from './near-miss';
 import { type CustomerProfile, effectiveSubtotal, listSubtotal, type PricingContext, type PricingLine } from './pricing-line';
@@ -81,7 +87,13 @@ export class PromotionEngine {
       return result.ok;
     };
 
-    const baseCtx: PricingContext = { now, lines: request.lines, merchandiseSubtotal: listSubtotal(request.lines), customer, paymentMethod };
+    const baseCtx: PricingContext = {
+      now,
+      lines: request.lines,
+      merchandiseSubtotal: listSubtotal(request.lines),
+      customer,
+      paymentMethod,
+    };
     const markdownPromos = live.filter(p => p.stage === 'markdown' && passes(p, baseCtx));
     const markdowns = computeMarkdowns(request.lines, markdownPromos, now);
     const ctx: PricingContext = { ...baseCtx, merchandiseSubtotal: effectiveSubtotal(markdowns.lines) };
@@ -121,7 +133,9 @@ export class PromotionEngine {
       const helpsSomewhere = scenarios.some(s => s.state.applied.has(promo.id));
       rejected.push({
         code: promo.def.code!,
-        reason: helpsSomewhere ? 'Another offer gives you a better price on this cart' : 'This code does not apply to the items in your cart',
+        reason: helpsSomewhere
+          ? 'Another offer gives you a better price on this cart'
+          : 'This code does not apply to the items in your cart',
       });
     }
 
@@ -169,7 +183,10 @@ export class PromotionEngine {
     if (combinations > (this.options.maxSelections ?? 64)) {
       const groupChoice = new Map<string, CompiledPromotion>();
       for (const [group, members] of groups) {
-        groupChoice.set(group, members.reduce((a, b) => (totalWith([...free, b]) < totalWith([...free, a]) ? b : a)));
+        groupChoice.set(
+          group,
+          members.reduce((a, b) => (totalWith([...free, b]) < totalWith([...free, a]) ? b : a)),
+        );
       }
       return [{ chosen: [...free, ...groupChoice.values()], groupChoice }];
     }
@@ -181,7 +198,12 @@ export class PromotionEngine {
     return out;
   }
 
-  private explain(best: Scenario, scenarios: readonly Scenario[], orderLevel: readonly CompiledPromotion[], eligible: readonly CompiledPromotion[]): string[] {
+  private explain(
+    best: Scenario,
+    scenarios: readonly Scenario[],
+    orderLevel: readonly CompiledPromotion[],
+    eligible: readonly CompiledPromotion[],
+  ): string[] {
     const out: string[] = [];
     for (const a of best.state.applied.values()) {
       out.push(`${a.name}: ${a.description}${a.times > 1 ? ` (applied ${a.times}×)` : ''} — saves ${formatINR(a.amount)}.`);
@@ -215,7 +237,9 @@ export class PromotionEngine {
           `"${exclusive.name}" can't be combined with other offers, and on its own it saves ${formatINR(bestShared.state.total - best.state.total)} more than the best combination.`,
         );
       } else if (solo.state.applied.has(exclusive.id)) {
-        out.push(`"${exclusive.name}" can't be combined with other offers; the combination applied saves ${formatINR(solo.state.total - best.state.total)} more.`);
+        out.push(
+          `"${exclusive.name}" can't be combined with other offers; the combination applied saves ${formatINR(solo.state.total - best.state.total)} more.`,
+        );
       }
     }
 
@@ -231,7 +255,12 @@ export class PromotionEngine {
     return out;
   }
 
-  private toBreakdown(best: Scenario, rejectedCodes: RejectedCode[], explanations: string[], suggestions: PriceBreakdown['suggestions']): PriceBreakdown {
+  private toBreakdown(
+    best: Scenario,
+    rejectedCodes: RejectedCode[],
+    explanations: string[],
+    suggestions: PriceBreakdown['suggestions'],
+  ): PriceBreakdown {
     const { state } = best;
     const lines = state.lines.map(({ line, amount, discounts }) => ({
       productId: line.productId,
