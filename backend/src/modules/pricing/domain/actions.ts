@@ -275,7 +275,7 @@ export class TieredAction extends CartDiscountAction {
   }
 
   summary(): string {
-    return `Spend more, save more: ${this.tiers.map(TieredAction.describeTier).join(', ')}${this.selector ? ` on ${describeSelector(this.selector)}` : ''}`;
+    return `${this.tiers.map(TieredAction.describeTier).join(', ')}${this.selector ? ` on ${describeSelector(this.selector)}` : ''}`;
   }
 }
 

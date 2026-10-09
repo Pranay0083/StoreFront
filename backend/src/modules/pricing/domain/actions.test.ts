@@ -62,6 +62,7 @@ describe('cart-level actions', () => {
     expect(tiers.discount(2_000_000, 2_500_000)).toBe(200_000);
     expect(tiers.discount(100_000, 3_500_000)).toBe(100_000);
     expect(tiers.nextTier(1_500_000)?.minSubtotal).toBe(2_000_000);
+    expect(tiers.summary()).toBe('5% off over ₹10,000, 10% off over ₹20,000, ₹4,000 off over ₹30,000');
   });
 });
 
