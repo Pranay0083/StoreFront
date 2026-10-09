@@ -10,8 +10,9 @@ export function catalogRoutes(controller: CatalogController, guards: AuthGuards)
   router.get('/', validate({ query: ProductListQuerySchema }), handler(controller.list));
   router.get('/categories', handler(controller.categories));
   router.get('/:slug', validate({ params: SlugParamsSchema }), handler(controller.getBySlug));
-  router.post('/', guards.requireAdmin, validate({ body: ProductInputSchema }), handler(controller.create));
-  router.put('/:id', guards.requireAdmin, validate({ body: ProductUpdateSchema }), handler(controller.update));
-  router.delete('/:id', guards.requireAdmin, handler(controller.remove));
+  const catalogWrite = guards.requirePermission('catalog:write');
+  router.post('/', catalogWrite, validate({ body: ProductInputSchema }), handler(controller.create));
+  router.put('/:id', catalogWrite, validate({ body: ProductUpdateSchema }), handler(controller.update));
+  router.delete('/:id', catalogWrite, handler(controller.remove));
   return router;
 }

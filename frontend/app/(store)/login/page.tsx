@@ -8,6 +8,7 @@ import { useAuth } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { isStaff } from '@storefront/contracts';
 
 function LoginContent() {
   const { user, login } = useAuth();
@@ -20,7 +21,7 @@ function LoginContent() {
 
   useEffect(() => {
     if (user && typeof user === 'object') {
-      router.replace(search.get('next') || (user.role === 'admin' ? '/admin' : '/'));
+      router.replace(search.get('next') || (isStaff(user.role) ? '/admin' : '/'));
     }
   }, [user, router, search]);
 
@@ -30,7 +31,7 @@ function LoginContent() {
     try {
       const u = await login(email, password);
       toast.success(`Welcome back, ${u.name}`);
-      router.replace(search.get('next') || (u.role === 'admin' ? '/admin' : '/'));
+      router.replace(search.get('next') || (isStaff(u.role) ? '/admin' : '/'));
     } catch (err: any) {
       toast.error(err.message);
     } finally {

@@ -28,6 +28,10 @@ export class ProductRepository {
       .lean<ProductRecord>();
   }
 
+  findManyByIds(ids: string[]): Promise<ProductRecord[]> {
+    return ProductModel.find({ _id: { $in: ids } }).lean<ProductRecord[]>();
+  }
+
   findBySlug(slug: string): Promise<ProductRecord | null> {
     return ProductModel.findOne({ slug }).lean<ProductRecord>();
   }
@@ -93,7 +97,24 @@ export class ProductRepository {
     ]);
   }
 
-  async setRating(id: string, rating: number, numReviews: number): Promise<void> {
-    await ProductModel.updateOne({ _id: id }, { $set: { rating, numReviews } });
+  /**
+   * Adjusts the rating aggregate in one atomic document update, so concurrent reviews never
+   * overwrite each other. Products created before `ratingSum` existed seed it from rating × count.
+   */
+  async applyRatingDelta(id: string, sumDelta: number, countDelta: number): Promise<{ rating: number; numReviews: number }> {
+    const sum = { $ifNull: ['$ratingSum', { $multiply: [{ $ifNull: ['$rating', 0] }, { $ifNull: ['$numReviews', 0] }] }] };
+    const updated = await ProductModel.findOneAndUpdate(
+      { _id: id },
+      [
+        { $set: { ratingSum: { $add: [sum, sumDelta] }, numReviews: { $add: [{ $ifNull: ['$numReviews', 0] }, countDelta] } } },
+        {
+          $set: {
+            rating: { $cond: [{ $gt: ['$numReviews', 0] }, { $round: [{ $divide: ['$ratingSum', '$numReviews'] }, 1] }, 0] },
+          },
+        },
+      ],
+      { new: true, projection: { rating: 1, numReviews: 1 } },
+    ).lean<{ rating: number; numReviews: number }>();
+    return { rating: updated?.rating ?? 0, numReviews: updated?.numReviews ?? 0 };
   }
 }

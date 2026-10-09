@@ -1,3 +1,4 @@
+import type { Role } from '@storefront/contracts';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
@@ -5,7 +6,7 @@ import { UserModel as User } from '../../src/modules/auth/user.model';
 import { ProductModel as Product } from '../../src/modules/catalog/product.model';
 import { CouponModel as Coupon } from '../../src/modules/coupons/coupon.model';
 
-export async function createUser(overrides: { email?: string; password?: string; name?: string; role?: 'customer' | 'admin' } = {}) {
+export async function createUser(overrides: { email?: string; password?: string; name?: string; role?: Role } = {}) {
   const password = overrides.password ?? 'Password@123';
   const user = await User.create({
     email: overrides.email ?? `user-${randomUUID().slice(0, 8)}@test.dev`,
@@ -13,7 +14,9 @@ export async function createUser(overrides: { email?: string; password?: string;
     role: overrides.role ?? 'customer',
     passwordHash: await bcrypt.hash(password, 4),
   });
-  const token = jwt.sign({ sub: String(user._id), email: user.email, type: 'access' }, process.env.JWT_SECRET!, { expiresIn: '15m' });
+  const token = jwt.sign({ sub: String(user._id), email: user.email, type: 'access' }, process.env.JWT_ACCESS_SECRET!, {
+    expiresIn: '15m',
+  });
   return { user, password, token, id: String(user._id) };
 }
 

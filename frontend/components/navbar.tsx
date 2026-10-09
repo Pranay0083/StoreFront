@@ -4,6 +4,7 @@ import { LayoutDashboard, LogOut, Package, ShoppingBag, User as UserIcon } from 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useCart } from '@/components/providers';
+import { isStaff } from '@storefront/contracts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,9 +65,9 @@ export function Navbar() {
                   <DropdownMenuItem data-testid="nav-orders-link" onClick={() => router.push('/orders')}>
                     <Package className="h-4 w-4" /> My orders
                   </DropdownMenuItem>
-                  {user.role === 'admin' && (
+                  {isStaff(user.role) && (
                     <DropdownMenuItem data-testid="nav-admin-link" onClick={() => router.push('/admin')}>
-                      <LayoutDashboard className="h-4 w-4" /> Admin dashboard
+                      <LayoutDashboard className="h-4 w-4" /> Back office
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />

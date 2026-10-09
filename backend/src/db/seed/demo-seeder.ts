@@ -389,6 +389,7 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
     }
     p.rating = Math.round((total / reviewers.length) * 10) / 10;
     p.numReviews = reviewers.length;
+    p.ratingSum = total;
     await p.save();
   }
   logger.info({ products: products.length, orders: orders.length }, 'Seeded demo catalog, orders and reviews');

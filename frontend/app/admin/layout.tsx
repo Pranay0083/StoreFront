@@ -1,20 +1,25 @@
 'use client';
 
-import { ArrowLeft, LayoutDashboard, LogOut, MessageSquare, Package, ShoppingBag, TicketPercent } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, LogOut, MessageSquare, Package, ScrollText, ShoppingBag, TicketPercent, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/components/providers';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { isStaff, ROLE_LABELS, type Permission, type User } from '@storefront/contracts';
 
-const LINKS = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/orders', label: 'Order queue', icon: Package },
-  { href: '/admin/products', label: 'Products', icon: ShoppingBag },
-  { href: '/admin/coupons', label: 'Coupons', icon: TicketPercent },
-  { href: '/admin/chats', label: 'Agent chats', icon: MessageSquare },
+const LINKS: Array<{ href: string; label: string; icon: typeof LayoutDashboard; permission: Permission }> = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
+  { href: '/admin/orders', label: 'Order queue', icon: Package, permission: 'orders:read' },
+  { href: '/admin/products', label: 'Products', icon: ShoppingBag, permission: 'catalog:write' },
+  { href: '/admin/coupons', label: 'Coupons', icon: TicketPercent, permission: 'promotions:write' },
+  { href: '/admin/chats', label: 'Agent chats', icon: MessageSquare, permission: 'chats:read' },
+  { href: '/admin/users', label: 'Team', icon: Users, permission: 'users:manage' },
+  { href: '/admin/audit', label: 'Audit log', icon: ScrollText, permission: 'audit:read' },
 ];
+
+const isStaffUser = (user: User | null | false): user is User => !!user && typeof user === 'object' && isStaff(user.role);
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -23,10 +28,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (user === false) router.replace('/login?next=/admin');
-    else if (user && typeof user === 'object' && user.role !== 'admin') router.replace('/');
+    else if (user && typeof user === 'object' && !isStaff(user.role)) router.replace('/');
   }, [user, router]);
 
-  if (!user || typeof user !== 'object' || user.role !== 'admin') {
+  if (!isStaffUser(user)) {
     return (
       <div className="p-10">
         <Skeleton className="h-8 w-56" />
@@ -34,6 +39,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
     );
   }
+
+  const links = LINKS.filter(l => user.permissions.includes(l.permission));
+  const current = LINKS.find(l => l.href === pathname);
+  const forbidden = current && !user.permissions.includes(current.permission);
 
   return (
     <div className="flex min-h-screen" data-testid="admin-layout">
@@ -45,7 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="label-caps mt-1 text-muted-foreground">Back office</p>
         </div>
         <nav className="flex-1 space-y-1 p-3">
-          {LINKS.map(l => (
+          {links.map(l => (
             <Link
               key={l.href}
               href={l.href}
@@ -79,7 +88,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 overflow-x-hidden">
         <header className="flex h-16 items-center justify-between border-b border-black/10 bg-white/70 px-6 backdrop-blur-xl">
           <div className="flex gap-4 md:hidden">
-            {LINKS.map(l => (
+            {links.map(l => (
               <Link
                 key={l.href}
                 href={l.href}
@@ -89,12 +98,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             ))}
           </div>
-          <p className="hidden text-sm text-muted-foreground md:block">Role-gated · admin</p>
+          <p className="hidden text-sm text-muted-foreground md:block" data-testid="admin-user-role">
+            Role-gated · {ROLE_LABELS[user.role]}
+          </p>
           <p data-testid="admin-user-email" className="text-sm font-medium">
             {user.email}
           </p>
         </header>
-        <main className="p-6 lg:p-8">{children}</main>
+        <main className="p-6 lg:p-8">
+          {forbidden ? (
+            <p className="text-sm text-muted-foreground" data-testid="admin-forbidden">
+              Your role ({ROLE_LABELS[user.role]}) does not include access to {current.label.toLowerCase()}.
+            </p>
+          ) : (
+            children
+          )}
+        </main>
       </div>
     </div>
   );

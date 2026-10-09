@@ -96,5 +96,6 @@ export interface Review {
   userName: string;
   rating: number;
   comment: string;
+  verifiedPurchase: boolean;
   createdAt: string;
 }

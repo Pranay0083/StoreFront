@@ -7,8 +7,8 @@ import { UpdateCartSchema } from './cart.schemas';
 
 export function cartRoutes(controller: CartController, guards: AuthGuards): Router {
   const router = Router();
-  router.use(guards.requireAuth);
-  router.get('/', handler(controller.get));
-  router.put('/', validate({ body: UpdateCartSchema }), handler(controller.replace));
+  router.post('/hydrate', validate({ body: UpdateCartSchema }), handler(controller.hydrate));
+  router.get('/', guards.requireAuth, handler(controller.get));
+  router.put('/', guards.requireAuth, validate({ body: UpdateCartSchema }), handler(controller.replace));
   return router;
 }

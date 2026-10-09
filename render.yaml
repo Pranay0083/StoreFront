@@ -9,8 +9,16 @@ services:
         sync: false
       - key: DB_NAME
         value: storefront
-      - key: JWT_SECRET
+      - key: JWT_ACCESS_SECRET
         generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: TRUST_PROXY
+        value: '1'
+      - key: COOKIE_SAMESITE
+        value: none
       - key: FRONTEND_URL
         sync: false
       - key: RAZORPAY_KEY_ID

@@ -1,4 +1,4 @@
-import type { CartItem } from '@storefront/contracts';
+import type { CartLine } from '@storefront/contracts';
 import { CartModel, type CartRecord } from './cart.model';
 
 export class CartRepository {
@@ -6,8 +6,8 @@ export class CartRepository {
     return CartModel.findOne({ userId }).lean<CartRecord>();
   }
 
-  async replaceItems(userId: string, items: CartItem[]): Promise<void> {
-    await CartModel.updateOne({ userId }, { $set: { items } }, { upsert: true });
+  async replaceLines(userId: string, lines: CartLine[]): Promise<void> {
+    await CartModel.updateOne({ userId }, { $set: { items: lines } }, { upsert: true });
   }
 
   async clear(userId: string): Promise<void> {

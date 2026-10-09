@@ -2,7 +2,12 @@ import { REFUND_WINDOW_DAYS } from '@storefront/contracts';
 import type { Router } from 'express';
 import { AdminController } from '../modules/admin/admin.controller';
 import { adminRoutes } from '../modules/admin/admin.routes';
+import { AdminUsersService } from '../modules/admin/admin-users.service';
 import { AdminService } from '../modules/admin/admin.service';
+import { AuditLogRepository } from '../modules/admin/audit-log.repository';
+import { auditTrail } from '../modules/admin/audit-trail';
+import { AuditService } from '../modules/admin/audit.service';
+import { StaffController } from '../modules/admin/staff.controller';
 import { AgentController } from '../modules/agent/agent.controller';
 import { agentRoutes } from '../modules/agent/agent.routes';
 import { AgentService } from '../modules/agent/agent.service';
@@ -13,6 +18,8 @@ import { AuthGuards } from '../modules/auth/auth.guards';
 import { authRoutes } from '../modules/auth/auth.routes';
 import { AuthService } from '../modules/auth/auth.service';
 import { LoginAttemptRepository } from '../modules/auth/login-attempt.repository';
+import { LoginThrottle } from '../modules/auth/login-throttle';
+import { AuthSessionRepository } from '../modules/auth/session.repository';
 import { TokenService } from '../modules/auth/token.service';
 import { UserRepository } from '../modules/auth/user.repository';
 import { CartController } from '../modules/cart/cart.controller';
@@ -46,14 +53,17 @@ import { paymentsRoutes } from '../modules/payments/payments.routes';
 import { RefundSaga } from '../modules/payments/refund.saga';
 import { PaymentsService } from '../modules/payments/payments.service';
 import { WebhookEventRepository } from '../modules/payments/webhook-event.repository';
+import { DeliveredOrderPurchaseVerifier } from '../modules/reviews/purchase-verifier';
 import { ReviewRepository } from '../modules/reviews/review.repository';
 import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
 import type { Env } from './config/env';
+import { CookiePolicy } from './http/cookies';
+import { CsrfProtection } from './http/csrf';
 import { idempotent } from './http/idempotency/idempotency.middleware';
 import { IdempotencyStore } from './http/idempotency/idempotency.store';
-import { createRateLimiters } from './http/rate-limit';
+import { createRateLimiters, memoryStores, type RateLimitStoreFactory } from './http/rate-limit';
 import { TransactionRunner } from './persistence/transaction';
 import { EventBus } from './events/event-bus';
 import { PollingOutboxRelay, type OutboxRelay } from './events/outbox-relay';
@@ -61,12 +71,19 @@ import { OutboxStore } from './events/outbox.store';
 import { logger } from './logger';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
-export function buildContainer(env: Env) {
-  const limiters = createRateLimiters(env);
+export interface Infrastructure {
+  rateLimitStores: RateLimitStoreFactory;
+}
+
+export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStores: memoryStores }) {
+  const limiters = createRateLimiters(env, infra.rateLimitStores);
+  const cookies = new CookiePolicy(env);
+  const csrf = new CsrfProtection(env.CSRF_SECRET, cookies, ['/payments/webhook', '/mcp']);
 
   const repositories = {
     users: new UserRepository(),
     loginAttempts: new LoginAttemptRepository(),
+    authSessions: new AuthSessionRepository(),
     products: new ProductRepository(),
     reviews: new ReviewRepository(),
     carts: new CartRepository(),
@@ -76,6 +93,7 @@ export function buildContainer(env: Env) {
     conversations: new ConversationRepository(),
     inventoryMovements: new InventoryMovementRepository(),
     stockReservations: new StockReservationRepository(),
+    auditLogs: new AuditLogRepository(),
   };
 
   const tx = new TransactionRunner();
@@ -83,10 +101,10 @@ export function buildContainer(env: Env) {
   const eventBus = new EventBus();
   const relay: OutboxRelay = new PollingOutboxRelay(outbox, eventBus, logger, { pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS });
 
-  const tokens = new TokenService(env.JWT_SECRET);
+  const tokens = new TokenService({ access: env.JWT_ACCESS_SECRET, refresh: env.JWT_REFRESH_SECRET });
   const inventory = new InventoryService(repositories.products, repositories.inventoryMovements, repositories.stockReservations);
   const catalog = new CatalogService(repositories.products, inventory, tx);
-  const cart = new CartService(repositories.carts);
+  const cart = new CartService(repositories.carts, repositories.products);
   const coupons = new CouponService(repositories.coupons);
   const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart, inventory, outbox, relay, tx, {
     reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -116,12 +134,16 @@ export function buildContainer(env: Env) {
     },
   };
 
+  const audit = new AuditService(repositories.auditLogs);
+
   const services = {
     tokens,
-    auth: new AuthService(repositories.users, repositories.loginAttempts, tokens),
+    audit,
+    adminUsers: new AdminUsersService(repositories.users),
+    auth: new AuthService(repositories.users, new LoginThrottle(repositories.loginAttempts), repositories.authSessions, tokens),
     catalog,
     inventory,
-    reviews: new ReviewsService(repositories.reviews, repositories.products),
+    reviews: new ReviewsService(repositories.reviews, repositories.products, new DeliveredOrderPurchaseVerifier()),
     cart,
     coupons,
     orders,
@@ -146,7 +168,7 @@ export function buildContainer(env: Env) {
   const idempotency = idempotent(new IdempotencyStore());
 
   const controllers = {
-    auth: new AuthController(services.auth),
+    auth: new AuthController(services.auth, cookies, csrf),
     catalog: new CatalogController(services.catalog),
     reviews: new ReviewsController(services.reviews),
     cart: new CartController(services.cart),
@@ -157,10 +179,11 @@ export function buildContainer(env: Env) {
     mcp: new McpController(services.agentTools),
     admin: new AdminController(services.admin),
     inventory: new InventoryController(services.inventory),
+    staff: new StaffController(services.audit, services.adminUsers),
   };
 
   const routes: Array<[path: string, router: Router]> = [
-    ['/auth', authRoutes(controllers.auth, guards, limiters)],
+    ['/auth', authRoutes(controllers.auth, guards)],
     ['/products', catalogRoutes(controllers.catalog, guards)],
     ['/reviews', reviewsRoutes(controllers.reviews, guards)],
     ['/cart', cartRoutes(controllers.cart, guards)],
@@ -171,10 +194,12 @@ export function buildContainer(env: Env) {
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
-    ['/admin', adminRoutes(controllers.admin, guards)],
+    ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
 
-  return { env, limiters, tx, eventBus, background, repositories, services, guards, controllers, routes };
+  const http = { auditTrail: auditTrail(audit) };
+
+  return { env, limiters, cookies, csrf, http, tx, eventBus, background, repositories, services, guards, controllers, routes };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

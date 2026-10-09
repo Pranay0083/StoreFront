@@ -1,15 +1,21 @@
 import { LoginAttemptModel, type LoginAttemptRecord } from './login-attempt.model';
 
+const FORGET_AFTER_MS = 24 * 60 * 60 * 1000;
+
 export class LoginAttemptRepository {
-  find(identifier: string): Promise<LoginAttemptRecord | null> {
-    return LoginAttemptModel.findOne({ identifier }).lean<LoginAttemptRecord>();
+  findMany(keys: string[]): Promise<LoginAttemptRecord[]> {
+    return LoginAttemptModel.find({ key: { $in: keys } }).lean<LoginAttemptRecord[]>();
   }
 
-  async recordFailure(identifier: string, count: number, lockedUntil?: Date): Promise<void> {
-    await LoginAttemptModel.updateOne({ identifier }, { $set: { count, ...(lockedUntil && { lockedUntil }) } }, { upsert: true });
+  async recordFailure(key: string, at: Date): Promise<void> {
+    await LoginAttemptModel.updateOne(
+      { key },
+      { $inc: { failures: 1 }, $set: { lastFailureAt: at, expireAt: new Date(at.getTime() + FORGET_AFTER_MS) } },
+      { upsert: true },
+    );
   }
 
-  async clear(identifier: string): Promise<void> {
-    await LoginAttemptModel.deleteOne({ identifier });
+  async clear(key: string): Promise<void> {
+    await LoginAttemptModel.deleteOne({ key });
   }
 }

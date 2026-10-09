@@ -1,7 +1,5 @@
 import { z } from 'zod';
-
-export const ROLES = ['customer', 'admin'] as const;
-export type Role = (typeof ROLES)[number];
+import type { Permission, Role } from './rbac';
 
 export const RegisterSchema = z
   .object({
@@ -31,9 +29,19 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  permissions: Permission[];
 }
 
 export interface AuthResponse {
   user: User;
   token?: string;
+}
+
+export interface AuthSessionInfo {
+  id: string;
+  createdAt: string;
+  lastUsedAt: string;
+  ip?: string;
+  userAgent?: string;
+  current: boolean;
 }

@@ -9,7 +9,8 @@ An explicit **order state machine**, a **role-gated admin dashboard built on rea
 ```
 Frontend   Next.js 14 (App Router) + TypeScript + Tailwind + shadcn-style component library
            Optimistic cart (localStorage + server merge), skeleton loading, next/image, route groups
-Auth       Custom JWT (email/password) → httpOnly cookies + Bearer fallback → RBAC (customer/admin)
+Auth       Short-lived access JWT + rotating refresh-token families (reuse detection) → httpOnly
+           cookies + Bearer → signed double-submit CSRF → permission-based RBAC with an audit trail
            Provider boundary isolated in middleware.ts — swap in Firebase Admin verifyIdToken later
 Monorepo   npm workspaces: backend (@storefront/api), frontend (@storefront/web), packages/contracts
            (@storefront/contracts — shared zod schemas, DTO types, order transitions, paise money helpers)
@@ -120,6 +121,20 @@ low-stock alerts (`$unwind sizes → $match stock < 5`).
 3. Checkout verification also checks that the signed Razorpay order id belongs to the order being
    paid, so a signature from one order cannot confirm another.
 
+## Security model
+
+| Concern | Mechanism |
+| --- | --- |
+| Sessions | 15-min access JWT + 7-day refresh JWT signed with **separate keys**. Each login is a refresh-token **family** stored only as SHA-256 fingerprints; every refresh atomically rotates it. Replaying a rotated token (outside a 10 s multi-tab grace window) revokes the whole family. `logout` revokes the family, `logout-all` every family plus outstanding access tokens; `/auth/sessions` lists and revokes devices. |
+| CSRF | Cookie-authenticated writes must echo an HMAC-signed token in `X-CSRF-Token` (signed double-submit). Tokens come from `GET /auth/csrf` and auth responses, so a cross-site frontend never needs to read the cookie; they rotate on login/logout. Bearer clients, the webhook and MCP are exempt. |
+| Cookies | `SameSite=None; Secure` in production (separate frontend/API sites), `Lax` locally; refresh cookie scoped to `/api/v1/auth`. Overridable via `COOKIE_*`. |
+| Brute force | Exponential backoff keyed on **IP + email** (owner is never locked out from another network) plus a looser per-email policy against distributed stuffing; `Retry-After` on 429. Unknown emails still pay for a bcrypt compare so timing does not reveal accounts. |
+| Rate limits | Declarative policy table — global, sign-in, session, checkout/payments, AI chat, catalog reads, MCP — stacked per request behind a pluggable counter store (memory now, Redis-ready). |
+| Trust boundary | Carts persist only `{productId, size, qty}`; titles, prices and stock are always read from the catalog. Reviews require a delivered order (verified purchase); ratings update atomically and incrementally. |
+| Authorization | Roles (`support`, `fulfillment`, `catalog_manager`, `admin`) map to permissions (`orders:manage`, `catalog:write`, `audit:read`…) defined once in `@storefront/contracts`; `requirePermission()` guards routes and the UI hides what a role cannot use. |
+| Audit | Every permission-guarded write is logged after the response (actor, permission, route, targets, redacted diff, status) and browsable at `/admin/audit` with keyset pagination. |
+| Headers & CORS | Deny-all CSP, no-referrer, same-site CORP, HSTS in production; credentialed CORS only for `CORS_ORIGINS`. CodeQL and grouped Dependabot updates run in CI. |
+
 ## Indexes
 
 - `products`: `{category:1, price:1}` compound (filters), text index on title+description (search), unique slug
@@ -140,7 +155,8 @@ Razorpay modal (`/api/v1/payments/config` reports the mode). Register the webhoo
 - **Frontend → Vercel**: root `frontend/`, zero-config Next.js. Set `NEXT_PUBLIC_API_URL`.
 - **API → Render/Railway**: `render.yaml` included — `npm start -w backend` applies pending
   migrations, seeds demo data when the catalog is empty (`SEED_DEMO_DATA=false` to skip), then serves.
-  Set Mongo + JWT + Razorpay env vars (and `ADMIN_PASSWORD` to provision the admin account).
+  Set Mongo, `JWT_ACCESS_SECRET` + `JWT_REFRESH_SECRET` (a legacy `JWT_SECRET` still works and is
+  HKDF-split), Razorpay env vars, `TRUST_PROXY=1` behind a proxy, and `ADMIN_PASSWORD` to provision the admin account.
 - **CI**: `.github/workflows/ci.yml` — format check, lint, typecheck, contracts + backend test suites
   (mongodb-memory-server), a migrate/seed/boot smoke test and the frontend build.
 

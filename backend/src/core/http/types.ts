@@ -1,11 +1,17 @@
 import type { Request } from 'express';
-import type { Role } from '@storefront/contracts';
+import type { Permission, Role } from '@storefront/contracts';
 
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: Role;
+  permissions: Permission[];
+}
+
+/** What the permission guard authorised, recorded by the audit trail. */
+export interface AuthzGrant {
+  permissions: string[];
 }
 
 declare global {
@@ -13,6 +19,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      authz?: AuthzGrant;
       rawBody?: Buffer;
     }
   }

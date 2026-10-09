@@ -1,22 +1,18 @@
 import mongoose, { Schema, type InferSchemaType, type Types } from 'mongoose';
 
-const cartItemSchema = new Schema(
+const cartLineSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
-    title: String,
-    image: String,
-    price: Number,
     size: { type: String, required: true },
-    qty: { type: Number, required: true },
-    slug: String,
+    qty: { type: Number, required: true, min: 1 },
   },
-  { _id: true },
+  { _id: false },
 );
 
 const cartSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', unique: true, required: true },
-    items: { type: [cartItemSchema], default: [] },
+    items: { type: [cartLineSchema], default: [] },
   },
   { timestamps: true },
 );
