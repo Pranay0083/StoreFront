@@ -19,8 +19,10 @@ export interface NearMissInput {
 
 const MAX_SUGGESTIONS = 4;
 const SPEND_MORE_RATIO = 0.3;
-const WHAT_IF_OPTIONS: OptimizerOptions = { nodeBudget: 5_000, timeBudgetMs: 50 };
+const WHAT_IF_OPTIONS: OptimizerOptions = { nodeBudget: 2_000, timeBudgetMs: 20 };
 const MAX_UNITS_FOR_WHAT_IF = 30;
+const MAX_WHAT_IF_RUNS = 24;
+const MAX_UNITS_TO_ADD = 2;
 
 const sameVariant = (a: EffectiveLine, b: EffectiveLine) => a.productId === b.productId && a.size === b.size;
 
@@ -46,14 +48,19 @@ function addItemSuggestions({ lines, bundleOffers, currentPlan, pool }: NearMiss
 
   const candidatesPool = [...lines, ...pool.filter(p => !lines.some(l => sameVariant(l, p)))];
   const out: Array<PricingSuggestion & { net: number }> = [];
+  let runs = 0;
   for (const offer of bundleOffers) {
+    // Adding a couple of units can only complete an application if the cart is already that close.
+    const eligibleUnits = lines.filter(l => offer.action.touches(l)).reduce((s, l) => s + l.qty, 0);
+    if (eligibleUnits + MAX_UNITS_TO_ADD < offer.action.unitsPerApplication) continue;
     const candidates = candidatesPool
       .filter(c => offer.action.touches(c))
       .sort((a, b) => a.effectiveUnitPrice - b.effectiveUnitPrice)
       .slice(0, 3);
     let best: (PricingSuggestion & { net: number }) | undefined;
     for (const candidate of candidates) {
-      for (let units = 1; units <= 2; units++) {
+      for (let units = 1; units <= MAX_UNITS_TO_ADD && runs < MAX_WHAT_IF_RUNS; units++) {
+        runs += 1;
         const result = optimizeBundles(addUnits(lines, candidate, units), bundleOffers, WHAT_IF_OPTIONS);
         const extra = result.savings - baseline;
         const added = units * candidate.effectiveUnitPrice;
