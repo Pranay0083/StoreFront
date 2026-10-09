@@ -63,3 +63,6 @@ dump.rdb
 
 # Build caches
 .cache/
+
+# Claude Code agent worktrees
+.claude/worktrees/
