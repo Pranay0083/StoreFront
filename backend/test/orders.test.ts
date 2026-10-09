@@ -50,10 +50,12 @@ describe('orders', () => {
     expect(res.body.error).toMatch(/Only 2 left/);
   });
 
-  it('scopes order reads to the owner or an admin', async () => {
+  it('scopes order reads to the owner or staff with orders:read', async () => {
     const buyer = await createUser();
     const other = await createUser();
     const admin = await createUser({ role: 'admin' });
+    const support = await createUser({ role: 'support' });
+    const catalogManager = await createUser({ role: 'catalog_manager' });
     const product = await createProduct();
     const order = (await placeOrder(buyer.token, { items: [{ productId: String(product._id), size: 'M', qty: 1 }] }).expect(201)).body;
 
@@ -61,6 +63,8 @@ describe('orders', () => {
     expect(mine.body).toHaveLength(1);
     await t.http().get(`${API}/orders/${order._id}`).set(bearer(other.token)).expect(403);
     await t.http().get(`${API}/orders/${order._id}`).set(bearer(admin.token)).expect(200);
+    await t.http().get(`${API}/orders/${order._id}`).set(bearer(support.token)).expect(200);
+    await t.http().get(`${API}/orders/${order._id}`).set(bearer(catalogManager.token)).expect(403);
   });
 
   it('lets the customer cancel and rejects illegal transitions', async () => {

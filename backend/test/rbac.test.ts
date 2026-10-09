@@ -41,6 +41,11 @@ const ENDPOINTS: Array<{ name: string; allowed: Role[]; call: (token: string) =>
   },
   { name: 'GET /admin/coupons', allowed: ['catalog_manager', 'admin'], call: tk => t.http().get(`${API}/admin/coupons`).set(bearer(tk)) },
   {
+    name: 'GET /admin/inventory/reconcile',
+    allowed: ['catalog_manager', 'admin'],
+    call: tk => t.http().get(`${API}/admin/inventory/reconcile`).set(bearer(tk)),
+  },
+  {
     name: 'POST /products',
     allowed: ['catalog_manager', 'admin'],
     call: tk =>

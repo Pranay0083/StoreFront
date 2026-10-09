@@ -91,7 +91,7 @@ export class OrdersService {
   async getVisibleTo(id: string, user: AuthUser): Promise<OrderRecord> {
     const order = await this.orders.findById(id);
     if (!order) throw new NotFoundError('Order not found');
-    if (String(order.userId) !== user.id && user.role !== 'admin') throw new ForbiddenError();
+    if (String(order.userId) !== user.id && !user.permissions.includes('orders:read')) throw new ForbiddenError();
     return order;
   }
 

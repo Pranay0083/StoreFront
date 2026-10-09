@@ -20,7 +20,7 @@ export const MovementsQuerySchema = z.object({
 
 export function inventoryRoutes(controller: InventoryController, guards: AuthGuards): Router {
   const router = Router();
-  router.use(guards.requireAdmin);
+  router.use(guards.requirePermission('catalog:write'));
   router.get('/reconcile', handler(controller.reconcile));
   router.get('/movements', validate({ query: MovementsQuerySchema }), handler(controller.movements));
   return router;
