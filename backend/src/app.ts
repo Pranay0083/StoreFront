@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from './core/http/error-handler';
 import { API_PREFIX } from './core/http/paths';
 import { corsPolicy, securityHeaders } from './core/http/security';
 import { logger } from './core/logger';
+import { requestIdMiddleware } from './core/observability/request-context';
 
 export { API_PREFIX };
 
@@ -16,8 +17,9 @@ export function buildApp(container: Container) {
   app.set('trust proxy', env.TRUST_PROXY);
   app.disable('x-powered-by');
 
+  app.use(requestIdMiddleware);
   app.use(securityHeaders(env));
-  app.use(pinoHttp({ logger }));
+  app.use(pinoHttp({ logger, genReqId: req => (req as express.Request).requestId ?? '' }));
 
   app.use(corsPolicy(env));
   app.use(
