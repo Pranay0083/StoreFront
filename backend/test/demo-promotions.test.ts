@@ -2,7 +2,7 @@ import type { PriceBreakdown } from '@storefront/contracts';
 import mongoose from 'mongoose';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pricingIndexes } from '../src/db/migrations/020-pricing-indexes';
-import { DEMO_PROMOTIONS, demoPromotions } from '../src/db/migrations/021-demo-promotions';
+import { DEMO_PROMOTIONS, seedDemoPromotions } from '../src/db/seed/demo-promotions';
 import { seedDemoData } from '../src/db/seed/demo-seeder';
 import { ProductModel } from '../src/modules/catalog/product.model';
 import { breakdownInvariantViolations } from '../src/modules/pricing/domain/test-fixtures';
@@ -13,7 +13,6 @@ const t = useTestApp();
 beforeEach(async () => {
   const db = mongoose.connection.db!;
   await pricingIndexes.up(db);
-  await demoPromotions.up(db);
   await seedDemoData({ ADMIN_EMAIL: 'admin@test.dev', ADMIN_PASSWORD: undefined });
   t.container.services.promotionCache.invalidate();
 });
@@ -28,9 +27,9 @@ async function quote(slugs: string[], codes: string[] = []): Promise<PriceBreakd
   return breakdown;
 }
 
-describe('021-demo-promotions', () => {
+describe('demo promotions seed', () => {
   it('seeds every demo promotion once, each with a version-1 snapshot', async () => {
-    await demoPromotions.up(mongoose.connection.db!);
+    await seedDemoPromotions(mongoose.connection.db!);
     const db = mongoose.connection.db!;
     expect(await db.collection('promotions').countDocuments()).toBe(DEMO_PROMOTIONS.length);
     expect(await db.collection('promotion_versions').countDocuments({ version: 1 })).toBe(DEMO_PROMOTIONS.length);

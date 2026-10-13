@@ -4,7 +4,6 @@ import { amountsToPaise } from './002-amounts-to-paise';
 import { inventoryLedger } from './010-inventory-ledger';
 import { orderConsistencyIndexes } from './011-order-consistency-indexes';
 import { pricingIndexes } from './020-pricing-indexes';
-import { demoPromotions } from './021-demo-promotions';
 import { authSessions } from './030-auth-sessions';
 import { loginThrottle } from './031-login-throttle';
 import { cartLines } from './032-cart-lines';
@@ -17,7 +16,6 @@ export const migrations: readonly Migration[] = [
   inventoryLedger,
   orderConsistencyIndexes,
   pricingIndexes,
-  demoPromotions,
   authSessions,
   loginThrottle,
   cartLines,

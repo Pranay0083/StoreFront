@@ -9,6 +9,7 @@ import { CouponModel } from '../../modules/coupons/coupon.model';
 import { recordOpeningBalances } from '../../modules/inventory/opening-balances';
 import { OrderModel } from '../../modules/orders/order.model';
 import { ReviewModel } from '../../modules/reviews/review.model';
+import { seedDemoPromotions } from './demo-promotions';
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=900&q=80&auto=format&fit=crop`;
 const APPAREL = ['S', 'M', 'L', 'XL'];
@@ -285,7 +286,7 @@ export interface SeedResult {
 }
 
 /**
- * Idempotent demo seed: ensures the admin and demo customer accounts and default coupons exist,
+ * Idempotent demo seed: ensures the admin and demo customer accounts, default coupons and demo promotions exist,
  * and populates the catalog, historical orders and reviews only when the catalog is empty.
  */
 export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWORD'>): Promise<SeedResult> {
@@ -298,6 +299,7 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
     ]);
     logger.info('Seeded default coupons');
   }
+  await seedDemoPromotions(mongoose.connection.db!);
   if ((await ProductModel.countDocuments()) > 0) return { catalogSeeded: false };
 
   const products = await ProductModel.insertMany(PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));

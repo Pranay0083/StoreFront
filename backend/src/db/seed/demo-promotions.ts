@@ -1,6 +1,5 @@
 import { PromotionInputSchema, rupeesToPaise as inr, type PromotionInput } from '@storefront/contracts';
 import type { mongo } from 'mongoose';
-import type { Migration } from '../migration';
 
 const SHIRTS_AND_TOPS = ['oxford-cotton-shirt', 'breton-linen-shirt', 'twill-overshirt', 'ribbed-knit-top'];
 const SMALL_ACCESSORIES = [
@@ -87,28 +86,24 @@ export const DEMO_PROMOTIONS: Array<Partial<PromotionInput> & Pick<PromotionInpu
   },
 ];
 
-export const demoPromotions: Migration = {
-  id: '021-demo-promotions',
-  description: 'Seed overlapping demo promotions (combo, mix-and-match, BOGO, tiers, codes, segments, markdowns)',
-  async up(db: mongo.Db) {
-    const promotions = db.collection('promotions');
-    const versions = db.collection('promotion_versions');
-    const now = new Date();
-    for (const raw of DEMO_PROMOTIONS) {
-      const input = PromotionInputSchema.parse({ status: 'active', ...raw });
-      if (await promotions.findOne({ $or: [{ name: input.name }, ...(input.code ? [{ code: input.code }] : [])] })) continue;
-      const doc = {
-        ...input,
-        usedCount: 0,
-        version: 1,
-        createdBy: 'system:migration',
-        updatedBy: 'system:migration',
-        createdAt: now,
-        updatedAt: now,
-      };
-      const { insertedId } = await promotions.insertOne(doc);
-      const { usedCount: _usedCount, createdAt: _c, updatedAt: _u, ...snapshot } = doc;
-      await versions.insertOne({ promotionId: insertedId, version: 1, snapshot, changedBy: 'system:migration', createdAt: now });
-    }
-  },
-};
+export async function seedDemoPromotions(db: mongo.Db): Promise<void> {
+  const promotions = db.collection('promotions');
+  const versions = db.collection('promotion_versions');
+  const now = new Date();
+  for (const raw of DEMO_PROMOTIONS) {
+    const input = PromotionInputSchema.parse({ status: 'active', ...raw });
+    if (await promotions.findOne({ $or: [{ name: input.name }, ...(input.code ? [{ code: input.code }] : [])] })) continue;
+    const doc = {
+      ...input,
+      usedCount: 0,
+      version: 1,
+      createdBy: 'system:seed',
+      updatedBy: 'system:seed',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const { insertedId } = await promotions.insertOne(doc);
+    const { usedCount: _usedCount, createdAt: _c, updatedAt: _u, ...snapshot } = doc;
+    await versions.insertOne({ promotionId: insertedId, version: 1, snapshot, changedBy: 'system:seed', createdAt: now });
+  }
+}
