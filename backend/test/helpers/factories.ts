@@ -1,10 +1,11 @@
-import type { Role } from '@storefront/contracts';
+import { PromotionInputSchema, type Role } from '@storefront/contracts';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { UserModel as User } from '../../src/modules/auth/user.model';
 import { ProductModel as Product } from '../../src/modules/catalog/product.model';
 import { CouponModel as Coupon } from '../../src/modules/coupons/coupon.model';
+import type { PromotionsService } from '../../src/modules/pricing/promotions.service';
 
 export async function createUser(overrides: { email?: string; password?: string; name?: string; role?: Role } = {}) {
   const password = overrides.password ?? 'Password@123';
@@ -46,6 +47,23 @@ export async function createCoupon(overrides: Record<string, unknown> = {}) {
     active: true,
     ...overrides,
   });
+}
+
+/** Creates an active promotion through the service so the active-promotion cache is invalidated. Defaults to a WELCOME10-style code. */
+export async function createPromotion(services: { promotions: PromotionsService }, overrides: Record<string, unknown> = {}) {
+  return services.promotions.create(
+    PromotionInputSchema.parse({
+      name: 'Welcome 10',
+      status: 'active',
+      activation: 'code',
+      code: 'WELCOME10',
+      stackGroup: 'order-discount',
+      conditions: { type: 'minSubtotal', amount: 100_000 },
+      action: { type: 'percentOff', percent: 10, maxDiscount: 50_000 },
+      ...overrides,
+    }),
+    'admin:test',
+  );
 }
 
 export const ADDRESS = {

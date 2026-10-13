@@ -8,7 +8,7 @@ export interface StockLine {
 }
 
 export interface DomainEventMap {
-  OrderPlaced: { orderId: string; orderNumber: string; userId: string; total: Paise; items: StockLine[]; couponCode?: string };
+  OrderPlaced: { orderId: string; orderNumber: string; userId: string; total: Paise; items: StockLine[]; promotionIds?: string[] };
   OrderPaid: {
     orderId: string;
     orderNumber: string;

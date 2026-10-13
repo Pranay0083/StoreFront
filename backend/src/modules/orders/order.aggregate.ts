@@ -1,4 +1,12 @@
-import { REFUND_WINDOW_DAYS, type Address, type OrderStatus, type Paise, type RefundState } from '@storefront/contracts';
+import {
+  REFUND_WINDOW_DAYS,
+  type Address,
+  type LineDiscount,
+  type OrderPricing,
+  type OrderStatus,
+  type Paise,
+  type RefundState,
+} from '@storefront/contracts';
 import { Types } from 'mongoose';
 import { BadRequestError, ConflictError } from '../../core/errors';
 import { domainEvent, type DomainEvent, type StockLine } from '../../core/events/domain-events';
@@ -14,6 +22,9 @@ export interface OrderLine {
   size: string;
   qty: number;
   slug?: string;
+  markdownPerUnit: Paise;
+  discounts: LineDiscount[];
+  lineTotal: Paise;
 }
 
 export interface StatusEvent {
@@ -55,6 +66,7 @@ export interface OrderProps {
   discount: Paise;
   couponCode?: string;
   total: Paise;
+  pricing?: OrderPricing;
   status: OrderStatus;
   statusHistory: StatusEvent[];
   payment: PaymentState;
@@ -75,7 +87,7 @@ export interface PlaceOrderInput {
   subtotal: Paise;
   shipping: Paise;
   discount: Paise;
-  couponCode?: string;
+  pricing?: OrderPricing;
   reservedUntil: Date;
 }
 
@@ -99,6 +111,11 @@ export class Order {
     if (!input.items.length) throw new BadRequestError('Order must contain at least one item');
     const total = input.subtotal - input.discount + input.shipping;
     if (total < 0) throw new BadRequestError('Order total cannot be negative');
+    const linesTotal = input.items.reduce((sum, i) => sum + i.lineTotal, 0);
+    if (linesTotal !== input.subtotal - input.discount) {
+      throw new BadRequestError('Order lines do not add up to the discounted subtotal');
+    }
+    if (input.pricing && input.pricing.stages.total !== total) throw new BadRequestError('Order total does not match its pricing');
     const order = new Order({
       ...input,
       id: new Types.ObjectId().toHexString(),
@@ -114,7 +131,7 @@ export class Order {
       userId: order.userId,
       total,
       items: order.stockLines(),
-      ...(input.couponCode && { couponCode: input.couponCode }),
+      ...(input.pricing?.applied.length && { promotionIds: input.pricing.applied.map(a => a.promotionId) }),
     });
     return order;
   }

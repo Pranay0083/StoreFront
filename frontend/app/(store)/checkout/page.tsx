@@ -138,7 +138,7 @@ export default function CheckoutPage() {
       const body = JSON.stringify({
         items: items.map(i => ({ productId: i.productId, size: i.size, qty: i.qty })),
         address,
-        ...(coupon ? { couponCode: coupon.code } : {}),
+        ...(coupon ? { codes: [coupon.code] } : {}),
       });
       // Retrying the same checkout reuses its key, so a timeout or double click never places two orders.
       if (checkoutAttempt.current?.body !== body) checkoutAttempt.current = { body, key: crypto.randomUUID() };

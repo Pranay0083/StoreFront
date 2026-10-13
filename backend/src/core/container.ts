@@ -128,7 +128,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     repositories.promotionRedemptions,
   );
   const coupons = new CouponService(repositories.coupons);
-  const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart, inventory, outbox, relay, tx, {
+  const orders = new OrdersService(repositories.orders, pricing, cart, inventory, outbox, relay, tx, {
     reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
     refundWindowDays: REFUND_WINDOW_DAYS,
   });

@@ -1,17 +1,17 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { ProductModel as Product } from '../src/modules/catalog/product.model';
-import { CouponModel as Coupon } from '../src/modules/coupons/coupon.model';
 import { OrderModel as Order } from '../src/modules/orders/order.model';
-import { ADDRESS, createCoupon, createProduct, createUser } from './helpers/factories';
+import { PromotionModel as Promotion } from '../src/modules/pricing/promotion.model';
+import { ADDRESS, createProduct, createPromotion, createUser } from './helpers/factories';
 import { API, bearer, useTestApp } from './helpers/app';
 
 const t = useTestApp();
 
-async function setupOrder(withCoupon = false) {
+async function setupOrder(withPromoCode = false) {
   const buyer = await createUser();
   const product = await createProduct({ price: 200_000 });
-  if (withCoupon) await createCoupon();
+  if (withPromoCode) await createPromotion(t.container.services);
   const order = (
     await t
       .http()
@@ -20,7 +20,7 @@ async function setupOrder(withCoupon = false) {
       .send({
         address: ADDRESS,
         items: [{ productId: String(product._id), size: 'M', qty: 2 }],
-        ...(withCoupon ? { couponCode: 'WELCOME10' } : {}),
+        ...(withPromoCode ? { codes: ['WELCOME10'] } : {}),
       })
       .expect(201)
   ).body;
@@ -46,12 +46,12 @@ describe('payments (demo mode)', () => {
     expect(first.body).toMatchObject({ ok: true, alreadyProcessed: false });
     expect(first.body.order.status).toBe('paid');
     expect(await stockOf(product._id, 'M')).toBe(8);
-    expect((await Coupon.findOne({ code: 'WELCOME10' }))!.usedCount).toBe(1);
+    expect((await Promotion.findOne({ code: 'WELCOME10' }))!.usedCount).toBe(1);
 
     const second = await t.http().post(`${API}/payments/demo-confirm`).set(bearer(buyer.token)).send({ orderId: order._id }).expect(200);
     expect(second.body.alreadyProcessed).toBe(true);
     expect(await stockOf(product._id, 'M')).toBe(8);
-    expect((await Coupon.findOne({ code: 'WELCOME10' }))!.usedCount).toBe(1);
+    expect((await Promotion.findOne({ code: 'WELCOME10' }))!.usedCount).toBe(1);
   });
 
   it("refuses to pay someone else's order", async () => {

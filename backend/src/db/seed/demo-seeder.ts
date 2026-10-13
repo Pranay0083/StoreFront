@@ -319,14 +319,18 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
     const buyer = pick(buyers);
     const items = Array.from({ length: 1 + rand(3) }, () => {
       const p = pick(products);
+      const qty = 1 + rand(2);
       return {
         productId: p._id,
         title: p.title,
         image: p.images[0],
         price: p.price,
         size: pick(p.sizes).size,
-        qty: 1 + rand(2),
+        qty,
         slug: p.slug,
+        markdownPerUnit: 0,
+        discounts: [],
+        lineTotal: p.price * qty,
       };
     });
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
@@ -363,6 +367,7 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
       },
       subtotal,
       shipping,
+      discount: 0,
       total: subtotal + shipping,
       status: path[path.length - 1],
       statusHistory,

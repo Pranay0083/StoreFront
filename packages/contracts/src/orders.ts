@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Paise } from './money';
+import { PAYMENT_METHODS, type AppliedPromotion, type LineDiscount, type OptimizerReport } from './pricing';
 
 export const ORDER_STATUSES = ['created', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refund_requested', 'refunded'] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -78,7 +79,9 @@ export const CreateOrderSchema = z
       )
       .min(1, 'Order must contain at least one item')
       .max(50, 'Order cannot exceed 50 distinct items'),
-    couponCode: z.string().max(30).optional(),
+    codes: z.array(z.string().trim().toUpperCase().min(1).max(30)).max(3, 'At most 3 promo codes per order').default([]),
+    quoteId: z.string().uuid('quoteId must be a quote id from /pricing/quote').optional(),
+    paymentMethod: z.enum(PAYMENT_METHODS).optional(),
     address: AddressSchema,
   })
   .strict();
@@ -96,10 +99,38 @@ export interface OrderItem {
   productId: string;
   title: string;
   image: string;
+  /** List price per unit at the time of purchase. */
   price: Paise;
   size: string;
   qty: number;
   slug: string;
+  markdownPerUnit: Paise;
+  /** Every promotion's share of this line, allocated to the paisa. */
+  discounts: LineDiscount[];
+  /** What the customer paid for this line, excluding shipping. */
+  lineTotal: Paise;
+}
+
+export interface OrderPricingStages {
+  listSubtotal: Paise;
+  markdownTotal: Paise;
+  bundleDiscount: Paise;
+  cartDiscount: Paise;
+  codeDiscount: Paise;
+  shipping: Paise;
+  shippingDiscount: Paise;
+  total: Paise;
+  totalSavings: Paise;
+}
+
+/** How the order was priced: the promotion versions applied and what each pricing stage contributed. */
+export interface OrderPricing {
+  quoteId?: string;
+  codes: string[];
+  applied: AppliedPromotion[];
+  stages: OrderPricingStages;
+  optimizer: OptimizerReport;
+  explanations: string[];
 }
 
 export interface StatusEvent {
@@ -142,8 +173,10 @@ export interface Order {
   subtotal: Paise;
   shipping: Paise;
   discount: Paise;
+  /** Only on orders placed before promotions replaced coupons. */
   couponCode?: string;
   total: Paise;
+  pricing?: OrderPricing;
   status: OrderStatus;
   statusHistory: StatusEvent[];
   payment: OrderPayment;

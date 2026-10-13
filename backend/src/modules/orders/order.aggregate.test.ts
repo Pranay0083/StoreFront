@@ -9,12 +9,22 @@ const at = (ms: number) => new Date(t0.getTime() + ms);
 const input = (overrides: Partial<PlaceOrderInput> = {}): PlaceOrderInput => ({
   orderNumber: 'SF-TEST1',
   userId: 'u1',
-  items: [{ productId: 'p1', title: 'Tee', price: 100_000, size: 'M', qty: 2 }],
+  items: [
+    {
+      productId: 'p1',
+      title: 'Tee',
+      price: 100_000,
+      size: 'M',
+      qty: 2,
+      markdownPerUnit: 0,
+      discounts: [{ promotionId: 'promo-1', amount: 20_000 }],
+      lineTotal: 180_000,
+    },
+  ],
   address: { name: 'Asha', line1: '12 Road', city: 'Pune', state: 'MH', pincode: '411001', phone: '9876543210' },
   subtotal: 200_000,
   shipping: 9_900,
   discount: 20_000,
-  couponCode: 'WELCOME10',
   reservedUntil: at(15 * 60_000),
   ...overrides,
 });
@@ -36,9 +46,13 @@ describe('Order aggregate', () => {
     expect(event).toMatchObject({
       name: 'OrderPlaced',
       aggregateId: order.id,
-      payload: { orderNumber: 'SF-TEST1', total: 189_900, couponCode: 'WELCOME10', items: [{ productId: 'p1', size: 'M', qty: 2 }] },
+      payload: { orderNumber: 'SF-TEST1', total: 189_900, items: [{ productId: 'p1', size: 'M', qty: 2 }] },
     });
     expect(order.pullEvents()).toEqual([]);
+  });
+
+  it('refuses lines that do not add up to the discounted subtotal', () => {
+    expect(() => Order.place(input({ discount: 10_000 }), t0)).toThrow(/do not add up/);
   });
 
   it('captures payment, clears the reservation deadline and emits OrderPaid', () => {
@@ -59,7 +73,7 @@ describe('Order aggregate', () => {
     expect(order.status).toBe('cancelled');
     expect(order.pullEvents().at(-1)).toMatchObject({
       name: 'OrderCancelled',
-      payload: { reason: 'Changed my mind', couponCode: 'WELCOME10' },
+      payload: { reason: 'Changed my mind' },
     });
     expect(() => paidOrder().cancel('user:u1', 'x')).toThrow(/Illegal transition: paid → cancelled/);
   });

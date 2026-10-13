@@ -35,7 +35,18 @@ export function toOrderProps(r: OrderRecord): OrderProps {
     orderNumber: r.orderNumber,
     userId: String(r.userId),
     items: r.items.map(i =>
-      compact({ productId: String(i.productId), title: i.title, image: i.image, price: i.price, size: i.size, qty: i.qty, slug: i.slug }),
+      compact({
+        productId: String(i.productId),
+        title: i.title,
+        image: i.image,
+        price: i.price,
+        size: i.size,
+        qty: i.qty,
+        slug: i.slug,
+        markdownPerUnit: i.markdownPerUnit ?? 0,
+        discounts: (i.discounts ?? []).map(d => ({ promotionId: d.promotionId, amount: d.amount })),
+        lineTotal: i.lineTotal ?? i.price * i.qty,
+      }),
     ),
     address: r.address,
     subtotal: r.subtotal,
@@ -43,6 +54,7 @@ export function toOrderProps(r: OrderRecord): OrderProps {
     discount: r.discount ?? 0,
     couponCode: r.couponCode ?? undefined,
     total: r.total,
+    pricing: r.pricing ?? undefined,
     status: r.status,
     statusHistory: r.statusHistory.map(e => ({ from: e.from ?? null, to: e.to, by: e.by, note: e.note ?? '', at: e.at })),
     payment: compact({

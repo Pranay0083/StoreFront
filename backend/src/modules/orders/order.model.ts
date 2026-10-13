@@ -1,4 +1,12 @@
-import { ORDER_STATUSES, REFUND_STATES, type Address, type OrderStatus, type RefundState } from '@storefront/contracts';
+import {
+  ORDER_STATUSES,
+  REFUND_STATES,
+  type Address,
+  type LineDiscount,
+  type OrderPricing,
+  type OrderStatus,
+  type RefundState,
+} from '@storefront/contracts';
 import mongoose, { Schema, type HydratedDocument, type Types } from 'mongoose';
 
 export interface OrderItemRecord {
@@ -9,6 +17,9 @@ export interface OrderItemRecord {
   size: string;
   qty: number;
   slug?: string;
+  markdownPerUnit?: number;
+  discounts?: LineDiscount[];
+  lineTotal?: number;
 }
 
 export interface StatusEventRecord {
@@ -50,6 +61,7 @@ export interface OrderRecord {
   discount: number;
   couponCode?: string;
   total: number;
+  pricing?: OrderPricing;
   status: OrderStatus;
   statusHistory: StatusEventRecord[];
   payment: OrderPaymentRecord;
@@ -77,6 +89,9 @@ const orderSchema = new Schema<OrderRecord>(
         size: { type: String, required: true },
         qty: { type: Number, required: true },
         slug: String,
+        markdownPerUnit: { type: Number, default: 0 },
+        discounts: [{ _id: false, promotionId: { type: String, required: true }, amount: { type: Number, required: true } }],
+        lineTotal: { type: Number, required: true },
       },
     ],
     address: { name: String, line1: String, city: String, state: String, pincode: String, phone: String },
@@ -85,6 +100,20 @@ const orderSchema = new Schema<OrderRecord>(
     discount: { type: Number, default: 0 },
     couponCode: String,
     total: { type: Number, required: true },
+    pricing: {
+      type: new Schema(
+        {
+          quoteId: String,
+          codes: { type: [String], default: [] },
+          applied: { type: [Schema.Types.Mixed], default: [] },
+          stages: { type: Schema.Types.Mixed, required: true },
+          optimizer: { type: Schema.Types.Mixed, required: true },
+          explanations: { type: [String], default: [] },
+        },
+        { _id: false, minimize: false },
+      ),
+      required: false,
+    },
     status: { type: String, enum: ORDER_STATUSES, default: 'created', required: true },
     statusHistory: [
       {

@@ -1,22 +1,22 @@
 import {
   ADMIN_ORDER_ACTIONS,
   CUSTOMER_CANCELLABLE_STATUSES,
-  shippingFor,
   type CreateOrderInput,
+  type OrderPricing,
   type OrderStatus,
+  type PriceBreakdown,
 } from '@storefront/contracts';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../core/errors';
+import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../../core/errors';
 import type { OutboxRelay } from '../../core/events/outbox-relay';
 import type { OutboxStore } from '../../core/events/outbox.store';
 import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
 import type { Session, TransactionRunner } from '../../core/persistence/transaction';
 import type { CartService } from '../cart/cart.service';
-import type { ProductRepository } from '../catalog/product.repository';
-import type { CouponService } from '../coupons/coupons.service';
 import type { InventoryService } from '../inventory/inventory.service';
+import type { PricingCart, PricingEngine } from '../pricing/pricing.service';
 import { generateOrderNumber } from './order-number';
-import { Order, type CapturedPayment, type OrderLine } from './order.aggregate';
+import { Order, type CapturedPayment } from './order.aggregate';
 import type { OrderRecord } from './order.model';
 import type { OrderRepository } from './order.repository';
 
@@ -37,11 +37,63 @@ export interface PaymentConfirmation {
 
 const SWEEP_ACTOR = 'system:reservation-expiry';
 
+export class CodeRejectedError extends AppError {
+  constructor(rejected: PriceBreakdown['rejectedCodes']) {
+    super(
+      400,
+      rejected.map(r => `${r.code}: ${r.reason}`).join('; '),
+      rejected.map(r => ({ path: `codes.${r.code}`, message: r.reason })),
+      'CODE_REJECTED',
+    );
+  }
+}
+
+/** Turns a price breakdown into the order's lines and pricing snapshot. */
+export function orderPricingFrom(breakdown: PriceBreakdown, codes: readonly string[], quoteId?: string) {
+  const items = breakdown.lines.map(l => ({
+    productId: l.productId,
+    title: l.title,
+    ...(l.image && { image: l.image }),
+    price: l.unitPrice,
+    size: l.size,
+    qty: l.qty,
+    slug: l.slug,
+    markdownPerUnit: l.markdownPerUnit,
+    discounts: l.discounts.map(d => ({ promotionId: d.promotionId, amount: d.amount })),
+    lineTotal: l.lineTotal,
+  }));
+  const pricing: OrderPricing = {
+    ...(quoteId && { quoteId }),
+    codes: [...codes],
+    applied: breakdown.applied,
+    stages: {
+      listSubtotal: breakdown.listSubtotal,
+      markdownTotal: breakdown.markdownTotal,
+      bundleDiscount: breakdown.bundleDiscount,
+      cartDiscount: breakdown.cartDiscount,
+      codeDiscount: breakdown.codeDiscount,
+      shipping: breakdown.shipping,
+      shippingDiscount: breakdown.shippingDiscount,
+      total: breakdown.total,
+      totalSavings: breakdown.totalSavings,
+    },
+    optimizer: breakdown.optimizer,
+    explanations: breakdown.explanations,
+  };
+  const linesTotal = items.reduce((sum, i) => sum + i.lineTotal, 0);
+  return {
+    items,
+    pricing,
+    subtotal: breakdown.listSubtotal,
+    discount: breakdown.listSubtotal - linesTotal,
+    shipping: breakdown.shipping - breakdown.shippingDiscount,
+  };
+}
+
 export class OrdersService {
   constructor(
     private readonly orders: OrderRepository,
-    private readonly products: ProductRepository,
-    private readonly coupons: CouponService,
+    private readonly pricing: PricingEngine,
     private readonly cart: CartService,
     private readonly inventory: InventoryService,
     private readonly outbox: OutboxStore,
@@ -51,36 +103,51 @@ export class OrdersService {
   ) {}
 
   /**
-   * Places an order in one transaction: price from current catalog data, reserve stock with guarded
-   * decrements, reserve the coupon use and record OrderPlaced. Either all of it commits or none.
+   * Places an order in one transaction: price the cart with the promotion engine (verifying the
+   * client's quote when one is supplied), reserve stock with guarded decrements, count promotion
+   * usage and record OrderPlaced. Either all of it commits or none of it does.
    */
   async create(input: CreateOrderInput, user: AuthUser): Promise<Order> {
+    const cart: PricingCart = {
+      items: input.items,
+      codes: input.codes ?? [],
+      ...(input.paymentMethod && { paymentMethod: input.paymentMethod }),
+    };
+    const caller = { userId: user.id };
+
     const order = await this.tx.run(async session => {
-      const items = await this.priceLines(input.items, session);
-      const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
-      const coupon = input.couponCode ? await this.coupons.quote(input.couponCode, subtotal) : undefined;
+      const breakdown = input.quoteId
+        ? await this.pricing.verifyQuote(input.quoteId, cart, caller)
+        : await this.pricing.price(cart, caller);
+      if (breakdown.rejectedCodes.length) throw new CodeRejectedError(breakdown.rejectedCodes);
+      const priced = orderPricingFrom(breakdown, cart.codes ?? [], input.quoteId);
 
       const placed = Order.place({
         orderNumber: generateOrderNumber(),
         userId: user.id,
-        items,
         address: input.address,
-        subtotal,
-        shipping: shippingFor(subtotal),
-        discount: coupon?.discount ?? 0,
-        couponCode: coupon?.coupon.code,
+        ...priced,
         reservedUntil: new Date(Date.now() + this.config.reservationTtlMs),
       });
       await this.orders.insert(placed, session);
-      await this.inventory.reserve(placed.id, items, placed.snapshot().reservedUntil!, `user:${user.id}`, session);
-      if (coupon) await this.coupons.redeem(coupon.coupon.code, placed.id, user.id, session);
+      await this.inventory.reserve(placed.id, priced.items, placed.snapshot().reservedUntil!, `user:${user.id}`, session);
+      await this.pricing.redeem({ orderId: placed.id, userId: user.id }, breakdown.applied, session);
       await this.outbox.append(placed.pullEvents(), session);
       return placed;
     });
 
     await this.cart.clear(user.id);
     this.relay.notify();
-    logger.info({ orderId: order.id, orderNumber: order.orderNumber, userId: user.id, total: order.total }, 'Order created');
+    logger.info(
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        userId: user.id,
+        total: order.total,
+        promotions: order.snapshot().pricing?.applied.map(a => a.promotionId) ?? [],
+      },
+      'Order created',
+    );
     return order;
   }
 
@@ -236,24 +303,5 @@ export class OrdersService {
   private async cancelUnpaid(order: Order, by: string, reason: string, session: Session): Promise<void> {
     order.cancel(by, reason);
     await this.inventory.release(order.id, by, reason, session);
-  }
-
-  private async priceLines(lines: CreateOrderInput['items'], session: Session): Promise<Array<OrderLine & { title: string }>> {
-    const items = [];
-    for (const line of lines) {
-      const product = await this.products.findById(line.productId, session);
-      if (!product) throw new BadRequestError(`Product not found: ${line.productId}`);
-      if (!product.sizes.some(s => s.size === line.size)) throw new BadRequestError(`Size ${line.size} not available for ${product.title}`);
-      items.push({
-        productId: String(product._id),
-        title: product.title,
-        image: product.images[0],
-        price: product.price,
-        size: line.size,
-        qty: line.qty,
-        slug: product.slug,
-      });
-    }
-    return items;
   }
 }
