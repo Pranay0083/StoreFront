@@ -6,4 +6,5 @@ export * from './coupons';
 export * from './errors';
 export * from './money';
 export * from './orders';
+export * from './pricing';
 export * from './rbac';

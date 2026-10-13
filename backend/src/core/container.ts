@@ -58,6 +58,14 @@ import { ReviewRepository } from '../modules/reviews/review.repository';
 import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
+import { ActivePromotionCache } from '../modules/pricing/active-promotion.cache';
+import { PricingController, PromotionsController } from '../modules/pricing/pricing.controller';
+import { MongoCustomerHistory, MongoPricingCatalog } from '../modules/pricing/pricing.ports';
+import { adminPromotionsRoutes, pricingRoutes } from '../modules/pricing/pricing.routes';
+import { PricingService } from '../modules/pricing/pricing.service';
+import { PromotionRepository } from '../modules/pricing/promotion.repository';
+import { PromotionsService } from '../modules/pricing/promotions.service';
+import { QuoteRepository } from '../modules/pricing/quote.model';
 import type { Env } from './config/env';
 import { CookiePolicy } from './http/cookies';
 import { CsrfProtection } from './http/csrf';
@@ -94,6 +102,8 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     inventoryMovements: new InventoryMovementRepository(),
     stockReservations: new StockReservationRepository(),
     auditLogs: new AuditLogRepository(),
+    promotions: new PromotionRepository(),
+    quotes: new QuoteRepository(),
   };
 
   const tx = new TransactionRunner();
@@ -136,6 +146,15 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
 
   const audit = new AuditService(repositories.auditLogs);
 
+  const promotionCache = new ActivePromotionCache(repositories.promotions);
+  const pricing = new PricingService(
+    new MongoPricingCatalog(),
+    new MongoCustomerHistory(),
+    promotionCache,
+    repositories.promotions,
+    repositories.quotes,
+  );
+
   const services = {
     tokens,
     audit,
@@ -162,6 +181,9 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
       repositories.products,
       repositories.conversations,
     ),
+    promotionCache,
+    pricing,
+    promotions: new PromotionsService(repositories.promotions, promotionCache, pricing),
   };
 
   const guards = new AuthGuards(services.auth);
@@ -180,6 +202,8 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     admin: new AdminController(services.admin),
     inventory: new InventoryController(services.inventory),
     staff: new StaffController(services.audit, services.adminUsers),
+    pricing: new PricingController(services.pricing),
+    promotions: new PromotionsController(services.promotions),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -192,8 +216,10 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     ['/payments', paymentsRoutes(controllers.payments, guards, idempotency)],
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
+    ['/pricing', pricingRoutes(controllers.pricing, guards)],
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
+    ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
 
