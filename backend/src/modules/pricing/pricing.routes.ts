@@ -21,7 +21,7 @@ export function pricingRoutes(controller: PricingController, guards: AuthGuards)
 
 export function adminPromotionsRoutes(controller: PromotionsController, guards: AuthGuards): Router {
   const router = Router();
-  router.use(guards.requireAdmin);
+  router.use(guards.requirePermission('promotions:write'));
   router.get('/', validate({ query: PromotionListQuerySchema }), handler(controller.list));
   router.post('/', validate({ body: PromotionInputSchema }), handler(controller.create));
   router.post('/simulate', validate({ body: PromotionSimulationSchema }), handler(controller.simulate));
