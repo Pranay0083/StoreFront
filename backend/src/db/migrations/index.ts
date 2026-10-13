@@ -10,6 +10,7 @@ import { cartLines } from './032-cart-lines';
 import { reviewAggregates } from './033-review-aggregates';
 import { auditLog } from './034-audit-log';
 import { promotionRedemptions } from './040-promotion-redemptions';
+import { couponsToPromotions } from './041-coupons-to-promotions';
 
 export const migrations: readonly Migration[] = [
   ensureIndexes,
@@ -23,4 +24,5 @@ export const migrations: readonly Migration[] = [
   reviewAggregates,
   auditLog,
   promotionRedemptions,
+  couponsToPromotions,
 ];

@@ -30,11 +30,6 @@ import { CatalogController } from '../modules/catalog/catalog.controller';
 import { catalogRoutes } from '../modules/catalog/catalog.routes';
 import { CatalogService } from '../modules/catalog/catalog.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
-import { CouponRepository } from '../modules/coupons/coupon.repository';
-import { CouponsController } from '../modules/coupons/coupons.controller';
-import { adminCouponsRoutes, couponsRoutes } from '../modules/coupons/coupons.routes';
-import { registerCouponHandlers } from '../modules/coupons/coupons.handlers';
-import { CouponService } from '../modules/coupons/coupons.service';
 import { McpController } from '../modules/mcp/mcp.controller';
 import { mcpRoutes } from '../modules/mcp/mcp.routes';
 import { OrderRepository } from '../modules/orders/order.repository';
@@ -97,7 +92,6 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     products: new ProductRepository(),
     reviews: new ReviewRepository(),
     carts: new CartRepository(),
-    coupons: new CouponRepository(),
     orders: new OrderRepository(),
     webhookEvents: new WebhookEventRepository(),
     conversations: new ConversationRepository(),
@@ -127,7 +121,6 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     repositories.quotes,
     repositories.promotionRedemptions,
   );
-  const coupons = new CouponService(repositories.coupons);
   const orders = new OrdersService(repositories.orders, pricing, cart, inventory, outbox, relay, tx, {
     reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
     refundWindowDays: REFUND_WINDOW_DAYS,
@@ -140,7 +133,6 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
   });
 
   registerInventoryHandlers(eventBus, { products: repositories.products, outbox, logger, lowStockThreshold: env.LOW_STOCK_THRESHOLD });
-  registerCouponHandlers(eventBus, { coupons, tx });
   registerPricingHandlers(eventBus, { pricing, tx });
   const refunds = new RefundSaga(orders, inventory, paymentGateway, logger);
   refunds.register(eventBus);
@@ -168,7 +160,6 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     inventory,
     reviews: new ReviewsService(repositories.reviews, repositories.products, new DeliveredOrderPurchaseVerifier()),
     cart,
-    coupons,
     orders,
     refunds,
     payments: new PaymentsService(paymentGateway, orders, repositories.webhookEvents, refunds),
@@ -198,7 +189,6 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     catalog: new CatalogController(services.catalog),
     reviews: new ReviewsController(services.reviews),
     cart: new CartController(services.cart),
-    coupons: new CouponsController(services.coupons),
     orders: new OrdersController(services.orders),
     payments: new PaymentsController(services.payments),
     agent: new AgentController(services.agent),
@@ -215,13 +205,11 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     ['/products', catalogRoutes(controllers.catalog, guards)],
     ['/reviews', reviewsRoutes(controllers.reviews, guards)],
     ['/cart', cartRoutes(controllers.cart, guards)],
-    ['/coupons', couponsRoutes(controllers.coupons, guards)],
     ['/orders', ordersRoutes(controllers.orders, guards, idempotency)],
     ['/payments', paymentsRoutes(controllers.payments, guards, idempotency)],
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/pricing', pricingRoutes(controllers.pricing, guards)],
-    ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],

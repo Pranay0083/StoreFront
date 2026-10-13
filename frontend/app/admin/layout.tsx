@@ -13,7 +13,7 @@ const LINKS: Array<{ href: string; label: string; icon: typeof LayoutDashboard; 
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
   { href: '/admin/orders', label: 'Order queue', icon: Package, permission: 'orders:read' },
   { href: '/admin/products', label: 'Products', icon: ShoppingBag, permission: 'catalog:write' },
-  { href: '/admin/coupons', label: 'Coupons', icon: TicketPercent, permission: 'promotions:write' },
+  { href: '/admin/promotions', label: 'Promotions', icon: TicketPercent, permission: 'promotions:write' },
   { href: '/admin/chats', label: 'Agent chats', icon: MessageSquare, permission: 'chats:read' },
   { href: '/admin/users', label: 'Team', icon: Users, permission: 'users:manage' },
   { href: '/admin/audit', label: 'Audit log', icon: ScrollText, permission: 'audit:read' },

@@ -158,9 +158,6 @@ export class Order {
   get items(): readonly OrderLine[] {
     return this.props.items;
   }
-  get couponCode() {
-    return this.props.couponCode;
-  }
   get payment(): Readonly<PaymentState> {
     return this.props.payment;
   }
@@ -228,7 +225,6 @@ export class Order {
       userId: this.userId,
       reason,
       by,
-      ...(this.couponCode && { couponCode: this.couponCode }),
     });
   }
 

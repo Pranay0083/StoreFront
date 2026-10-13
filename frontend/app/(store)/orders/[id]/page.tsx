@@ -149,7 +149,10 @@ function OrderDetailContent() {
             </div>
             {order.discount > 0 && (
               <div className="flex justify-between text-emerald-800">
-                <span>Discount{order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                <span>
+                  Discount
+                  {order.couponCode ? ` (${order.couponCode})` : order.pricing?.codes.length ? ` (${order.pricing.codes.join(', ')})` : ''}
+                </span>
                 <span data-testid="order-detail-discount">−{fmtINR(order.discount)}</span>
               </div>
             )}

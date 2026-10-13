@@ -18,7 +18,7 @@ export interface DomainEventMap {
     paymentId?: string;
     items: StockLine[];
   };
-  OrderCancelled: { orderId: string; orderNumber: string; userId: string; reason: string; by: string; couponCode?: string };
+  OrderCancelled: { orderId: string; orderNumber: string; userId: string; reason: string; by: string };
   RefundRequested: {
     orderId: string;
     orderNumber: string;

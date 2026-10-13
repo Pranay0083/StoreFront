@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { UserModel as User } from '../../src/modules/auth/user.model';
 import { ProductModel as Product } from '../../src/modules/catalog/product.model';
-import { CouponModel as Coupon } from '../../src/modules/coupons/coupon.model';
 import type { PromotionsService } from '../../src/modules/pricing/promotions.service';
 
 export async function createUser(overrides: { email?: string; password?: string; name?: string; role?: Role } = {}) {
@@ -33,18 +32,6 @@ export async function createProduct(overrides: Record<string, unknown> = {}) {
       { size: 'M', stock: 10 },
       { size: 'L', stock: 2 },
     ],
-    ...overrides,
-  });
-}
-
-export async function createCoupon(overrides: Record<string, unknown> = {}) {
-  return Coupon.create({
-    code: 'WELCOME10',
-    type: 'percent',
-    value: 10,
-    minSubtotal: 100_000,
-    maxDiscount: 50_000,
-    active: true,
     ...overrides,
   });
 }

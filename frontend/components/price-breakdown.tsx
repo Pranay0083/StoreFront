@@ -152,14 +152,14 @@ export function PromoCodes({
     <div className="space-y-2">
       <div className="flex gap-2">
         <Input
-          data-testid="coupon-input"
+          data-testid="promo-code-input"
           value={input}
           onChange={e => setInput(e.target.value.toUpperCase())}
           onKeyDown={e => e.key === 'Enter' && add()}
           placeholder="Promo code (try WELCOME10)"
           className="h-10 flex-1"
         />
-        <Button data-testid="coupon-apply-button" variant="outline" className="h-10 px-4" onClick={add} disabled={!input.trim()}>
+        <Button data-testid="promo-code-apply-button" variant="outline" className="h-10 px-4" onClick={add} disabled={!input.trim()}>
           Apply
         </Button>
       </div>

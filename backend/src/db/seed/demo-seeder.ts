@@ -5,7 +5,6 @@ import { logger } from '../../core/logger';
 import type { Env } from '../../core/config/env';
 import { UserModel } from '../../modules/auth/user.model';
 import { ProductModel } from '../../modules/catalog/product.model';
-import { CouponModel } from '../../modules/coupons/coupon.model';
 import { recordOpeningBalances } from '../../modules/inventory/opening-balances';
 import { OrderModel } from '../../modules/orders/order.model';
 import { ReviewModel } from '../../modules/reviews/review.model';
@@ -286,19 +285,12 @@ export interface SeedResult {
 }
 
 /**
- * Idempotent demo seed: ensures the admin and demo customer accounts, default coupons and demo promotions exist,
+ * Idempotent demo seed: ensures the admin and demo customer accounts and the demo promotions (including the WELCOME10 and FLAT500 codes) exist,
  * and populates the catalog, historical orders and reviews only when the catalog is empty.
  */
 export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWORD'>): Promise<SeedResult> {
   await seedAdmin(env);
   const customer = await seedCustomer('customer@storefront.dev', 'Demo Customer', 'Customer@123');
-  if ((await CouponModel.countDocuments()) === 0) {
-    await CouponModel.insertMany([
-      { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: inr(1000), maxDiscount: inr(500), active: true },
-      { code: 'FLAT500', type: 'flat', value: inr(500), minSubtotal: inr(2999), active: true },
-    ]);
-    logger.info('Seeded default coupons');
-  }
   await seedDemoPromotions(mongoose.connection.db!);
   if ((await ProductModel.countDocuments()) > 0) return { catalogSeeded: false };
 

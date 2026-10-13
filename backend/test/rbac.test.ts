@@ -39,7 +39,6 @@ const ENDPOINTS: Array<{ name: string; allowed: Role[]; call: (token: string) =>
     allowed: ['support', 'admin'],
     call: tk => t.http().get(`${API}/admin/conversations`).set(bearer(tk)),
   },
-  { name: 'GET /admin/coupons', allowed: ['catalog_manager', 'admin'], call: tk => t.http().get(`${API}/admin/coupons`).set(bearer(tk)) },
   {
     name: 'GET /admin/promotions',
     allowed: ['catalog_manager', 'admin'],
@@ -87,7 +86,7 @@ describe('permission matrix', () => {
 
   it('names the missing permission', async () => {
     const { token } = await createUser({ role: 'support' });
-    const res = await t.http().get(`${API}/admin/coupons`).set(bearer(token)).expect(403);
+    const res = await t.http().get(`${API}/admin/promotions`).set(bearer(token)).expect(403);
     expect(res.body.error).toBe('Missing permission: promotions:write');
   });
 });

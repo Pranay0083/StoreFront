@@ -117,7 +117,7 @@ export default function DocsPage() {
             <Endpoint method="tool" path="get_product_details" desc="Full product detail incl. per-size stock" />
             <Endpoint method="tool" path="list_categories" desc="Categories with counts" />
             <Endpoint method="tool" path="get_order_status" desc="Order status + timeline (order number + email)" />
-            <Endpoint method="tool" path="get_store_info" desc="Shipping, returns, payments, coupons, sizing" />
+            <Endpoint method="tool" path="get_store_info" desc="Shipping, returns, payments, offers & promo codes, sizing" />
           </div>
           <p className="label-caps pt-1 text-muted-foreground">Claude Desktop / Cursor config</p>
           <Code>{`{
