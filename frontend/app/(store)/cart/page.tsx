@@ -4,14 +4,18 @@ import { Minus, Plus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { StockNote } from '@/components/cart-sheet';
+import { AppliedOffers, PriceSummary } from '@/components/price-breakdown';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
-import { shippingFor } from '@storefront/contracts';
 import { fmtINR } from '@/lib/api';
+import { usePriceQuote } from '@/lib/use-price-quote';
+
+const NO_CODES: string[] = [];
 
 export default function CartPage() {
-  const { items, subtotal, updateQty, removeItem } = useCart();
-  const shipping = shippingFor(subtotal);
+  const { items, updateQty, removeItem } = useCart();
+  const { quote, loading, error } = usePriceQuote(items, NO_CODES);
+  const breakdown = quote?.breakdown ?? null;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8" data-testid="cart-page">
@@ -77,20 +81,15 @@ export default function CartPage() {
 
           <aside className="h-fit border border-black/10 bg-white p-8">
             <p className="label-caps text-muted-foreground">Summary</p>
-            <div className="mt-6 space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span data-testid="summary-subtotal">{fmtINR(subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Shipping</span>
-                <span>{shipping === 0 ? 'Free' : fmtINR(shipping)}</span>
-              </div>
-              <div className="flex justify-between border-t border-black/10 pt-3 text-base font-semibold">
-                <span>Total</span>
-                <span data-testid="summary-total">{fmtINR(subtotal + shipping)}</span>
-              </div>
+            <div className="mt-6">
+              <PriceSummary breakdown={breakdown} loading={loading} />
+              {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
             </div>
+            {breakdown && (
+              <div className="mt-6 border-t border-black/10 pt-5">
+                <AppliedOffers breakdown={breakdown} />
+              </div>
+            )}
             <Button asChild size="lg" className="mt-8 w-full" data-testid="cart-page-checkout-button">
               <Link href="/checkout">Proceed to checkout</Link>
             </Button>

@@ -5,12 +5,13 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { AppliedOffers, PriceSummary, PromoCodes } from '@/components/price-breakdown';
 import { useAuth, useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { shippingFor } from '@storefront/contracts';
-import { api, fmtINR } from '@/lib/api';
+import { api, ApiError, fmtINR } from '@/lib/api';
+import { REQUOTE_CODES, usePriceQuote } from '@/lib/use-price-quote';
 import type { Order } from '@storefront/contracts';
 
 declare global {
@@ -19,21 +20,30 @@ declare global {
   }
 }
 
+function LineTotal({ listTotal, paid }: { listTotal: number; paid?: number }) {
+  if (paid === undefined || paid === listTotal) return <p className="text-sm font-medium">{fmtINR(listTotal)}</p>;
+  return (
+    <p className="text-right text-sm font-medium">
+      <span className="block text-xs text-muted-foreground line-through">{fmtINR(listTotal)}</span>
+      {fmtINR(paid)}
+    </p>
+  );
+}
+
 export default function CheckoutPage() {
   const { user } = useAuth();
-  const { items, subtotal, clear } = useCart();
+  const { items, clear } = useCart();
   const router = useRouter();
   const [mode, setMode] = useState<'demo' | 'razorpay' | null>(null);
   const [paying, setPaying] = useState(false);
   const [address, setAddress] = useState({ name: '', line1: '', city: '', state: '', pincode: '', phone: '' });
-  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
-  const [couponInput, setCouponInput] = useState('');
-  const [applying, setApplying] = useState(false);
+  const [codes, setCodes] = useState<string[]>([]);
+  const { quote, loading: quoting, error: quoteError, refresh } = usePriceQuote(items, codes);
   const checkoutAttempt = useRef<{ body: string; key: string } | null>(null);
 
-  const shipping = shippingFor(subtotal);
-  const discount = coupon?.discount ?? 0;
-  const total = subtotal - discount + shipping;
+  const breakdown = quote?.breakdown ?? null;
+  const total = breakdown?.total ?? 0;
+  const paidFor = new Map((breakdown?.lines ?? []).map(l => [`${l.productId}::${l.size}`, l.lineTotal]));
 
   useEffect(() => {
     if (user === false) router.replace('/login?next=/checkout');
@@ -53,23 +63,6 @@ export default function CheckoutPage() {
   }, [user]);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setAddress(a => ({ ...a, [k]: e.target.value }));
-
-  const applyCouponCode = async () => {
-    if (!couponInput.trim()) return;
-    setApplying(true);
-    try {
-      const d = await api<{ code: string; discount: number }>('/coupons/validate', {
-        method: 'POST',
-        body: JSON.stringify({ code: couponInput, subtotal }),
-      });
-      setCoupon({ code: d.code, discount: d.discount });
-      toast.success(`${d.code} applied — you save ${fmtINR(d.discount)}`);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setApplying(false);
-    }
-  };
 
   const finishPayment = (order: Order) => {
     clear();
@@ -133,12 +126,15 @@ export default function CheckoutPage() {
     })) {
       if (!(address as any)[k]) return toast.error(`${label} is required`);
     }
+    if (!quote || quoting) return;
+    if (breakdown?.rejectedCodes.length) return toast.error('Remove the promo codes that cannot be applied first');
     setPaying(true);
     try {
       const body = JSON.stringify({
         items: items.map(i => ({ productId: i.productId, size: i.size, qty: i.qty })),
         address,
-        ...(coupon ? { codes: [coupon.code] } : {}),
+        codes,
+        quoteId: quote.quoteId,
       });
       // Retrying the same checkout reuses its key, so a timeout or double click never places two orders.
       if (checkoutAttempt.current?.body !== body) checkoutAttempt.current = { body, key: crypto.randomUUID() };
@@ -149,7 +145,12 @@ export default function CheckoutPage() {
       });
       await payWithRazorpay(order);
     } catch (e: any) {
-      toast.error(e.message);
+      if (e instanceof ApiError && e.code && REQUOTE_CODES.has(e.code)) {
+        const fresh = await refresh();
+        toast.warning(fresh ? `${e.message} Your new total is ${fmtINR(fresh.breakdown.total)}.` : e.message);
+      } else {
+        toast.error(e.message);
+      }
     } finally {
       setPaying(false);
     }
@@ -242,75 +243,34 @@ export default function CheckoutPage() {
                     {i.size} × {i.qty}
                   </p>
                 </div>
-                <p className="text-sm font-medium">{fmtINR(i.price * i.qty)}</p>
+                <LineTotal listTotal={i.price * i.qty} paid={paidFor.get(`${i.productId}::${i.size}`)} />
               </div>
             ))}
           </div>
           <div className="mt-6 border-t border-black/10 pt-5">
-            {coupon ? (
-              <div className="flex items-center justify-between text-sm" data-testid="coupon-applied">
-                <span className="font-medium text-emerald-800">{coupon.code} applied</span>
-                <button
-                  data-testid="coupon-remove-button"
-                  onClick={() => setCoupon(null)}
-                  className="text-xs text-muted-foreground underline hover:text-foreground"
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Input
-                  data-testid="coupon-input"
-                  value={couponInput}
-                  onChange={e => setCouponInput(e.target.value.toUpperCase())}
-                  placeholder="Coupon (try WELCOME10)"
-                  className="h-10 flex-1"
-                />
-                <Button
-                  data-testid="coupon-apply-button"
-                  variant="outline"
-                  className="h-10 px-4"
-                  onClick={applyCouponCode}
-                  disabled={applying || !couponInput.trim()}
-                >
-                  {applying ? '…' : 'Apply'}
-                </Button>
-              </div>
-            )}
+            <PromoCodes codes={codes} onChange={setCodes} breakdown={breakdown} />
           </div>
-          <div className="mt-5 space-y-3 border-t border-black/10 pt-5 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{fmtINR(subtotal)}</span>
+          {breakdown && (
+            <div className="mt-5 border-t border-black/10 pt-5">
+              <AppliedOffers breakdown={breakdown} />
             </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-emerald-800">
-                <span>Discount ({coupon?.code})</span>
-                <span data-testid="checkout-discount">−{fmtINR(discount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span>{shipping === 0 ? 'Free' : fmtINR(shipping)}</span>
-            </div>
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span data-testid="checkout-total">{fmtINR(total)}</span>
-            </div>
+          )}
+          <div className="mt-5 border-t border-black/10 pt-5">
+            <PriceSummary breakdown={breakdown} loading={quoting} />
+            {quoteError && <p className="mt-2 text-xs text-destructive">{quoteError}</p>}
           </div>
           <Button
             data-testid="checkout-pay-button"
             size="lg"
             className="mt-8 w-full"
             onClick={placeOrder}
-            disabled={paying || mode === null}
+            disabled={paying || mode === null || !quote || quoting}
           >
             <Lock className="h-4 w-4" />
             {paying ? 'Processing…' : mode === 'demo' ? `Demo Pay ${fmtINR(total)}` : `Pay ${fmtINR(total)}`}
           </Button>
           <p className="mt-3 text-center text-xs text-muted-foreground">
-            Signature-verified · Idempotent confirmation · Stock reserved on payment
+            Best price chosen automatically · Signature-verified · Stock reserved at checkout
           </p>
         </aside>
       </div>
