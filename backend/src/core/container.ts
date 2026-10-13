@@ -61,8 +61,10 @@ import { ReviewsService } from '../modules/reviews/reviews.service';
 import { ActivePromotionCache } from '../modules/pricing/active-promotion.cache';
 import { PricingController, PromotionsController } from '../modules/pricing/pricing.controller';
 import { MongoCustomerHistory, MongoPricingCatalog } from '../modules/pricing/pricing.ports';
+import { registerPricingHandlers } from '../modules/pricing/pricing.handlers';
 import { adminPromotionsRoutes, pricingRoutes } from '../modules/pricing/pricing.routes';
 import { PricingService } from '../modules/pricing/pricing.service';
+import { PromotionRedemptionRepository } from '../modules/pricing/promotion-redemption.model';
 import { PromotionRepository } from '../modules/pricing/promotion.repository';
 import { PromotionsService } from '../modules/pricing/promotions.service';
 import { QuoteRepository } from '../modules/pricing/quote.model';
@@ -104,6 +106,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     auditLogs: new AuditLogRepository(),
     promotions: new PromotionRepository(),
     quotes: new QuoteRepository(),
+    promotionRedemptions: new PromotionRedemptionRepository(),
   };
 
   const tx = new TransactionRunner();
@@ -115,6 +118,15 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
   const inventory = new InventoryService(repositories.products, repositories.inventoryMovements, repositories.stockReservations);
   const catalog = new CatalogService(repositories.products, inventory, tx);
   const cart = new CartService(repositories.carts, repositories.products);
+  const promotionCache = new ActivePromotionCache(repositories.promotions);
+  const pricing = new PricingService(
+    new MongoPricingCatalog(),
+    new MongoCustomerHistory(),
+    promotionCache,
+    repositories.promotions,
+    repositories.quotes,
+    repositories.promotionRedemptions,
+  );
   const coupons = new CouponService(repositories.coupons);
   const orders = new OrdersService(repositories.orders, repositories.products, coupons, cart, inventory, outbox, relay, tx, {
     reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -129,6 +141,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
 
   registerInventoryHandlers(eventBus, { products: repositories.products, outbox, logger, lowStockThreshold: env.LOW_STOCK_THRESHOLD });
   registerCouponHandlers(eventBus, { coupons, tx });
+  registerPricingHandlers(eventBus, { pricing, tx });
   const refunds = new RefundSaga(orders, inventory, paymentGateway, logger);
   refunds.register(eventBus);
 
@@ -145,15 +158,6 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
   };
 
   const audit = new AuditService(repositories.auditLogs);
-
-  const promotionCache = new ActivePromotionCache(repositories.promotions);
-  const pricing = new PricingService(
-    new MongoPricingCatalog(),
-    new MongoCustomerHistory(),
-    promotionCache,
-    repositories.promotions,
-    repositories.quotes,
-  );
 
   const services = {
     tokens,

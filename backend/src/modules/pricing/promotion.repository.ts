@@ -102,19 +102,20 @@ export class PromotionRepository {
   }
 
   /** Counts one redemption unless that would exceed the usage limit. */
-  async tryRedeem(id: string): Promise<boolean> {
+  async tryRedeem(id: string, session?: ClientSession): Promise<boolean> {
     const result = await PromotionModel.updateOne(
       {
         _id: id,
         $or: [{ usageLimit: { $exists: false } }, { usageLimit: null }, { $expr: { $lt: ['$usedCount', '$usageLimit'] } }],
       },
       { $inc: { usedCount: 1 } },
+      { session },
     );
     return result.modifiedCount === 1;
   }
 
-  async releaseRedemption(id: string): Promise<void> {
-    await PromotionModel.updateOne({ _id: id, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } });
+  async releaseRedemption(id: string, session?: ClientSession): Promise<void> {
+    await PromotionModel.updateOne({ _id: id, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } }, { session });
   }
 
   private async snapshot(record: PromotionRecord, by: string, session: ClientSession): Promise<void> {

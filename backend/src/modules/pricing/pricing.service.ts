@@ -9,7 +9,8 @@ import {
   type PricingItem,
 } from '@storefront/contracts';
 import { createHash, randomUUID } from 'node:crypto';
-import { AppError, BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../core/errors';
+import { AppError, BadRequestError, ForbiddenError, NotFoundError } from '../../core/errors';
+import type { Session } from '../../core/persistence/transaction';
 import type { ActivePromotionCache } from './active-promotion.cache';
 import { BuyXGetYAction, FixedBundlePriceAction, MixAndMatchAction } from './domain/actions';
 import { type CustomerProfile, GUEST, type PricingLine } from './domain/pricing-line';
@@ -17,6 +18,7 @@ import type { CompiledPromotion } from './domain/promotion';
 import { PromotionEngine } from './domain/promotion-engine';
 import { matchesSelector } from './domain/selector';
 import type { CatalogProduct, CustomerHistory, PricingCatalog } from './pricing.ports';
+import type { PromotionRedemptionRepository } from './promotion-redemption.model';
 import type { PromotionRepository } from './promotion.repository';
 import type { QuoteRepository } from './quote.model';
 
@@ -30,14 +32,22 @@ export interface PricingCaller {
   userId?: string;
 }
 
+export interface RedemptionOwner {
+  orderId: string;
+  userId: string;
+}
+
 /** The contract checkout depends on: quote a cart, then verify the quote when the order is placed. */
 export interface PricingEngine {
+  /** Prices a cart server-side without issuing a quote. */
+  price(cart: PricingCart, caller: PricingCaller): Promise<PriceBreakdown>;
   quote(cart: PricingCart, caller: PricingCaller): Promise<PriceQuote>;
   /** Re-prices the cart and returns the breakdown only if it still matches the quote. */
   verifyQuote(quoteId: string, cart: PricingCart, caller: PricingCaller): Promise<PriceBreakdown>;
-  /** Counts usage of the applied promotions; all-or-nothing against usage limits. */
-  redeem(applied: readonly AppliedPromotion[]): Promise<void>;
-  release(applied: readonly AppliedPromotion[]): Promise<void>;
+  /** Counts one use of every applied promotion for an order inside the caller's transaction; all-or-nothing against usage limits. */
+  redeem(owner: RedemptionOwner, applied: readonly AppliedPromotion[], session: Session): Promise<void>;
+  /** Gives an order's promotion uses back. Idempotent per order; returns false when there was nothing to release. */
+  release(orderId: string, session: Session): Promise<boolean>;
 }
 
 export interface PriceOverrides {
@@ -55,6 +65,18 @@ export class QuoteExpiredError extends AppError {
 export class PriceChangedError extends AppError {
   constructor() {
     super(409, 'Prices or offers changed since you were quoted. Please review your cart.', undefined, 'PRICE_CHANGED');
+  }
+}
+
+export class QuoteMismatchError extends AppError {
+  constructor() {
+    super(409, 'Your cart changed since this price was quoted', undefined, 'QUOTE_CART_MISMATCH');
+  }
+}
+
+export class PromotionExhaustedError extends AppError {
+  constructor(name: string) {
+    super(409, `"${name}" has just been fully redeemed. Please review your cart.`, undefined, 'PROMOTION_EXHAUSTED');
   }
 }
 
@@ -147,6 +169,7 @@ export class PricingService implements PricingEngine {
     private readonly cache: ActivePromotionCache,
     private readonly promotions: PromotionRepository,
     private readonly quotes: QuoteRepository,
+    private readonly redemptions: PromotionRedemptionRepository,
     private readonly engine = new PromotionEngine(),
     private readonly clock: () => Date = () => new Date(),
   ) {}
@@ -183,26 +206,41 @@ export class PricingService implements PricingEngine {
     const stored = await this.quotes.findById(quoteId);
     if (!stored || stored.expiresAt <= this.clock()) throw new QuoteExpiredError();
     if (stored.userId !== (caller.userId ?? null)) throw new ForbiddenError('This quote belongs to a different customer');
-    if (stored.cartHash !== hashCart(cart, caller)) throw new ConflictError('Your cart changed since this price was quoted');
+    if (stored.cartHash !== hashCart(cart, caller)) throw new QuoteMismatchError();
     const fresh = await this.price(cart, caller);
     if (hashBreakdown(fresh) !== stored.contentHash) throw new PriceChangedError();
     return fresh;
   }
 
-  async redeem(applied: readonly AppliedPromotion[]): Promise<void> {
-    const done: AppliedPromotion[] = [];
+  async redeem(owner: RedemptionOwner, applied: readonly AppliedPromotion[], session: Session): Promise<void> {
+    if (!applied.length) return;
     for (const promo of applied) {
-      if (!(await this.promotions.tryRedeem(promo.promotionId))) {
-        await this.release(done);
+      if (!(await this.promotions.tryRedeem(promo.promotionId, session))) {
         this.cache.invalidate();
-        throw new ConflictError(`"${promo.name}" has just been fully redeemed. Please review your cart.`);
+        throw new PromotionExhaustedError(promo.name);
       }
-      done.push(promo);
     }
+    await this.redemptions.record(
+      {
+        ...owner,
+        promotions: applied.map(p => ({
+          promotionId: p.promotionId,
+          version: p.version,
+          name: p.name,
+          amount: p.amount,
+          ...(p.code && { code: p.code }),
+        })),
+      },
+      session,
+    );
   }
 
-  async release(applied: readonly AppliedPromotion[]): Promise<void> {
-    await Promise.all(applied.map(p => this.promotions.releaseRedemption(p.promotionId)));
+  async release(orderId: string, session: Session): Promise<boolean> {
+    const released = await this.redemptions.release(orderId, session);
+    if (!released) return false;
+    for (const p of released.promotions) await this.promotions.releaseRedemption(String(p.promotionId), session);
+    this.cache.invalidate();
+    return true;
   }
 
   /** "Bought together" offers a product page can advertise. */
