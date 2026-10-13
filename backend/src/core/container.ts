@@ -49,6 +49,7 @@ import { InventoryMovementRepository, StockReservationRepository } from '../modu
 import { inventoryRoutes } from '../modules/inventory/inventory.routes';
 import { InventoryService } from '../modules/inventory/inventory.service';
 import { PaymentGatewayFactory } from '../modules/payments/gateways/payment-gateway.factory';
+import { gatewayBreaker, ResilientPaymentGateway } from '../modules/payments/gateways/resilient.gateway';
 import { paymentsRoutes } from '../modules/payments/payments.routes';
 import { RefundSaga } from '../modules/payments/refund.saga';
 import { PaymentsService } from '../modules/payments/payments.service';
@@ -121,11 +122,12 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
     refundWindowDays: REFUND_WINDOW_DAYS,
   });
   const agentTools = new AgentTools(catalog, repositories.orders, repositories.users);
-  const paymentGateway = PaymentGatewayFactory.create({
+  const rawGateway = PaymentGatewayFactory.create({
     keyId: env.RAZORPAY_KEY_ID,
     keySecret: env.RAZORPAY_KEY_SECRET,
     webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
   });
+  const paymentGateway = new ResilientPaymentGateway(rawGateway, gatewayBreaker(`payment-gateway:${rawGateway.name}`));
 
   registerInventoryHandlers(eventBus, { products: repositories.products, outbox, logger, lowStockThreshold: env.LOW_STOCK_THRESHOLD });
   registerCouponHandlers(eventBus, { coupons, tx });
