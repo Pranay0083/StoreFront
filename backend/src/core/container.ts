@@ -72,20 +72,19 @@ import { CookiePolicy } from './http/cookies';
 import { CsrfProtection } from './http/csrf';
 import { idempotent } from './http/idempotency/idempotency.middleware';
 import { IdempotencyStore } from './http/idempotency/idempotency.store';
-import { createRateLimiters, memoryStores, type RateLimitStoreFactory } from './http/rate-limit';
+import { createRateLimiters } from './http/rate-limit';
+import { memoryInfrastructure, type Infrastructure } from './infrastructure';
 import { TransactionRunner } from './persistence/transaction';
 import { EventBus } from './events/event-bus';
 import { PollingOutboxRelay, type OutboxRelay } from './events/outbox-relay';
+import { QueueOutboxRelay } from './events/queue-outbox-relay';
 import { OutboxStore } from './events/outbox.store';
 import { logger } from './logger';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
-export interface Infrastructure {
-  rateLimitStores: RateLimitStoreFactory;
-}
-
-export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStores: memoryStores }) {
+export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastructure()) {
   const limiters = createRateLimiters(env, infra.rateLimitStores);
+  const jobs = infra.queue;
   const cookies = new CookiePolicy(env);
   const csrf = new CsrfProtection(env.CSRF_SECRET, cookies, ['/payments/webhook', '/mcp']);
 
@@ -110,7 +109,10 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
   const tx = new TransactionRunner();
   const outbox = new OutboxStore();
   const eventBus = new EventBus();
-  const relay: OutboxRelay = new PollingOutboxRelay(outbox, eventBus, logger, { pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS });
+  const relay: OutboxRelay =
+    infra.kind === 'redis'
+      ? new QueueOutboxRelay(outbox, eventBus, jobs, infra.pubsub, logger, { pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS })
+      : new PollingOutboxRelay(outbox, eventBus, logger, { pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS });
 
   const tokens = new TokenService({ access: env.JWT_ACCESS_SECRET, refresh: env.JWT_REFRESH_SECRET });
   const inventory = new InventoryService(repositories.products, repositories.inventoryMovements, repositories.stockReservations);
@@ -135,14 +137,17 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
   refunds.register(eventBus);
 
   const reservationSweeper: ReservationExpiryScheduler = new IntervalReservationSweeper(orders, env.RESERVATION_SWEEP_INTERVAL_MS, logger);
+  /** Everything that consumes work: the outbox relay, queue workers and periodic sweeps. */
   const background = {
-    start() {
+    async start() {
       relay.start();
       reservationSweeper.start();
+      await jobs.start();
     },
     async stop() {
       await reservationSweeper.stop();
       await relay.stop();
+      await jobs.stop();
     },
   };
 
@@ -227,7 +232,7 @@ export function buildContainer(env: Env, infra: Infrastructure = { rateLimitStor
 
   const http = { auditTrail: auditTrail(audit) };
 
-  return { env, limiters, cookies, csrf, http, tx, eventBus, background, repositories, services, guards, controllers, routes };
+  return { env, infra, jobs, limiters, cookies, csrf, http, tx, eventBus, background, repositories, services, guards, controllers, routes };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

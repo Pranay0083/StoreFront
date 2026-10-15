@@ -43,6 +43,11 @@ const EnvSchema = z
     RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
     LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
+    REDIS_URL: z.string().url('REDIS_URL must be a redis:// or rediss:// URL').optional(),
+    QUEUE_PREFIX: z.string().min(1).default('storefront'),
+    JOBS_IN_PROCESS: z.enum(['auto', 'true', 'false']).default('auto'),
+    WORKER_PORT: z.coerce.number().int().positive().default(4002),
+    SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
     SEED_DEMO_DATA: bool.default('true'),
   })
   .superRefine((env, ctx) => {
