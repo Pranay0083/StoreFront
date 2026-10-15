@@ -1,4 +1,5 @@
 import type { Logger } from 'pino';
+import { requestContext } from '../observability/request-context';
 import type { EventBus } from './event-bus';
 import { OutboxStore } from './outbox.store';
 import type { OutboxRecord } from './outbox.model';
@@ -93,7 +94,7 @@ export class PollingOutboxRelay implements OutboxRelay {
     for (const sub of this.bus.handlersFor(event.name)) {
       if (record.handlersDone.includes(sub.id)) continue;
       try {
-        await sub.run(event, ctx);
+        await requestContext.run({ requestId: record.requestId ?? record._id }, () => sub.run(event, ctx));
         await this.store.markHandlerDone(record._id, sub.id);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

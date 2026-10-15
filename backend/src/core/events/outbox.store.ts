@@ -1,3 +1,4 @@
+import { requestContext } from '../observability/request-context';
 import type { Session } from '../persistence/transaction';
 import type { AnyDomainEvent, DomainEvent } from './domain-events';
 import { OutboxModel, type OutboxRecord } from './outbox.model';
@@ -8,7 +9,9 @@ const DUPLICATE_KEY = 11000;
 export class OutboxStore {
   async append(events: readonly DomainEvent[], session?: Session): Promise<void> {
     if (!events.length) return;
+    const requestId = requestContext.requestId();
     const docs = events.map(e => ({
+      ...(requestId && { requestId }),
       _id: e.id,
       name: e.name,
       aggregateId: e.aggregateId,
@@ -62,6 +65,44 @@ export class OutboxStore {
 
   async deadLetter(id: string, error: string, now: Date): Promise<void> {
     await OutboxModel.updateOne({ _id: id }, { $set: { status: 'dead', lastError: error, processedAt: now }, $unset: { lockedUntil: 1 } });
+  }
+
+  async markDispatched(id: string, now: Date): Promise<void> {
+    await OutboxModel.updateOne(
+      { _id: id },
+      { $set: { status: 'dispatched', dispatchedAt: now }, $unset: { lockedUntil: 1, lastError: 1 } },
+    );
+  }
+
+  /** Completes a dispatched event once every one of its handlers has reported success. */
+  async completeIfAllHandled(id: string, handlerIds: readonly string[], now: Date): Promise<boolean> {
+    const res = await OutboxModel.updateOne(
+      { _id: id, status: 'dispatched', handlersDone: { $all: [...handlerIds] } },
+      { $set: { status: 'done', processedAt: now } },
+    );
+    return res.modifiedCount === 1;
+  }
+
+  /** Puts a dead-lettered event back in line with a fresh attempt budget. */
+  async revive(id: string, now = new Date()): Promise<boolean> {
+    const res = await OutboxModel.updateOne(
+      { _id: id, status: 'dead' },
+      { $set: { status: 'pending', attempts: 0, nextAttemptAt: now }, $unset: { processedAt: 1, lockedUntil: 1 } },
+    );
+    return res.modifiedCount === 1;
+  }
+
+  async discard(id: string): Promise<boolean> {
+    return (await OutboxModel.deleteOne({ _id: id, status: 'dead' })).deletedCount === 1;
+  }
+
+  listDead(limit = 100): Promise<OutboxRecord[]> {
+    return OutboxModel.find({ status: 'dead' }).sort({ processedAt: -1 }).limit(limit).lean<OutboxRecord[]>();
+  }
+
+  async countByStatus(): Promise<Record<string, number>> {
+    const rows = await OutboxModel.aggregate<{ _id: string; n: number }>([{ $group: { _id: '$status', n: { $sum: 1 } } }]);
+    return Object.fromEntries(rows.map(r => [r._id, r.n]));
   }
 
   find(id: string): Promise<OutboxRecord | null> {
