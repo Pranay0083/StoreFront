@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { OutboxModel } from '../src/core/events/outbox.model';
-import { MemoryJobQueue } from '../src/core/queue/memory-job-queue';
+import { type MemoryJobQueue } from '../src/core/queue/memory-job-queue';
 import { ProductModel as Product } from '../src/modules/catalog/product.model';
 import { InventoryMovementModel as Movement } from '../src/modules/inventory/inventory-movement.model';
 import { recordOpeningBalances } from '../src/modules/inventory/opening-balances';
