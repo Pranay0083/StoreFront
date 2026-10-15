@@ -9,6 +9,7 @@ import { loginThrottle } from './031-login-throttle';
 import { cartLines } from './032-cart-lines';
 import { reviewAggregates } from './033-review-aggregates';
 import { auditLog } from './034-audit-log';
+import { platformIndexes } from './050-platform-indexes';
 
 export const migrations: readonly Migration[] = [
   ensureIndexes,
@@ -21,4 +22,5 @@ export const migrations: readonly Migration[] = [
   cartLines,
   reviewAggregates,
   auditLog,
+  platformIndexes,
 ];
