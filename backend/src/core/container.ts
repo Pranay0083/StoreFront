@@ -36,6 +36,8 @@ import { adminCouponsRoutes, couponsRoutes } from '../modules/coupons/coupons.ro
 import { registerCouponHandlers } from '../modules/coupons/coupons.handlers';
 import { CouponService } from '../modules/coupons/coupons.service';
 import { McpController } from '../modules/mcp/mcp.controller';
+import { JobsController, jobsAdminRoutes } from '../modules/operations/jobs.routes';
+import { JobsAdminService } from '../modules/operations/jobs.service';
 import { mcpRoutes } from '../modules/mcp/mcp.routes';
 import { OrderRepository } from '../modules/orders/order.repository';
 import { OrdersController } from '../modules/orders/orders.controller';
@@ -197,6 +199,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     promotionCache,
     pricing,
     promotions: new PromotionsService(repositories.promotions, promotionCache, pricing),
+    jobsAdmin: new JobsAdminService(jobs, infra.deadLetters, outbox, relay),
   };
 
   const guards = new AuthGuards(services.auth);
@@ -217,6 +220,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     staff: new StaffController(services.audit, services.adminUsers),
     pricing: new PricingController(services.pricing),
     promotions: new PromotionsController(services.promotions),
+    jobs: new JobsController(services.jobsAdmin),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -233,6 +237,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/admin/coupons', adminCouponsRoutes(controllers.coupons, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
+    ['/admin/jobs', jobsAdminRoutes(controllers.jobs, guards)],
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
 
