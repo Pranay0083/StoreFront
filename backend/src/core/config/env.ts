@@ -40,7 +40,7 @@ const EnvSchema = z
     GROQ_API_KEY: z.string().default(''),
     GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
     RESERVATION_TTL_MINUTES: z.coerce.number().positive().default(15),
-    RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+    RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
     LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
     REDIS_URL: z.string().url('REDIS_URL must be a redis:// or rediss:// URL').optional(),

@@ -41,7 +41,8 @@ import { OrderRepository } from '../modules/orders/order.repository';
 import { OrdersController } from '../modules/orders/orders.controller';
 import { ordersRoutes } from '../modules/orders/orders.routes';
 import { OrdersService } from '../modules/orders/orders.service';
-import { IntervalReservationSweeper, type ReservationExpiryScheduler } from '../modules/orders/reservation-sweeper';
+import { QueuedReservationScheduler } from '../modules/orders/reservation-jobs';
+import type { ReservationExpiryScheduler } from '../modules/orders/reservation-sweeper';
 import { PaymentsController } from '../modules/payments/payments.controller';
 import { registerInventoryHandlers } from '../modules/inventory/inventory.handlers';
 import { InventoryController } from '../modules/inventory/inventory.controller';
@@ -136,7 +137,12 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   const refunds = new RefundSaga(orders, inventory, paymentGateway, logger);
   refunds.register(eventBus);
 
-  const reservationSweeper: ReservationExpiryScheduler = new IntervalReservationSweeper(orders, env.RESERVATION_SWEEP_INTERVAL_MS, logger);
+  const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
+    ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
+    sweepIntervalMs: env.RESERVATION_SWEEP_INTERVAL_MS,
+  });
+  reservationScheduler.register(eventBus);
+  const reservationSweeper: ReservationExpiryScheduler = reservationScheduler;
   /** Everything that consumes work: the outbox relay, queue workers and periodic sweeps. */
   const background = {
     async start() {
