@@ -1,3 +1,4 @@
+import { MemoryLruCache, RedisCache, type CacheProvider } from './cache/cache';
 import type { Env } from './config/env';
 import { memoryStores, type RateLimitStoreFactory } from './http/rate-limit';
 import { logger } from './logger';
@@ -19,6 +20,7 @@ export interface Infrastructure {
   queue: JobQueue;
   deadLetters: DeadLetterStore;
   pubsub: PubSub;
+  cache: CacheProvider;
   rateLimitStores: RateLimitStoreFactory;
   ping(): Promise<boolean>;
   close(): Promise<void>;
@@ -33,6 +35,7 @@ export function memoryInfrastructure(): Infrastructure {
     queue,
     deadLetters,
     pubsub,
+    cache: new MemoryLruCache(),
     rateLimitStores: memoryStores,
     ping: async () => true,
     close: async () => {
@@ -54,6 +57,7 @@ export function redisInfrastructure(env: Pick<Env, 'REDIS_URL' | 'QUEUE_PREFIX'>
     queue,
     deadLetters,
     pubsub,
+    cache: new RedisCache(redis, `${env.QUEUE_PREFIX}:cache:`),
     rateLimitStores: memoryStores,
     ping: () => pingRedis(redis),
     close: async () => {
