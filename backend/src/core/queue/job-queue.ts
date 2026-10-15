@@ -75,5 +75,13 @@ export class UnknownJobError extends Error {
   }
 }
 
+/** Thrown by a handler when retrying cannot help (e.g. a rejected recipient); goes straight to the dead-letter queue. */
+export class UnrecoverableJobError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnrecoverableJobError';
+  }
+}
+
 /** Some backends reserve ':' in custom ids. */
 export const safeJobId = (id: string) => id.replace(/:/g, '_');

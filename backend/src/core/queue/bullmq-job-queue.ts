@@ -1,4 +1,4 @@
-import { Queue, Worker, type Job } from 'bullmq';
+import { Queue, UnrecoverableError, Worker, type Job } from 'bullmq';
 import type { Logger } from 'pino';
 import { pingRedis, type Redis } from '../redis';
 import type { DeadLetterStore } from './dead-letter.store';
@@ -7,6 +7,7 @@ import {
   DEFAULT_BACKOFF_MS,
   QUEUE_NAMES,
   UnknownJobError,
+  UnrecoverableJobError,
   safeJobId,
   type EnqueueOptions,
   type JobDefinition,
@@ -129,18 +130,23 @@ export class BullMqJobQueue implements JobQueue {
   private async process(job: Job<JobEnvelope>): Promise<void> {
     const definition = this.require(job.name);
     const started = Date.now();
-    await runJob(definition, job.data, {
-      jobId: job.id ?? 'unknown',
-      name: job.name,
-      attempt: job.attemptsMade + 1,
-      maxAttempts: job.opts.attempts ?? 1,
-    });
+    try {
+      await runJob(definition, job.data, {
+        jobId: job.id ?? 'unknown',
+        name: job.name,
+        attempt: job.attemptsMade + 1,
+        maxAttempts: job.opts.attempts ?? 1,
+      });
+    } catch (err) {
+      if (err instanceof UnrecoverableJobError) throw new UnrecoverableError(err.message);
+      throw err;
+    }
     this.options.observer?.onCompleted?.(job.name, Date.now() - started);
   }
 
   private async onFailed(job: Job<JobEnvelope> | undefined, error: Error): Promise<void> {
     if (!job) return;
-    const final = job.attemptsMade >= (job.opts.attempts ?? 1);
+    const final = job.attemptsMade >= (job.opts.attempts ?? 1) || error instanceof UnrecoverableError;
     this.options.observer?.onFailed?.(job.name, final);
     if (!final) {
       this.logger.warn({ err: error, job: job.name, jobId: job.id, attempt: job.attemptsMade }, 'Job failed, will retry');

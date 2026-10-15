@@ -6,6 +6,7 @@ import {
   DEFAULT_BACKOFF_MS,
   QUEUE_NAMES,
   UnknownJobError,
+  UnrecoverableJobError,
   safeJobId,
   type EnqueueOptions,
   type JobDefinition,
@@ -164,7 +165,7 @@ export class MemoryJobQueue implements JobQueue {
       await runJob(definition, pending.job, { jobId: pending.id, name: pending.name, attempt: pending.attempt, maxAttempts });
       this.options.observer?.onCompleted?.(pending.name, this.clock() - started);
     } catch (error) {
-      const final = pending.attempt >= maxAttempts;
+      const final = pending.attempt >= maxAttempts || error instanceof UnrecoverableJobError;
       this.options.observer?.onFailed?.(pending.name, final);
       if (final) {
         this.bump(this.failed, definition.queue, 1);

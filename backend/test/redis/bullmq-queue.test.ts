@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { requestContext } from '../../src/core/observability/request-context';
 import { BullMqJobQueue } from '../../src/core/queue/bullmq-job-queue';
 import type { DeadLetterInput, DeadLetterRecord, DeadLetterStore } from '../../src/core/queue/dead-letter.store';
+import { UnrecoverableJobError } from '../../src/core/queue/job-queue';
 import type { Redis } from '../../src/core/redis';
 import { describeWithRedis, testRedis, uniquePrefix, waitFor } from '../helpers/redis';
 
@@ -70,6 +71,16 @@ describeWithRedis('BullMqJobQueue (real Redis)', () => {
       error: 'provider down',
       data: { n: 1 },
     });
+  });
+
+  it('skips remaining attempts for unrecoverable failures', async () => {
+    const handler = vi.fn().mockRejectedValue(new UnrecoverableJobError('bad address'));
+    queue.register({ name: 'fatal', queue: 'notifications', attempts: 5, backoffMs: 10, handler });
+    await queue.start();
+    await queue.enqueue('fatal', {});
+    await waitFor(() => deadLetters.entries.length === 1);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(deadLetters.entries[0]).toMatchObject({ error: 'bad address' });
   });
 
   it('deduplicates by job id and honours delays', async () => {

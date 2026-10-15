@@ -2,7 +2,7 @@ import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { requestContext } from '../observability/request-context';
 import type { DeadLetterInput, DeadLetterRecord, DeadLetterStore } from './dead-letter.store';
-import { UnknownJobError, type JobContext } from './job-queue';
+import { UnknownJobError, UnrecoverableJobError, type JobContext } from './job-queue';
 import { MemoryJobQueue } from './memory-job-queue';
 
 class FakeDeadLetters implements DeadLetterStore {
@@ -70,6 +70,16 @@ describe('MemoryJobQueue', () => {
       expect.objectContaining({ queue: 'notifications', name: 'mail', jobId: 'mail_1', data: { id: 1 }, error: 'smtp down', attempts: 3 }),
     ]);
     expect((await queue.counts()).find(c => c.queue === 'notifications')).toMatchObject({ failed: 1, waiting: 0, delayed: 0 });
+  });
+
+  it('dead-letters unrecoverable failures without spending the retry budget', async () => {
+    const { queue, deadLetters } = setup();
+    const handler = vi.fn().mockRejectedValue(new UnrecoverableJobError('recipient rejected'));
+    queue.register({ name: 'mail', queue: 'notifications', attempts: 5, backoffMs: 0, handler });
+    await queue.enqueue('mail', {});
+    await queue.drain();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(deadLetters.entries).toEqual([expect.objectContaining({ error: 'recipient rejected', attempts: 1 })]);
   });
 
   it('holds delayed jobs until they are due and deduplicates by job id', async () => {
