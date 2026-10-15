@@ -195,11 +195,13 @@ export class Order {
 
   ship(by: string, note = '', now = new Date()): void {
     this.transition('shipped', by, note, now);
+    this.record('OrderShipped', { orderId: this.id, orderNumber: this.orderNumber, userId: this.userId, by, ...(note && { note }) });
   }
 
   deliver(by: string, note = '', now = new Date()): void {
     this.transition('delivered', by, note, now);
     this.props.deliveredAt = now;
+    this.record('OrderDelivered', { orderId: this.id, orderNumber: this.orderNumber, userId: this.userId, by });
   }
 
   cancel(by: string, reason: string, now = new Date()): void {

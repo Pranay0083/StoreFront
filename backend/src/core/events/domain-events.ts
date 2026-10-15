@@ -18,6 +18,8 @@ export interface DomainEventMap {
     paymentId?: string;
     items: StockLine[];
   };
+  OrderShipped: { orderId: string; orderNumber: string; userId: string; by: string; note?: string };
+  OrderDelivered: { orderId: string; orderNumber: string; userId: string; by: string };
   OrderCancelled: { orderId: string; orderNumber: string; userId: string; reason: string; by: string; couponCode?: string };
   RefundRequested: {
     orderId: string;
