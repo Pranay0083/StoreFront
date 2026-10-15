@@ -36,6 +36,12 @@ import { adminCouponsRoutes, couponsRoutes } from '../modules/coupons/coupons.ro
 import { registerCouponHandlers } from '../modules/coupons/coupons.handlers';
 import { CouponService } from '../modules/coupons/coupons.service';
 import { McpController } from '../modules/mcp/mcp.controller';
+import { AbandonedCartReminder } from '../modules/notifications/abandoned-cart';
+import { ConsoleMessagingProvider } from '../modules/notifications/channels';
+import { NotificationLogRepository } from '../modules/notifications/notification-log';
+import { registerNotificationHandlers } from '../modules/notifications/notification.handlers';
+import { NotificationDispatcher, NotificationService } from '../modules/notifications/notification.service';
+import { createEmailProvider } from '../modules/notifications/providers';
 import { JobsController, jobsAdminRoutes } from '../modules/operations/jobs.routes';
 import { JobsAdminService } from '../modules/operations/jobs.service';
 import { mcpRoutes } from '../modules/mcp/mcp.routes';
@@ -145,11 +151,37 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   });
   reservationScheduler.register(eventBus);
   const reservationSweeper: ReservationExpiryScheduler = reservationScheduler;
+
+  const emailProvider = createEmailProvider(env, logger);
+  const messagingProviders = [new ConsoleMessagingProvider('sms', logger), new ConsoleMessagingProvider('whatsapp', logger)];
+  const notifications = new NotificationService(emailProvider, messagingProviders, new NotificationLogRepository(), env.EMAIL_FROM, logger);
+  const notificationDispatcher = new NotificationDispatcher(jobs);
+  notificationDispatcher.register(notifications);
+  registerNotificationHandlers(eventBus, {
+    users: repositories.users,
+    orders: repositories.orders,
+    dispatcher: notificationDispatcher,
+    frontendUrl: env.FRONTEND_URL,
+  });
+  const abandonedCarts = new AbandonedCartReminder(
+    repositories.carts,
+    repositories.users,
+    repositories.products,
+    notificationDispatcher,
+    logger,
+    {
+      idleHours: env.ABANDONED_CART_HOURS,
+      scanIntervalMs: env.ABANDONED_CART_SCAN_INTERVAL_MS,
+      frontendUrl: env.FRONTEND_URL,
+    },
+  );
+  abandonedCarts.register(jobs);
   /** Everything that consumes work: the outbox relay, queue workers and periodic sweeps. */
   const background = {
     async start() {
       relay.start();
       reservationSweeper.start();
+      abandonedCarts.start(jobs);
       await jobs.start();
     },
     async stop() {
@@ -200,6 +232,11 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     pricing,
     promotions: new PromotionsService(repositories.promotions, promotionCache, pricing),
     jobsAdmin: new JobsAdminService(jobs, infra.deadLetters, outbox, relay),
+    emailProvider,
+    messagingProviders,
+    notifications,
+    notificationDispatcher,
+    abandonedCarts,
   };
 
   const guards = new AuthGuards(services.auth);
