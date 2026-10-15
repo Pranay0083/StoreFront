@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { BadRequestError, ConflictError, NotFoundError } from '../../core/errors';
 import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
+import type { JobQueue } from '../../core/queue/job-queue';
 import type { OrdersService } from '../orders/orders.service';
 import type { PaymentGateway } from './gateways/payment-gateway';
 import type { RefundSaga } from './refund.saga';
@@ -29,13 +30,36 @@ export interface WebhookInput {
   payload: RazorpayWebhookPayload;
 }
 
+export const PROCESS_WEBHOOK_JOB = 'payments.process-webhook';
+
+export interface WebhookJob {
+  eventId: string;
+  payload: RazorpayWebhookPayload;
+}
+
+export type WebhookStatus = 'processed' | 'accepted' | 'duplicate_ignored';
+
 export class PaymentsService {
+  /**
+   * With a job queue, webhooks are acknowledged as soon as they are verified and deduplicated, and
+   * processed by a retried job, so slow downstream work never makes the provider time out and resend.
+   */
   constructor(
     private readonly gateway: PaymentGateway,
     private readonly orders: OrdersService,
     private readonly webhookEvents: WebhookEventRepository,
     private readonly refunds: RefundSaga,
-  ) {}
+    private readonly jobs?: JobQueue,
+  ) {
+    jobs?.register<WebhookJob>({
+      name: PROCESS_WEBHOOK_JOB,
+      queue: 'payments',
+      attempts: 8,
+      backoffMs: 5_000,
+      concurrency: 4,
+      handler: job => this.processWebhook(job.payload),
+    });
+  }
 
   get mode() {
     return this.gateway.name;
@@ -98,7 +122,7 @@ export class PaymentsService {
     return { ok: true, alreadyProcessed: result.alreadyProcessed, order: result.order };
   }
 
-  async handleWebhook({ rawBody, signature, eventId, payload }: WebhookInput): Promise<{ status: 'processed' | 'duplicate_ignored' }> {
+  async handleWebhook({ rawBody, signature, eventId, payload }: WebhookInput): Promise<{ status: WebhookStatus }> {
     if (!signature || !rawBody) throw new BadRequestError('Missing signature');
     if (!this.gateway.verifyWebhook(rawBody, signature)) throw new BadRequestError('Invalid webhook signature');
 
@@ -106,7 +130,11 @@ export class PaymentsService {
     if (!(await this.webhookEvents.recordOnce(id, payload.event))) return { status: 'duplicate_ignored' };
 
     try {
-      await this.dispatchWebhook(payload);
+      if (this.jobs) {
+        await this.jobs.enqueue<WebhookJob>(PROCESS_WEBHOOK_JOB, { eventId: id, payload }, { jobId: `webhook:${id}` });
+        return { status: 'accepted' };
+      }
+      await this.processWebhook(payload);
     } catch (err) {
       // Forget the event so the provider's retry is processed instead of being dropped as a duplicate.
       await this.webhookEvents.forget(id);
@@ -115,7 +143,7 @@ export class PaymentsService {
     return { status: 'processed' };
   }
 
-  private async dispatchWebhook(payload: RazorpayWebhookPayload): Promise<void> {
+  async processWebhook(payload: RazorpayWebhookPayload): Promise<void> {
     try {
       switch (payload.event) {
         case 'payment.captured':

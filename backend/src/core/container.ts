@@ -180,7 +180,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     coupons,
     orders,
     refunds,
-    payments: new PaymentsService(paymentGateway, orders, repositories.webhookEvents, refunds),
+    payments: new PaymentsService(paymentGateway, orders, repositories.webhookEvents, refunds, jobs),
     outbox,
     relay,
     reservationSweeper,
