@@ -4,14 +4,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { CUSTOMER_CANCELLABLE_STATUSES, REFUND_WINDOW_DAYS, type Order } from '@storefront/contracts';
+import { CUSTOMER_CANCELLABLE_STATUSES, PARTIAL_REFUND_STATUSES, REFUND_WINDOW_DAYS, type Order } from '@storefront/contracts';
 import { toast } from 'sonner';
 import { OrderTimeline } from '@/components/order-timeline';
+import { RefundDialog } from '@/components/refund-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
 import { api, fmtDate, fmtDateTime, fmtINR } from '@/lib/api';
 
 const DAY_MS = 86_400_000;
@@ -29,8 +28,6 @@ function OrderDetailContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
-  const [refundReason, setRefundReason] = useState('');
-  const [requesting, setRequesting] = useState(false);
 
   const load = useCallback(() => {
     api<Order>(`/orders/${id}`)
@@ -62,7 +59,8 @@ function OrderDetailContent() {
   const cancellable = CUSTOMER_CANCELLABLE_STATUSES.includes(order.status);
   const paidAlready = order.status !== 'created';
   const deliveredAt = order.deliveredAt ? new Date(order.deliveredAt).getTime() : null;
-  const refundable = order.status === 'delivered' && deliveredAt !== null && Date.now() - deliveredAt <= REFUND_WINDOW_DAYS * DAY_MS;
+  const refundable =
+    PARTIAL_REFUND_STATUSES.includes(order.status) && deliveredAt !== null && Date.now() - deliveredAt <= REFUND_WINDOW_DAYS * DAY_MS;
 
   const cancel = async () => {
     setCancelling(true);
@@ -74,23 +72,6 @@ function OrderDetailContent() {
       toast.error(e.message);
     } finally {
       setCancelling(false);
-    }
-  };
-
-  const requestRefund = async () => {
-    setRequesting(true);
-    try {
-      const updated = await api<Order>(`/orders/${order._id}/refund`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: refundReason }),
-      });
-      setOrder(updated);
-      setRefundOpen(false);
-      toast.success('Refund requested');
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setRequesting(false);
     }
   };
 
@@ -113,7 +94,7 @@ function OrderDetailContent() {
           )}
           {refundable && (
             <Button variant="outline" size="sm" data-testid="order-refund-button" onClick={() => setRefundOpen(true)}>
-              Request refund
+              Return items
             </Button>
           )}
         </div>
@@ -136,9 +117,15 @@ function OrderDetailContent() {
                   <p className="text-sm font-medium">{item.title}</p>
                   <p className="text-xs text-muted-foreground">
                     Size {item.size} × {item.qty}
+                    {item.refundedQty > 0 && <span className="ml-2 text-amber-800">· {item.refundedQty} refunded</span>}
                   </p>
                 </div>
-                <p className="text-sm font-semibold">{fmtINR(item.price * item.qty)}</p>
+                <p className="text-right text-sm font-semibold">
+                  {item.lineTotal < item.price * item.qty && (
+                    <span className="block text-xs font-normal text-muted-foreground line-through">{fmtINR(item.price * item.qty)}</span>
+                  )}
+                  {fmtINR(item.lineTotal)}
+                </p>
               </div>
             </div>
           ))}
@@ -164,6 +151,22 @@ function OrderDetailContent() {
               <span>Total</span>
               <span data-testid="order-detail-total">{fmtINR(order.total)}</span>
             </div>
+            {order.refundedAmount > 0 && (
+              <div className="flex justify-between text-amber-800">
+                <span>Refunded</span>
+                <span data-testid="order-detail-refunded">−{fmtINR(order.refundedAmount)}</span>
+              </div>
+            )}
+            {order.pricing?.applied.length ? (
+              <ul className="mt-3 space-y-1 border-t border-black/10 pt-3 text-xs text-muted-foreground" data-testid="order-detail-offers">
+                {order.pricing.applied.map(a => (
+                  <li key={a.promotionId} className="flex justify-between">
+                    <span>{a.name}</span>
+                    <span>−{fmtINR(a.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         </div>
 
@@ -211,24 +214,13 @@ function OrderDetailContent() {
         </div>
       </div>
 
-      <Dialog open={refundOpen} onOpenChange={setRefundOpen}>
-        <DialogContent data-testid="order-refund-dialog">
-          <DialogTitle>Request a refund</DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Refunds are available for {REFUND_WINDOW_DAYS} days after delivery and go back to your original payment method.
-          </p>
-          <Textarea
-            data-testid="order-refund-reason"
-            placeholder="Tell us what went wrong"
-            value={refundReason}
-            onChange={e => setRefundReason(e.target.value)}
-            maxLength={500}
-          />
-          <Button data-testid="order-refund-submit" onClick={requestRefund} disabled={requesting || refundReason.trim().length < 3}>
-            {requesting ? 'Submitting…' : 'Submit request'}
-          </Button>
-        </DialogContent>
-      </Dialog>
+      <RefundDialog
+        order={order}
+        open={refundOpen}
+        onOpenChange={setRefundOpen}
+        endpoint={`/orders/${order._id}/refund`}
+        onRefunded={setOrder}
+      />
     </div>
   );
 }
