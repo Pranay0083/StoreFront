@@ -5,6 +5,7 @@ import {
   type OrderPricing,
   type OrderStatus,
   type PriceBreakdown,
+  type RefundRequestInput,
 } from '@storefront/contracts';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../../core/errors';
 import type { OutboxRelay } from '../../core/events/outbox-relay';
@@ -221,10 +222,18 @@ export class OrdersService {
     });
   }
 
-  async requestRefund(id: string, user: AuthUser, reason: string): Promise<Order> {
+  /** Customer refund: whole order, or specific delivered items within the refund window. */
+  async requestRefund(id: string, user: AuthUser, input: RefundRequestInput): Promise<Order> {
     return this.mutate({ orderId: id }, order => {
       if (order.userId !== user.id) throw new ForbiddenError();
-      order.requestRefund({ by: `user:${user.id}`, reason, windowDays: this.config.refundWindowDays });
+      order.requestRefund({ by: `user:${user.id}`, reason: input.reason, lines: input.lines, windowDays: this.config.refundWindowDays });
+    });
+  }
+
+  /** Operator refund of the whole order or specific lines; not limited by the customer refund window. */
+  async adminRefund(id: string, adminId: string, input: RefundRequestInput): Promise<Order> {
+    return this.mutate({ orderId: id }, order => {
+      order.requestRefund({ by: `admin:${adminId}`, reason: input.reason, lines: input.lines, windowDays: Number.POSITIVE_INFINITY });
     });
   }
 
@@ -243,7 +252,8 @@ export class OrdersService {
         case 'cancelled':
           return this.cancelUnpaid(order, by, note || 'Cancelled by admin', session);
         case 'refund_requested':
-          return order.requestRefund({ by, reason: note || 'Refund issued by admin', windowDays: Number.POSITIVE_INFINITY });
+          order.requestRefund({ by, reason: note || 'Refund issued by admin', windowDays: Number.POSITIVE_INFINITY });
+          return;
         default:
           throw new ConflictError(`Illegal transition: ${order.status} → ${to}`);
       }

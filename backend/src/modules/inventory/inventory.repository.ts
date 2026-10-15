@@ -68,6 +68,22 @@ export class StockReservationRepository {
     ).lean<StockReservationRecord>();
   }
 
+  /** Records returned units on a sold reservation; compare-and-set on its status so concurrent returns cannot both apply. */
+  async recordReturns(
+    orderId: string,
+    from: ReservationStatus,
+    items: Array<{ productId: string; size: string; qty: number; returnedQty: number }>,
+    to: ReservationStatus,
+    session: Session,
+  ): Promise<boolean> {
+    const res = await StockReservationModel.updateOne(
+      { orderId, status: from },
+      { $set: { status: to, items: items.map(i => ({ ...i, productId: new Types.ObjectId(i.productId) })) } },
+      { session },
+    );
+    return res.modifiedCount === 1;
+  }
+
   async expiredOrderIds(now: Date, limit: number): Promise<string[]> {
     const rows = await StockReservationModel.find({ status: 'active', expiresAt: { $lte: now } }, { orderId: 1 })
       .sort({ expiresAt: 1 })

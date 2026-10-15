@@ -9,6 +9,8 @@ import {
   AuditLogQuerySchema,
   BulkTransitionSchema,
   LowStockQuerySchema,
+  OrderIdParamsSchema,
+  RefundRequestSchema,
   RevenueQuerySchema,
   UpdateUserRoleSchema,
   UserIdParamsSchema,
@@ -30,6 +32,12 @@ export function adminRoutes(controller: AdminController, staff: StaffController,
     guards.requirePermission('orders:manage'),
     validate({ body: BulkTransitionSchema }),
     handler(controller.bulkTransition),
+  );
+  router.post(
+    '/orders/:id/refund',
+    guards.requirePermission('orders:manage'),
+    validate({ params: OrderIdParamsSchema, body: RefundRequestSchema }),
+    handler(controller.refundOrder),
   );
   router.get('/conversations', guards.requirePermission('chats:read'), handler(controller.conversations));
   router.get('/audit-log', guards.requirePermission('audit:read'), validate({ query: AuditLogQuerySchema }), handler(staff.auditLog));

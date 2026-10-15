@@ -9,10 +9,10 @@ import { PermanentGatewayError, type PaymentGateway, type RefundResult } from '.
 const ACTOR = 'system:refund-saga';
 
 /**
- * Orchestrates refunds across the order, the payment provider and inventory:
+ * Orchestrates refunds (whole orders or individual lines) across the order, the payment provider and inventory:
  *   1. claim the refund (requested → processing) so only one worker submits it
  *   2. ask the gateway to refund the captured payment
- *   3. settle: complete + restock (synchronously or via the refund webhook), or
+ *   3. settle: complete + restock the refunded units (synchronously or via the refund webhook), or
  *      compensate by returning the order to its previous status.
  * Transient gateway errors release the claim and rethrow so the outbox retries with backoff.
  */
@@ -38,11 +38,13 @@ export class RefundSaga {
 
     let result: RefundResult;
     try {
+      const refund = claimed.openRefund!;
       result = await this.gateway.refund({
         paymentId: claimed.payment.razorpayPaymentId ?? '',
-        amount: claimed.refund!.amount,
+        amount: refund.amount,
         orderId,
         orderNumber: claimed.orderNumber,
+        refundId: refund.id,
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -60,11 +62,12 @@ export class RefundSaga {
     this.logger.info({ orderId, refundId: result.refundId, status: result.status }, 'Refund submitted to gateway');
   }
 
-  /** Settles a refund and puts the goods back into stock in the same transaction. Idempotent. */
+  /** Settles a refund and puts exactly its units back into stock in the same transaction. Idempotent. */
   async complete(locator: OrderLocator, gatewayRefundId?: string, by = ACTOR): Promise<Order> {
     return this.orders.mutate(locator, async (order, session) => {
-      if (!order.completeRefund({ by, gatewayRefundId })) return false;
-      await this.inventory.restockSale(order.id, order.restockKind(), by, `Refund ${order.orderNumber}`, session);
+      const refund = order.completeRefund({ by, gatewayRefundId });
+      if (!refund) return false;
+      await this.inventory.restockLines(order.id, refund.lines, order.restockKind(), by, `Refund ${order.orderNumber}`, session);
     });
   }
 

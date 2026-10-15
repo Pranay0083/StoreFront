@@ -1,7 +1,15 @@
 import { ORDER_STATUSES } from '@storefront/contracts';
 import { z } from 'zod';
 
-export { AdminUsersQuerySchema, AuditLogQuerySchema, BulkTransitionSchema, UpdateUserRoleSchema } from '@storefront/contracts';
+export {
+  AdminUsersQuerySchema,
+  AuditLogQuerySchema,
+  BulkTransitionSchema,
+  RefundRequestSchema,
+  UpdateUserRoleSchema,
+} from '@storefront/contracts';
+
+export const OrderIdParamsSchema = z.object({ id: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid order id') });
 
 export const UserIdParamsSchema = z.object({ id: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid user id') });
 

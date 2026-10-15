@@ -7,7 +7,7 @@ export const STORE_INFO = {
   payments:
     'We accept Razorpay (cards, UPI, netbanking). A DEMO PAY option is available in demo mode which exercises the exact same order flow.',
   returns:
-    'Orders can be cancelled any time before they are shipped. After delivery, refunds can be requested within 7 days — refunds are processed to the original payment method. Every order follows an audited lifecycle: created → paid → packed → shipped → delivered.',
+    'Orders can be cancelled any time before they are shipped. After delivery, the whole order or individual items can be returned within 7 days; each item is refunded at the price actually paid for it after offers, and shipping is refunded once everything has been returned. Refunds go to the original payment method. Every order follows an audited lifecycle: created → paid → packed → shipped → delivered.',
   offers:
     'Bundle deals, multi-buy offers and spend-more tiers apply automatically: the bag always picks the cheapest combination of offers and explains it. Promo codes such as WELCOME10 (10% off, up to ₹500, on orders above ₹1,000) are entered at checkout; only one order-wide discount applies per order.',
   sizes: 'Apparel is available in XS-XXL depending on the product; footwear in UK 6-11. Stock per size is shown on each product page.',

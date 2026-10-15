@@ -27,7 +27,10 @@ export class OrderConcurrencyError extends ConflictError {
 
 const compact = <T extends object>(obj: T): T => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 
-const OPTIONAL_STATE_FIELDS = ['refund', 'paidAt', 'deliveredAt', 'reservedUntil'] as const;
+const OPTIONAL_STATE_FIELDS = ['paidAt', 'deliveredAt', 'reservedUntil'] as const;
+
+/** Revenue after refunds, so partially refunded orders count only what the customer kept. */
+const NET_TOTAL = { $subtract: ['$total', { $ifNull: ['$refundedAmount', 0] }] };
 
 export function toOrderProps(r: OrderRecord): OrderProps {
   return compact({
@@ -46,6 +49,8 @@ export function toOrderProps(r: OrderRecord): OrderProps {
         markdownPerUnit: i.markdownPerUnit ?? 0,
         discounts: (i.discounts ?? []).map(d => ({ promotionId: d.promotionId, amount: d.amount })),
         lineTotal: i.lineTotal ?? i.price * i.qty,
+        refundedQty: i.refundedQty ?? 0,
+        refundedAmount: i.refundedAmount ?? 0,
       }),
     ),
     address: r.address,
@@ -64,7 +69,8 @@ export function toOrderProps(r: OrderRecord): OrderProps {
       status: r.payment?.status === 'captured' ? ('captured' as const) : ('pending' as const),
       capturedAt: r.payment?.capturedAt ?? undefined,
     }),
-    refund: r.refund ? compact({ ...r.refund }) : undefined,
+    refunds: (r.refunds ?? []).map(f => compact({ ...f, lines: f.lines.map(l => ({ ...l })) })),
+    refundedAmount: r.refundedAmount ?? 0,
     paidAt: r.paidAt ?? undefined,
     deliveredAt: r.deliveredAt ?? undefined,
     reservedUntil: r.reservedUntil ?? undefined,
@@ -89,7 +95,7 @@ export class OrderRepository {
   }
 
   loadByGatewayRefundId(gatewayRefundId: string, session?: Session): Promise<Order | null> {
-    return this.loadOne({ 'refund.gatewayRefundId': gatewayRefundId }, session);
+    return this.loadOne({ 'refunds.gatewayRefundId': gatewayRefundId }, session);
   }
 
   loadByPaymentId(paymentId: string, session?: Session): Promise<Order | null> {
@@ -99,11 +105,18 @@ export class OrderRepository {
   /** Persists the aggregate only if nobody else changed it since it was loaded (optimistic concurrency). */
   async save(order: Order, session?: Session): Promise<void> {
     const p = order.snapshot();
-    const set: Record<string, unknown> = { status: p.status, statusHistory: p.statusHistory, payment: compact({ ...p.payment }) };
+    const set: Record<string, unknown> = {
+      status: p.status,
+      statusHistory: p.statusHistory,
+      payment: compact({ ...p.payment }),
+      items: p.items,
+      refunds: p.refunds.map(r => compact({ ...r })),
+      refundedAmount: p.refundedAmount,
+    };
     const unset: Record<string, 1> = {};
     for (const key of OPTIONAL_STATE_FIELDS) {
       if (p[key] === undefined) unset[key] = 1;
-      else set[key] = key === 'refund' ? compact({ ...p.refund! }) : p[key];
+      else set[key] = p[key];
     }
     const res = await OrderModel.updateOne(
       { _id: p.id, version: p.version === 0 ? { $in: [0, null] } : p.version },
@@ -157,7 +170,7 @@ export class OrderRepository {
   async revenueSummary(): Promise<RevenueSummary> {
     const [row] = await OrderModel.aggregate<RevenueSummary>([
       { $match: { status: { $in: REVENUE_STATUSES } } },
-      { $group: { _id: null, revenue: { $sum: '$total' }, orders: { $sum: 1 }, avg: { $avg: '$total' } } },
+      { $group: { _id: null, revenue: { $sum: NET_TOTAL }, orders: { $sum: 1 }, avg: { $avg: NET_TOTAL } } },
     ]);
     return row ?? { revenue: 0, orders: 0, avg: 0 };
   }
@@ -168,7 +181,7 @@ export class OrderRepository {
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt' } },
-          revenue: { $sum: '$total' },
+          revenue: { $sum: NET_TOTAL },
           orders: { $sum: 1 },
         },
       },
@@ -191,8 +204,15 @@ export class OrderRepository {
           _id: '$items.productId',
           title: { $first: '$items.title' },
           image: { $first: '$items.image' },
-          units: { $sum: '$items.qty' },
-          revenue: { $sum: { $multiply: ['$items.price', '$items.qty'] } },
+          units: { $sum: { $subtract: ['$items.qty', { $ifNull: ['$items.refundedQty', 0] }] } },
+          revenue: {
+            $sum: {
+              $subtract: [
+                { $ifNull: ['$items.lineTotal', { $multiply: ['$items.price', '$items.qty'] }] },
+                { $ifNull: ['$items.refundedAmount', 0] },
+              ],
+            },
+          },
         },
       },
       { $sort: { revenue: -1 } },

@@ -20,7 +20,7 @@ export class DemoGateway implements PaymentGateway {
   }
 
   async refund(request: RefundRequest): Promise<RefundResult> {
-    return { refundId: `demo_rfnd_${request.orderId}`, status: 'processed' };
+    return { refundId: `demo_rfnd_${request.refundId}`, status: 'processed' };
   }
 
   verifyWebhook(rawBody: Buffer, signature: string): boolean {

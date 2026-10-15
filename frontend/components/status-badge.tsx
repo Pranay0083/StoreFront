@@ -9,13 +9,14 @@ const VARIANTS: Record<OrderStatus, 'secondary' | 'default' | 'success' | 'warni
   delivered: 'success',
   cancelled: 'destructive',
   refund_requested: 'warning',
+  partially_refunded: 'warning',
   refunded: 'destructive',
 };
 
 export function StatusBadge({ status, testId }: { status: OrderStatus; testId?: string }) {
   return (
     <Badge variant={VARIANTS[status] || 'secondary'} data-testid={testId || `status-badge-${status}`}>
-      {status.replace('_', ' ')}
+      {status.replaceAll('_', ' ')}
     </Badge>
   );
 }

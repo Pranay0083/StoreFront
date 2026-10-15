@@ -62,13 +62,14 @@ describe('refund saga (demo gateway)', () => {
     const res = await t.http().post(`${API}/orders/${order._id}/cancel`).set(bearer(buyer.token)).expect(200);
     expect(res.body).toMatchObject({
       status: 'refund_requested',
-      refund: { status: 'requested', previousStatus: 'paid', amount: order.total },
+      refunds: [expect.objectContaining({ status: 'requested', kind: 'full', previousStatus: 'paid', amount: order.total })],
     });
 
     await drain();
     const refunded = (await Order.findById(order._id).lean())!;
     expect(refunded.status).toBe('refunded');
-    expect(refunded.refund).toMatchObject({ status: 'processed', gatewayRefundId: `demo_rfnd_${order._id}` });
+    expect(refunded.refunds![0]).toMatchObject({ status: 'processed', gatewayRefundId: `demo_rfnd_${refunded.refunds![0].id}` });
+    expect(refunded.refundedAmount).toBe(order.total);
     expect(await stockOf(product._id)).toBe(10);
     expect((await Movement.find({ orderId: order._id }).sort({ createdAt: 1 }).lean()).map(m => m.type)).toEqual([
       'RESERVE',
@@ -149,8 +150,10 @@ describe('refund saga (asynchronous gateway)', () => {
     await saga.submit(order._id);
     await saga.submit(order._id);
     expect(gateway.refund).toHaveBeenCalledTimes(1);
-    expect(gateway.refund).toHaveBeenCalledWith(expect.objectContaining({ paymentId: 'pay_async', amount: order.total }));
-    expect((await Order.findById(order._id).lean())!.refund).toMatchObject({ status: 'pending', gatewayRefundId: 'rfnd_async' });
+    expect(gateway.refund).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentId: 'pay_async', amount: order.total, refundId: expect.any(String) }),
+    );
+    expect((await Order.findById(order._id).lean())!.refunds![0]).toMatchObject({ status: 'pending', gatewayRefundId: 'rfnd_async' });
     expect(await stockOf(product._id)).toBe(8);
 
     const payments = new PaymentsService(gateway, t.container.services.orders, new WebhookEventRepository(), saga);
@@ -186,7 +189,7 @@ describe('refund saga (asynchronous gateway)', () => {
 
     const restored = (await Order.findById(order._id).lean())!;
     expect(restored.status).toBe('packed');
-    expect(restored.refund).toMatchObject({ status: 'failed', failureReason: 'Account closed' });
+    expect(restored.refunds![0]).toMatchObject({ status: 'failed', failureReason: 'Account closed' });
     expect(restored.statusHistory.at(-1)).toMatchObject({ from: 'refund_requested', to: 'packed', note: 'Refund failed: Account closed' });
     expect(await stockOf(product._id)).toBe(8);
   });
@@ -200,7 +203,7 @@ describe('refund saga (asynchronous gateway)', () => {
     });
     await t.http().post(`${API}/orders/${order._id}/cancel`).set(bearer(buyer.token)).expect(200);
     await expect(sagaWith(flaky).submit(order._id, { attempt: 1, maxAttempts: 5 })).rejects.toThrow('gateway timeout');
-    expect((await Order.findById(order._id).lean())!.refund!.status).toBe('requested');
+    expect((await Order.findById(order._id).lean())!.refunds![0].status).toBe('requested');
     await sagaWith(flaky).submit(order._id, { attempt: 2, maxAttempts: 5 });
     expect(await statusOf(order._id)).toBe('refunded');
 
@@ -212,6 +215,6 @@ describe('refund saga (asynchronous gateway)', () => {
     await sagaWith(rejecting).submit(second.order._id);
     const restored = (await Order.findById(second.order._id).lean())!;
     expect(restored.status).toBe('paid');
-    expect(restored.refund).toMatchObject({ status: 'failed', failureReason: 'The refund amount exceeds the payment' });
+    expect(restored.refunds![0]).toMatchObject({ status: 'failed', failureReason: 'The refund amount exceeds the payment' });
   });
 });

@@ -57,8 +57,8 @@ export class RazorpayGateway implements PaymentGateway {
       const refund = await this.client.payments.refund(request.paymentId, {
         amount: request.amount,
         speed: 'normal',
-        receipt: `rf_${request.orderNumber}`.slice(0, 40),
-        notes: { orderId: request.orderId },
+        receipt: `rf_${request.refundId}`.slice(0, 40),
+        notes: { orderId: request.orderId, orderNumber: request.orderNumber, refundId: request.refundId },
       });
       const status = refund.status === 'processed' || refund.status === 'failed' ? refund.status : 'pending';
       return { refundId: refund.id, status };

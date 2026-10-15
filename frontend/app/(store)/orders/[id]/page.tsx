@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, fmtDate, fmtDateTime, fmtINR } from '@/lib/api';
 
 const DAY_MS = 86_400_000;
-const REFUND_LABELS: Record<NonNullable<Order['refund']>['status'], string> = {
+const REFUND_LABELS: Record<Order['refunds'][number]['status'], string> = {
   requested: 'Requested',
   processing: 'Submitted to payment provider',
   pending: 'Processing with your bank',
@@ -188,15 +188,24 @@ function OrderDetailContent() {
               <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{order.payment.razorpayPaymentId}</p>
             )}
           </div>
-          {order.refund && (
+          {order.refunds.length > 0 && (
             <div className="border border-black/10 bg-white p-6" data-testid="order-refund-card">
-              <p className="label-caps mb-4 text-muted-foreground">Refund</p>
-              <p className="text-sm font-medium">
-                {fmtINR(order.refund.amount)} · {REFUND_LABELS[order.refund.status]}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">Requested {fmtDateTime(order.refund.requestedAt)}</p>
-              <p className="mt-2 text-sm text-muted-foreground">{order.refund.reason}</p>
-              {order.refund.failureReason && <p className="mt-2 text-sm text-destructive">{order.refund.failureReason}</p>}
+              <p className="label-caps mb-4 text-muted-foreground">Refunds</p>
+              <ul className="space-y-4">
+                {order.refunds.map(r => (
+                  <li key={r.id} data-testid={`order-refund-${r.id}`}>
+                    <p className="text-sm font-medium">
+                      {fmtINR(r.amount)} · {REFUND_LABELS[r.status]}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {r.kind === 'full' ? 'Whole order' : `${r.lines.reduce((s, l) => s + l.qty, 0)} item(s)`} · Requested{' '}
+                      {fmtDateTime(r.requestedAt)}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">{r.reason}</p>
+                    {r.failureReason && <p className="mt-1 text-sm text-destructive">{r.failureReason}</p>}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

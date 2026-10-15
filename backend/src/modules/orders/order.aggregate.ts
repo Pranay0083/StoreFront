@@ -1,10 +1,14 @@
 import {
+  PARTIAL_REFUND_STATUSES,
   REFUND_WINDOW_DAYS,
+  refundableAmount,
   type Address,
   type LineDiscount,
   type OrderPricing,
+  type OrderRefundLine,
   type OrderStatus,
   type Paise,
+  type RefundKind,
   type RefundState,
 } from '@storefront/contracts';
 import { Types } from 'mongoose';
@@ -25,7 +29,11 @@ export interface OrderLine {
   markdownPerUnit: Paise;
   discounts: LineDiscount[];
   lineTotal: Paise;
+  refundedQty: number;
+  refundedAmount: Paise;
 }
+
+export type NewOrderLine = Omit<OrderLine, 'refundedQty' | 'refundedAmount'>;
 
 export interface StatusEvent {
   from: OrderStatus | null;
@@ -44,8 +52,12 @@ export interface PaymentState {
 }
 
 export interface RefundDetails {
+  id: string;
+  kind: RefundKind;
   status: RefundState;
   amount: Paise;
+  lines: OrderRefundLine[];
+  shippingAmount: Paise;
   reason: string;
   requestedBy: string;
   requestedAt: Date;
@@ -70,7 +82,8 @@ export interface OrderProps {
   status: OrderStatus;
   statusHistory: StatusEvent[];
   payment: PaymentState;
-  refund?: RefundDetails;
+  refunds: RefundDetails[];
+  refundedAmount: Paise;
   paidAt?: Date;
   deliveredAt?: Date;
   reservedUntil?: Date;
@@ -82,7 +95,7 @@ export interface OrderProps {
 export interface PlaceOrderInput {
   orderNumber: string;
   userId: string;
-  items: OrderLine[];
+  items: NewOrderLine[];
   address: Address;
   subtotal: Paise;
   shipping: Paise;
@@ -96,6 +109,17 @@ export interface CapturedPayment {
   paymentId?: string;
   provider?: string;
 }
+
+export interface RefundRequestDetails {
+  by: string;
+  reason: string;
+  windowDays?: number;
+  /** Units to refund; omitted means everything not yet refunded. */
+  lines?: ReadonlyArray<{ productId: string; size: string; qty: number }>;
+}
+
+const OPEN_REFUND_STATES: readonly RefundState[] = ['requested', 'processing', 'pending'];
+const lineKey = (l: { productId: string; size: string }) => `${l.productId}::${l.size}`;
 
 /**
  * Order aggregate root. Every status change goes through a method that enforces the lifecycle
@@ -118,8 +142,11 @@ export class Order {
     if (input.pricing && input.pricing.stages.total !== total) throw new BadRequestError('Order total does not match its pricing');
     const order = new Order({
       ...input,
+      items: input.items.map(i => ({ ...i, refundedQty: 0, refundedAmount: 0 })),
       id: new Types.ObjectId().toHexString(),
       total,
+      refunds: [],
+      refundedAmount: 0,
       status: 'created',
       statusHistory: [{ from: null, to: 'created', by: `user:${input.userId}`, note: 'Order placed', at: now }],
       payment: { provider: 'demo', status: 'pending' },
@@ -161,8 +188,12 @@ export class Order {
   get payment(): Readonly<PaymentState> {
     return this.props.payment;
   }
-  get refund(): Readonly<RefundDetails> | undefined {
-    return this.props.refund;
+  get refunds(): readonly RefundDetails[] {
+    return this.props.refunds;
+  }
+  /** The refund currently being processed, if any; at most one is open at a time. */
+  get openRefund(): Readonly<RefundDetails> | undefined {
+    return this.findOpenRefund();
   }
   get version() {
     return this.props.version;
@@ -228,80 +259,137 @@ export class Order {
     });
   }
 
-  requestRefund(request: { by: string; reason: string; windowDays?: number }, now = new Date()): void {
+  /**
+   * Opens a refund for specific units, or for everything not yet refunded. Line amounts come from
+   * each line's paid total split over its units, so successive partial refunds add up to exactly
+   * what was paid; shipping is only returned by the refund that leaves nothing unrefunded.
+   */
+  requestRefund(request: RefundRequestDetails, now = new Date()): RefundDetails {
     if (!this.isPaymentCaptured) throw new ConflictError('Only paid orders can be refunded');
-    if (this.status === 'delivered') {
+    if (PARTIAL_REFUND_STATUSES.includes(this.status)) {
       const windowDays = request.windowDays ?? REFUND_WINDOW_DAYS;
       const deliveredAt = this.props.deliveredAt ?? this.lastTransitionTo('delivered') ?? now;
       if (now.getTime() - deliveredAt.getTime() > windowDays * DAY_MS) {
         throw new ConflictError(`The ${windowDays}-day refund window for this order has closed`);
       }
     }
+
+    const wanted = this.refundUnits(request.lines);
+    const remainingUnits = this.props.items.reduce((s, i) => s + i.qty - i.refundedQty, 0);
+    const requestedUnits = [...wanted.values()].reduce((s, q) => s + q, 0);
+    if (requestedUnits === 0) throw new ConflictError('Nothing left to refund on this order');
+    const kind: RefundKind = requestedUnits === remainingUnits ? 'full' : 'partial';
+    if (kind === 'partial' && !PARTIAL_REFUND_STATUSES.includes(this.status)) {
+      throw new ConflictError('Individual items can be returned once the order is delivered; cancel the whole order instead');
+    }
+
+    const lines: OrderRefundLine[] = this.props.items
+      .filter(i => wanted.has(lineKey(i)))
+      .map(i => {
+        const qty = wanted.get(lineKey(i))!;
+        return { productId: i.productId, size: i.size, qty, amount: refundableAmount(i, i.refundedQty, qty) };
+      });
+    const shippingAmount = kind === 'full' ? this.props.shipping : 0;
+    const amount = lines.reduce((s, l) => s + l.amount, 0) + shippingAmount;
+
     const previousStatus = this.status;
     this.transition('refund_requested', request.by, request.reason, now);
-    this.props.refund = {
+    const refund: RefundDetails = {
+      id: new Types.ObjectId().toHexString(),
+      kind,
       status: 'requested',
-      amount: this.total,
+      amount,
+      lines,
+      shippingAmount,
       reason: request.reason,
       requestedBy: request.by,
       requestedAt: now,
       previousStatus,
     };
+    this.props.refunds = [...this.props.refunds, refund];
     this.record('RefundRequested', {
       orderId: this.id,
       orderNumber: this.orderNumber,
       userId: this.userId,
-      amount: this.total,
+      refundId: refund.id,
+      kind,
+      amount,
+      lines,
       reason: request.reason,
       by: request.by,
       previousStatus,
     });
+    return refund;
   }
 
-  /** Claims the refund for submission to the gateway; false if another worker already claimed it. */
+  /** Claims the open refund for submission to the gateway; false if another worker already claimed it. */
   beginRefundSubmission(): boolean {
-    if (this.status !== 'refund_requested' || this.props.refund?.status !== 'requested') return false;
-    this.props.refund.status = 'processing';
+    const refund = this.findOpenRefund();
+    if (this.status !== 'refund_requested' || refund?.status !== 'requested') return false;
+    refund.status = 'processing';
     return true;
   }
 
   /** Returns a claimed refund to the queue after a transient gateway error. */
   retryRefundSubmission(): void {
-    if (this.props.refund?.status === 'processing') this.props.refund.status = 'requested';
+    const refund = this.findOpenRefund();
+    if (refund?.status === 'processing') refund.status = 'requested';
   }
 
   markRefundPending(gatewayRefundId: string): void {
-    this.assertRefundOpen();
-    this.props.refund = { ...this.props.refund!, status: 'pending', gatewayRefundId };
+    const refund = this.requireOpenRefund();
+    refund.status = 'pending';
+    refund.gatewayRefundId = gatewayRefundId;
   }
 
-  /** Settles the refund. Returns false when it was already settled, making webhook replays harmless. */
-  completeRefund(settlement: { by: string; gatewayRefundId?: string }, now = new Date()): boolean {
-    if (this.status === 'refunded') return false;
-    this.assertRefundOpen();
-    const gatewayRefundId = settlement.gatewayRefundId ?? this.props.refund!.gatewayRefundId;
-    this.transition('refunded', settlement.by, 'Refund processed', now);
-    this.props.refund = { ...this.props.refund!, status: 'processed', completedAt: now, ...(gatewayRefundId && { gatewayRefundId }) };
+  /**
+   * Settles the open refund: marks its units refunded and moves the order to `refunded` once nothing
+   * is left, otherwise to `partially_refunded`. Returns the settled refund, or null when there is
+   * nothing to settle (a webhook replay, or a notification about a different refund).
+   */
+  completeRefund(settlement: { by: string; gatewayRefundId?: string }, now = new Date()): RefundDetails | null {
+    const refund = this.findOpenRefund();
+    if (!refund || this.status !== 'refund_requested') return null;
+    if (settlement.gatewayRefundId && refund.gatewayRefundId && refund.gatewayRefundId !== settlement.gatewayRefundId) return null;
+
+    const settled = new Map(refund.lines.map(l => [lineKey(l), l]));
+    this.props.items = this.props.items.map(i => {
+      const line = settled.get(lineKey(i));
+      return line ? { ...i, refundedQty: i.refundedQty + line.qty, refundedAmount: i.refundedAmount + line.amount } : i;
+    });
+    this.props.refundedAmount += refund.amount;
+    const fullyRefunded = this.props.items.every(i => i.refundedQty >= i.qty);
+    this.transition(fullyRefunded ? 'refunded' : 'partially_refunded', settlement.by, 'Refund processed', now);
+
+    const gatewayRefundId = settlement.gatewayRefundId ?? refund.gatewayRefundId;
+    refund.status = 'processed';
+    refund.completedAt = now;
+    if (gatewayRefundId) refund.gatewayRefundId = gatewayRefundId;
     this.record('RefundCompleted', {
       orderId: this.id,
       orderNumber: this.orderNumber,
       userId: this.userId,
-      amount: this.props.refund.amount,
+      refundId: refund.id,
+      amount: refund.amount,
+      lines: refund.lines,
+      fullyRefunded,
       ...(gatewayRefundId && { gatewayRefundId }),
     });
-    return true;
+    return { ...refund };
   }
 
   /** Saga compensation: the refund could not be made, so the order returns to where it was. */
   failRefund(failure: { by: string; reason: string }, now = new Date()): boolean {
-    if (this.status !== 'refund_requested') return false;
-    const refund = this.props.refund!;
+    const refund = this.findOpenRefund();
+    if (this.status !== 'refund_requested' || !refund) return false;
     this.transition(refund.previousStatus, failure.by, `Refund failed: ${failure.reason}`, now);
-    this.props.refund = { ...refund, status: 'failed', failureReason: failure.reason };
+    refund.status = 'failed';
+    refund.failureReason = failure.reason;
     this.record('RefundFailed', {
       orderId: this.id,
       orderNumber: this.orderNumber,
       userId: this.userId,
+      refundId: refund.id,
       amount: refund.amount,
       reason: failure.reason,
       restoredStatus: refund.previousStatus,
@@ -344,10 +432,27 @@ export class Order {
     };
   }
 
-  private assertRefundOpen(): void {
-    if (this.status !== 'refund_requested' || !this.props.refund) {
-      throw new ConflictError(`Order ${this.orderNumber} has no refund in progress`);
+  private findOpenRefund(): RefundDetails | undefined {
+    return [...this.props.refunds].reverse().find(r => OPEN_REFUND_STATES.includes(r.status));
+  }
+
+  private requireOpenRefund(): RefundDetails {
+    const refund = this.findOpenRefund();
+    if (this.status !== 'refund_requested' || !refund) throw new ConflictError(`Order ${this.orderNumber} has no refund in progress`);
+    return refund;
+  }
+
+  /** Validates requested units against what is still refundable; defaults to everything that is. */
+  private refundUnits(lines: RefundRequestDetails['lines']): Map<string, number> {
+    const remaining = new Map(this.props.items.map(i => [lineKey(i), i.qty - i.refundedQty]));
+    if (!lines) return new Map([...remaining].filter(([, qty]) => qty > 0));
+    const wanted = new Map<string, number>();
+    for (const line of lines) wanted.set(lineKey(line), (wanted.get(lineKey(line)) ?? 0) + line.qty);
+    for (const [key, qty] of wanted) {
+      if (!remaining.has(key)) throw new BadRequestError(`This order has no item ${key.replace('::', ' in size ')}`);
+      if (qty > remaining.get(key)!) throw new ConflictError(`Only ${remaining.get(key)} of that item can still be refunded`);
     }
+    return wanted;
   }
 
   private lastTransitionTo(status: OrderStatus): Date | undefined {

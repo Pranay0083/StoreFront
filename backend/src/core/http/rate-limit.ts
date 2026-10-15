@@ -49,7 +49,7 @@ export const RATE_LIMIT_POLICIES = {
   checkout: {
     windowMs: 10 * MINUTE,
     limit: 30,
-    matches: route('POST', /^\/orders\/?$/, /^\/orders\/[^/]+\/cancel\/?$/, /^\/payments\/(create|verify|demo-confirm)\/?$/),
+    matches: route('POST', /^\/orders\/?$/, /^\/orders\/[^/]+\/(cancel|refund)\/?$/, /^\/payments\/(create|verify|demo-confirm)\/?$/),
     message: 'Too many checkout attempts, please wait a few minutes',
   },
   agentChat: {

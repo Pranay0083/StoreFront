@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { OrderStatus, Paise } from '@storefront/contracts';
+import type { OrderRefundLine, OrderStatus, Paise, RefundKind } from '@storefront/contracts';
 
 export interface StockLine {
   productId: string;
@@ -23,13 +23,34 @@ export interface DomainEventMap {
     orderId: string;
     orderNumber: string;
     userId: string;
+    refundId: string;
+    kind: RefundKind;
     amount: Paise;
+    lines: OrderRefundLine[];
     reason: string;
     by: string;
     previousStatus: OrderStatus;
   };
-  RefundCompleted: { orderId: string; orderNumber: string; userId: string; amount: Paise; gatewayRefundId?: string };
-  RefundFailed: { orderId: string; orderNumber: string; userId: string; amount: Paise; reason: string; restoredStatus: OrderStatus };
+  RefundCompleted: {
+    orderId: string;
+    orderNumber: string;
+    userId: string;
+    refundId: string;
+    amount: Paise;
+    lines: OrderRefundLine[];
+    /** True once every unit of the order has been refunded. */
+    fullyRefunded: boolean;
+    gatewayRefundId?: string;
+  };
+  RefundFailed: {
+    orderId: string;
+    orderNumber: string;
+    userId: string;
+    refundId: string;
+    amount: Paise;
+    reason: string;
+    restoredStatus: OrderStatus;
+  };
   StockLow: { productId: string; size: string; stock: number; threshold: number };
 }
 

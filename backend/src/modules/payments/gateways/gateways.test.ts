@@ -61,7 +61,7 @@ describe('RazorpayGateway', () => {
 
   it('maps refund responses and classifies 4xx rejections as permanent', async () => {
     const ok = new RazorpayGateway(config, fakeClient({ refund: async () => ({ id: 'rfnd_9', status: 'processed' }) }));
-    await expect(ok.refund({ paymentId: 'pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1' })).resolves.toEqual({
+    await expect(ok.refund({ paymentId: 'pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1', refundId: 'r1' })).resolves.toEqual({
       refundId: 'rfnd_9',
       status: 'processed',
     });
@@ -74,9 +74,9 @@ describe('RazorpayGateway', () => {
         },
       }),
     );
-    await expect(rejected.refund({ paymentId: 'pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1' })).rejects.toThrowError(
-      new PermanentGatewayError('The refund amount exceeds the payment'),
-    );
+    await expect(
+      rejected.refund({ paymentId: 'pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1', refundId: 'r1' }),
+    ).rejects.toThrowError(new PermanentGatewayError('The refund amount exceeds the payment'));
 
     const outage = new RazorpayGateway(
       config,
@@ -86,9 +86,9 @@ describe('RazorpayGateway', () => {
         },
       }),
     );
-    await expect(outage.refund({ paymentId: 'pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1' })).rejects.not.toBeInstanceOf(
-      PermanentGatewayError,
-    );
+    await expect(
+      outage.refund({ paymentId: 'pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1', refundId: 'r1' }),
+    ).rejects.not.toBeInstanceOf(PermanentGatewayError);
   });
 });
 
@@ -97,8 +97,10 @@ describe('DemoGateway', () => {
     const gateway = new DemoGateway('hook-secret');
     expect(gateway.publicConfig()).toEqual({ mode: 'demo', keyId: null });
     expect(gateway.verifyPayment()).toBe(false);
-    await expect(gateway.refund({ paymentId: 'demo_pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1' })).resolves.toEqual({
-      refundId: 'demo_rfnd_o1',
+    await expect(
+      gateway.refund({ paymentId: 'demo_pay_1', amount: 100, orderId: 'o1', orderNumber: 'SF-1', refundId: 'r1' }),
+    ).resolves.toEqual({
+      refundId: 'demo_rfnd_r1',
       status: 'processed',
     });
     const body = Buffer.from('{}');

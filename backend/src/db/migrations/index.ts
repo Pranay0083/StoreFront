@@ -11,6 +11,7 @@ import { reviewAggregates } from './033-review-aggregates';
 import { auditLog } from './034-audit-log';
 import { promotionRedemptions } from './040-promotion-redemptions';
 import { couponsToPromotions } from './041-coupons-to-promotions';
+import { lineRefunds } from './042-line-refunds';
 
 export const migrations: readonly Migration[] = [
   ensureIndexes,
@@ -25,4 +26,5 @@ export const migrations: readonly Migration[] = [
   auditLog,
   promotionRedemptions,
   couponsToPromotions,
+  lineRefunds,
 ];

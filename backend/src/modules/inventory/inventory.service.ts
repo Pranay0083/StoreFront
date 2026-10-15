@@ -93,14 +93,35 @@ export class InventoryService {
   }
 
   /**
-   * Puts sold units back into stock after a refund: RELEASE for orders that never shipped,
-   * RETURN for goods coming back from the customer. Idempotent: only a committed reservation is restocked.
+   * Puts refunded units of a sale back into stock: RELEASE for orders that never shipped, RETURN for
+   * goods coming back from the customer. Only sold reservations take units back, never more than were
+   * sold per line, and the reservation becomes `returned` once every unit is back. Returns false when
+   * the order has no sale to restock (e.g. its reservation was released before a late payment).
    */
-  async restockSale(orderId: string, kind: 'RELEASE' | 'RETURN', actor: string, note: string, session: Session): Promise<boolean> {
-    const reservation = await this.reservations.transition(orderId, 'committed', 'returned', session);
-    if (!reservation) return false;
+  async restockLines(
+    orderId: string,
+    lines: readonly StockItem[],
+    kind: 'RELEASE' | 'RETURN',
+    actor: string,
+    note: string,
+    session: Session,
+  ): Promise<boolean> {
+    const reservation = await this.reservations.findByOrder(orderId, session);
+    if (!reservation || (reservation.status !== 'committed' && reservation.status !== 'partially_returned')) return false;
+    const items = reservation.items.map(i => ({ ...this.line(i), returnedQty: i.returnedQty ?? 0 }));
+    for (const line of lines) {
+      const item = items.find(i => i.productId === line.productId && i.size === line.size);
+      if (!item || item.returnedQty + line.qty > item.qty) {
+        throw new ConflictError(`Cannot return ${line.qty} of ${line.productId} (${line.size}) for order ${orderId}`);
+      }
+      item.returnedQty += line.qty;
+    }
+    const next = items.every(i => i.returnedQty >= i.qty) ? 'returned' : 'partially_returned';
+    if (!(await this.reservations.recordReturns(orderId, reservation.status, items, next, session))) {
+      throw new ConflictError(`Stock for order ${orderId} was returned concurrently, please retry`);
+    }
     await this.restock(
-      reservation.items.map(i => this.line(i)),
+      lines.map(l => ({ productId: l.productId, size: l.size, qty: l.qty })),
       kind,
       orderId,
       actor,

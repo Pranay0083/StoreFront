@@ -27,6 +27,8 @@ export interface RefundRequest {
   amount: Paise;
   orderId: string;
   orderNumber: string;
+  /** Our id for this refund; an order can be refunded in several parts. */
+  refundId: string;
 }
 
 export interface RefundResult {

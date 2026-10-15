@@ -2,13 +2,24 @@ import { z } from 'zod';
 import type { Paise } from './money';
 import { PAYMENT_METHODS, type AppliedPromotion, type LineDiscount, type OptimizerReport } from './pricing';
 
-export const ORDER_STATUSES = ['created', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refund_requested', 'refunded'] as const;
+export const ORDER_STATUSES = [
+  'created',
+  'paid',
+  'packed',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'refund_requested',
+  'partially_refunded',
+  'refunded',
+] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 /**
  * Full lifecycle. `cancelled` is reserved for orders that were never paid; any paid order leaves
  * through the refund saga (`refund_requested` → `refunded`), whose compensation path returns the
- * order to the status it had before the refund was requested.
+ * order to the status it had before the refund was requested. Delivered orders can also return
+ * individual items, which settles as `partially_refunded` until every unit has been refunded.
  */
 export const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   created: ['paid', 'cancelled'],
@@ -17,7 +28,8 @@ export const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatu
   shipped: ['delivered'],
   delivered: ['refund_requested'],
   cancelled: ['refund_requested'],
-  refund_requested: ['refunded', 'paid', 'packed', 'delivered', 'cancelled'],
+  refund_requested: ['refunded', 'partially_refunded', 'paid', 'packed', 'delivered', 'cancelled'],
+  partially_refunded: ['refund_requested'],
   refunded: [],
 };
 
@@ -32,22 +44,50 @@ export const ADMIN_ORDER_ACTIONS: Readonly<Record<OrderStatus, readonly OrderSta
   delivered: ['refund_requested'],
   cancelled: [],
   refund_requested: [],
+  partially_refunded: ['refund_requested'],
   refunded: [],
 };
 
 /** Statuses from which a customer may cancel; paid orders are cancelled by refunding them. */
 export const CUSTOMER_CANCELLABLE_STATUSES: readonly OrderStatus[] = ['created', 'paid', 'packed'];
 
+/** Individual items can only be returned once the goods are with the customer; before that the whole order is cancelled. */
+export const PARTIAL_REFUND_STATUSES: readonly OrderStatus[] = ['delivered', 'partially_refunded'];
+
 export const REFUND_WINDOW_DAYS = 7;
 
-export const REVENUE_STATUSES: readonly OrderStatus[] = ['paid', 'packed', 'shipped', 'delivered'];
+export const REVENUE_STATUSES: readonly OrderStatus[] = ['paid', 'packed', 'shipped', 'delivered', 'partially_refunded'];
+
+export const RefundLineSchema = z
+  .object({
+    productId: z.string().min(1, 'Product ID is required'),
+    size: z.string().min(1, 'Size is required'),
+    qty: z.number().int('Quantity must be a whole number').min(1, 'Quantity must be at least 1').max(20),
+  })
+  .strict();
+export type RefundLineInput = z.infer<typeof RefundLineSchema>;
 
 export const RefundRequestSchema = z
   .object({
     reason: z.string().trim().min(3, 'Please tell us why you want a refund').max(500, 'Reason is too long'),
+    /** Omit to refund everything not yet refunded. */
+    lines: z.array(RefundLineSchema).min(1, 'Choose at least one item').max(50).optional(),
   })
   .strict();
 export type RefundRequestInput = z.infer<typeof RefundRequestSchema>;
+
+/**
+ * Amount refundable for `units` more units of a line, given how many were already refunded.
+ * The line's paid total is split over its units by largest remainder (the first units carry the
+ * extra paisa), so refunding every unit, in any number of steps, returns exactly `lineTotal`.
+ */
+export function refundableAmount(line: { lineTotal: Paise; qty: number }, alreadyRefunded: number, units: number): Paise {
+  const base = Math.floor(line.lineTotal / line.qty);
+  const extra = line.lineTotal - base * line.qty;
+  const from = Math.min(extra, alreadyRefunded);
+  const to = Math.min(extra, alreadyRefunded + units);
+  return base * units + (to - from);
+}
 
 export const AddressSchema = z
   .object({
@@ -109,6 +149,8 @@ export interface OrderItem {
   discounts: LineDiscount[];
   /** What the customer paid for this line, excluding shipping. */
   lineTotal: Paise;
+  refundedQty: number;
+  refundedAmount: Paise;
 }
 
 export interface OrderPricingStages {
@@ -152,9 +194,24 @@ export interface OrderPayment {
 export const REFUND_STATES = ['requested', 'processing', 'pending', 'processed', 'failed'] as const;
 export type RefundState = (typeof REFUND_STATES)[number];
 
-export interface OrderRefund {
-  status: RefundState;
+export const REFUND_KINDS = ['full', 'partial'] as const;
+export type RefundKind = (typeof REFUND_KINDS)[number];
+
+export interface OrderRefundLine {
+  productId: string;
+  size: string;
+  qty: number;
   amount: Paise;
+}
+
+export interface OrderRefund {
+  id: string;
+  kind: RefundKind;
+  status: RefundState;
+  /** Lines plus shipping; shipping is only refunded by the refund that completes a full refund. */
+  amount: Paise;
+  lines: OrderRefundLine[];
+  shippingAmount: Paise;
   reason: string;
   requestedBy: string;
   requestedAt: string;
@@ -180,7 +237,8 @@ export interface Order {
   status: OrderStatus;
   statusHistory: StatusEvent[];
   payment: OrderPayment;
-  refund?: OrderRefund;
+  refunds: OrderRefund[];
+  refundedAmount: Paise;
   paidAt?: string;
   deliveredAt?: string;
   reservedUntil?: string;

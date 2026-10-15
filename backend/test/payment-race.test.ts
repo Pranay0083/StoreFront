@@ -106,7 +106,7 @@ describe('payment confirmation races (Razorpay mode)', () => {
     const saved = (await Order.findById(order._id).lean())!;
     expect(saved.status).toBe('refund_requested');
     expect(saved.payment).toMatchObject({ status: 'captured', razorpayPaymentId: 'pay_late' });
-    expect(saved.refund).toMatchObject({ previousStatus: 'cancelled', status: 'requested' });
+    expect(saved.refunds).toEqual([expect.objectContaining({ previousStatus: 'cancelled', status: 'requested', kind: 'full' })]);
     expect((await Product.findById(product._id).lean())!.sizes[0].stock).toBe(10);
   });
 });
