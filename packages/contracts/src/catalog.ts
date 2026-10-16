@@ -48,6 +48,8 @@ export const ProductListQuerySchema = z.object({
     .int()
     .catch(24)
     .transform(n => Math.min(48, Math.max(1, n))),
+  /** Opaque keyset cursor from a previous page's `nextCursor`; takes precedence over `page`. */
+  cursor: z.string().max(512).optional(),
 });
 export type ProductListQuery = z.infer<typeof ProductListQuerySchema>;
 
@@ -71,6 +73,8 @@ export interface ProductListResponse {
   total: number;
   page: number;
   pages: number;
+  /** Pass back as `cursor` for the next page; null on the last page. */
+  nextCursor: string | null;
 }
 
 export interface Category {

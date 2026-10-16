@@ -4,6 +4,7 @@ import { logger } from '../../core/logger';
 import type { TransactionRunner } from '../../core/persistence/transaction';
 import type { InventoryService } from '../inventory/inventory.service';
 import type { ProductRecord } from './product.model';
+import { encodeCursor } from './product-cursor';
 import { ProductQueryBuilder } from './product-query.builder';
 import type { ProductRepository } from './product.repository';
 
@@ -20,10 +21,15 @@ export class CatalogService {
     private readonly tx: TransactionRunner,
   ) {}
 
-  async list(query: ProductListQuery): Promise<{ items: ProductRecord[]; total: number; page: number; pages: number }> {
-    const spec = ProductQueryBuilder.fromListQuery(query).build();
-    const [items, total] = await Promise.all([this.products.find(spec), this.products.count(spec.filter)]);
-    return { items, total, page: query.page, pages: Math.ceil(total / query.limit) };
+  async list(
+    query: ProductListQuery,
+  ): Promise<{ items: ProductRecord[]; total: number; page: number; pages: number; nextCursor: string | null }> {
+    const builder = ProductQueryBuilder.fromListQuery(query);
+    const spec = builder.build();
+    const [items, total] = await Promise.all([this.products.find(spec), this.products.count(spec.countFilter)]);
+    const last = items.at(-1);
+    const nextCursor = last && items.length === query.limit ? encodeCursor(builder.sort, last) : null;
+    return { items, total, page: query.page, pages: Math.ceil(total / query.limit), nextCursor };
   }
 
   search(builder: ProductQueryBuilder): Promise<ProductRecord[]> {

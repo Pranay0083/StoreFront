@@ -1,19 +1,21 @@
 import type { ProductListQuery, ProductSort } from '@storefront/contracts';
 import type { FilterQuery, SortOrder } from 'mongoose';
+import { decodeCursor, keysetFilter, SORT_FIELDS } from './product-cursor';
 import type { ProductRecord } from './product.model';
 
 export interface ProductQuery {
   filter: FilterQuery<ProductRecord>;
+  /** The filter without the keyset condition, for totals. */
+  countFilter: FilterQuery<ProductRecord>;
   sort: Record<string, SortOrder>;
   skip: number;
   limit: number;
 }
 
-const SORTS: Record<ProductSort, Record<string, SortOrder>> = {
-  'price-asc': { price: 1 },
-  'price-desc': { price: -1 },
-  newest: { createdAt: -1 },
-  rating: { rating: -1 },
+/** `_id` breaks ties so pagination is deterministic (and keyset cursors are exact). */
+const sortSpec = (sort: ProductSort): Record<string, SortOrder> => {
+  const { field, direction } = SORT_FIELDS[sort];
+  return { [field]: direction, _id: direction };
 };
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -21,7 +23,8 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Fluent builder that turns catalog search criteria into a single Mongo query spec. */
 export class ProductQueryBuilder {
   private readonly filter: FilterQuery<ProductRecord> = {};
-  private sortSpec: Record<string, SortOrder> = SORTS.newest;
+  private sortName: ProductSort = 'newest';
+  private cursorFilter?: FilterQuery<ProductRecord>;
   private skipCount = 0;
   private limitCount = 24;
 
@@ -33,7 +36,8 @@ export class ProductQueryBuilder {
       .priceBetween(q.minPrice, q.maxPrice)
       .matchingText(q.q)
       .sortBy(q.sort)
-      .page(q.page, q.limit);
+      .page(q.page, q.limit)
+      .after(q.cursor);
   }
 
   inCategory(category?: string): this {
@@ -69,7 +73,19 @@ export class ProductQueryBuilder {
   }
 
   sortBy(sort?: ProductSort, fallback: ProductSort = 'newest'): this {
-    this.sortSpec = SORTS[sort ?? fallback] ?? SORTS[fallback];
+    this.sortName = sort && SORT_FIELDS[sort] ? sort : fallback;
+    return this;
+  }
+
+  get sort(): ProductSort {
+    return this.sortName;
+  }
+
+  /** Keyset pagination: continue after the cursor instead of skipping (call after sortBy). */
+  after(cursor?: string): this {
+    if (!cursor) return this;
+    this.cursorFilter = keysetFilter(decodeCursor(cursor, this.sortName));
+    this.skipCount = 0;
     return this;
   }
 
@@ -86,6 +102,8 @@ export class ProductQueryBuilder {
   }
 
   build(): ProductQuery {
-    return { filter: { ...this.filter }, sort: { ...this.sortSpec }, skip: this.skipCount, limit: this.limitCount };
+    const countFilter = { ...this.filter };
+    const filter = this.cursorFilter ? { ...countFilter, $and: [this.cursorFilter] } : countFilter;
+    return { filter, countFilter, sort: sortSpec(this.sortName), skip: this.skipCount, limit: this.limitCount };
   }
 }
