@@ -4,7 +4,14 @@ const DUPLICATE_KEY = 11000;
 
 export type BeginResult = { acquired: true } | { acquired: false; existing: IdempotencyRecord };
 
-export class IdempotencyStore {
+/** Storage port for idempotency keys: Mongo by default, Redis when available. */
+export interface IdempotencyStorage {
+  begin(id: string, requestHash: string, now?: Date): Promise<BeginResult>;
+  complete(id: string, responseStatus: number, responseBody: unknown): Promise<void>;
+  release(id: string): Promise<void>;
+}
+
+export class IdempotencyStore implements IdempotencyStorage {
   constructor(private readonly lockTimeoutMs = 60_000) {}
 
   /**

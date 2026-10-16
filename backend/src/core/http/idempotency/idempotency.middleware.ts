@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { AppError, BadRequestError, ConflictError } from '../../errors';
 import { logger } from '../../logger';
-import type { IdempotencyStore } from './idempotency.store';
+import type { IdempotencyStorage } from './idempotency.store';
 
 export const IDEMPOTENCY_HEADER = 'Idempotency-Key';
 const MAX_KEY_LENGTH = 255;
@@ -33,7 +33,7 @@ export class IdempotencyKeyReusedError extends AppError {
  * is rejected with 422 and a retry racing an in-flight original gets 409. Keys are scoped to the
  * user and route. Mount after auth and validation so only well-formed requests consume a key.
  */
-export function idempotent(store: IdempotencyStore): RequestHandler {
+export function idempotent(store: IdempotencyStorage): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction) => {
     const key = req.header(IDEMPOTENCY_HEADER);
     if (key === undefined) return next();

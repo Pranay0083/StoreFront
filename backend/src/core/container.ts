@@ -81,7 +81,6 @@ import type { Env } from './config/env';
 import { CookiePolicy } from './http/cookies';
 import { CsrfProtection } from './http/csrf';
 import { idempotent } from './http/idempotency/idempotency.middleware';
-import { IdempotencyStore } from './http/idempotency/idempotency.store';
 import { createRateLimiters } from './http/rate-limit';
 import { memoryInfrastructure, type Infrastructure } from './infrastructure';
 import { TransactionRunner } from './persistence/transaction';
@@ -244,7 +243,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   };
 
   const guards = new AuthGuards(services.auth);
-  const idempotency = idempotent(new IdempotencyStore());
+  const idempotency = idempotent(infra.idempotency);
 
   const controllers = {
     auth: new AuthController(services.auth, cookies, csrf),

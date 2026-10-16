@@ -1,6 +1,9 @@
 import { MemoryLruCache, RedisCache, type CacheProvider } from './cache/cache';
 import type { Env } from './config/env';
+import { IdempotencyStore, type IdempotencyStorage } from './http/idempotency/idempotency.store';
+import { RedisIdempotencyStore } from './http/idempotency/redis-idempotency.store';
 import { memoryStores, type RateLimitStoreFactory } from './http/rate-limit';
+import { redisRateLimitStores } from './http/redis-rate-limit';
 import { logger } from './logger';
 import { LocalPubSub, RedisPubSub, type PubSub } from './pubsub';
 import { BullMqJobQueue } from './queue/bullmq-job-queue';
@@ -22,6 +25,7 @@ export interface Infrastructure {
   pubsub: PubSub;
   cache: CacheProvider;
   rateLimitStores: RateLimitStoreFactory;
+  idempotency: IdempotencyStorage;
   ping(): Promise<boolean>;
   close(): Promise<void>;
 }
@@ -37,6 +41,7 @@ export function memoryInfrastructure(): Infrastructure {
     pubsub,
     cache: new MemoryLruCache(),
     rateLimitStores: memoryStores,
+    idempotency: new IdempotencyStore(),
     ping: async () => true,
     close: async () => {
       await queue.stop();
@@ -58,7 +63,8 @@ export function redisInfrastructure(env: Pick<Env, 'REDIS_URL' | 'QUEUE_PREFIX'>
     deadLetters,
     pubsub,
     cache: new RedisCache(redis, `${env.QUEUE_PREFIX}:cache:`),
-    rateLimitStores: memoryStores,
+    rateLimitStores: redisRateLimitStores(redis, `${env.QUEUE_PREFIX}:`),
+    idempotency: new RedisIdempotencyStore(redis, `${env.QUEUE_PREFIX}:idempotency:`),
     ping: () => pingRedis(redis),
     close: async () => {
       await queue.stop();
