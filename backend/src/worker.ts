@@ -22,11 +22,12 @@ try {
 
   const probes = express();
   probes.disable('x-powered-by');
-  probes.get('/health', (_req, res) => res.json({ status: 'ok', role: 'worker' }));
+  probes.use(container.health.routes());
   probes.get('/metrics', metricsHandler(metrics, env.METRICS_TOKEN));
   const server = probes.listen(env.WORKER_PORT, env.HOST, () => logger.info(`storefront-worker probes on ${env.HOST}:${env.WORKER_PORT}`));
 
   new GracefulShutdown(logger, env.SHUTDOWN_TIMEOUT_MS)
+    .onBegin(() => container.health.markDraining())
     .add('probe server', () => closeHttpServer(server))
     .add('background work', () => container.background.stop())
     .add('infrastructure', () => infra.close())

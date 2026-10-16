@@ -21,6 +21,7 @@ export function buildApp(container: Container) {
   app.use(requestIdMiddleware);
   app.use(container.metrics.httpMiddleware());
   app.get('/metrics', metricsHandler(container.metrics, env.METRICS_TOKEN));
+  app.use(container.health.routes());
   app.use(securityHeaders(env));
   app.use(pinoHttp({ logger, genReqId: req => (req as express.Request).requestId ?? '' }));
 

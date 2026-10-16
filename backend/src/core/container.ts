@@ -91,6 +91,7 @@ import { PollingOutboxRelay, type OutboxRelay } from './events/outbox-relay';
 import { QueueOutboxRelay } from './events/queue-outbox-relay';
 import { OutboxStore } from './events/outbox.store';
 import { logger } from './logger';
+import { HealthMonitor, mongoCheck } from './observability/health';
 import { Metrics } from './observability/metrics';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
@@ -289,12 +290,19 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   ];
 
   const http = { auditTrail: auditTrail(audit) };
+  const health = new HealthMonitor([
+    mongoCheck,
+    ...(infra.kind === 'redis' ? [{ name: 'redis', critical: true, check: () => infra.ping() }] : []),
+    { name: 'queue', critical: true, check: () => jobs.ping() },
+    ...(search.provider.requiresIndexing ? [{ name: 'search', critical: false, check: () => search.provider.ping() }] : []),
+  ]);
 
   return {
     env,
     infra,
     jobs,
     metrics,
+    health,
     limiters,
     cookies,
     csrf,
