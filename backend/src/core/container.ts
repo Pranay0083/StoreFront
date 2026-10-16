@@ -75,7 +75,7 @@ import { BroadcastingPromotionCache } from '../modules/pricing/broadcasting-prom
 import { PricingController, PromotionsController } from '../modules/pricing/pricing.controller';
 import { MongoCustomerHistory, MongoPricingCatalog } from '../modules/pricing/pricing.ports';
 import { adminPromotionsRoutes, pricingRoutes } from '../modules/pricing/pricing.routes';
-import { PricingService } from '../modules/pricing/pricing.service';
+import { InstrumentedPricingService } from '../modules/pricing/instrumented-pricing.service';
 import { PromotionRepository } from '../modules/pricing/promotion.repository';
 import { PromotionsService } from '../modules/pricing/promotions.service';
 import { QuoteRepository } from '../modules/pricing/quote.model';
@@ -91,9 +91,10 @@ import { PollingOutboxRelay, type OutboxRelay } from './events/outbox-relay';
 import { QueueOutboxRelay } from './events/queue-outbox-relay';
 import { OutboxStore } from './events/outbox.store';
 import { logger } from './logger';
+import { Metrics } from './observability/metrics';
 
 /** Composition root: the only place where concrete classes are instantiated and wired together. */
-export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastructure()) {
+export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastructure(), metrics = new Metrics()) {
   const limiters = createRateLimiters(env, infra.rateLimitStores);
   const jobs = infra.queue;
   const cookies = new CookiePolicy(env);
@@ -130,7 +131,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   const search = new SearchService(createSearchProvider(env), repositories.products);
   search.registerIndexing(eventBus, jobs, repositories.orders);
   const catalog = new CatalogService(repositories.products, inventory, tx, outbox, search);
-  const cachedCatalog = new CachingCatalog(catalog, infra.cache, env.CATALOG_CACHE_TTL_SECONDS);
+  const cachedCatalog = new CachingCatalog(catalog, infra.cache, env.CATALOG_CACHE_TTL_SECONDS, metrics.cacheObserver());
   cachedCatalog.registerInvalidation(eventBus);
   const cart = new CartService(repositories.carts, repositories.products);
   const coupons = new CouponService(repositories.coupons);
@@ -145,6 +146,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
   });
   const paymentGateway = new ResilientPaymentGateway(rawGateway, gatewayBreaker(`payment-gateway:${rawGateway.name}`));
+  metrics.trackQueue(jobs).trackOutbox(outbox).trackCircuit(paymentGateway.breaker).registerEventCounters(eventBus);
 
   registerInventoryHandlers(eventBus, { products: repositories.products, outbox, logger, lowStockThreshold: env.LOW_STOCK_THRESHOLD });
   registerCouponHandlers(eventBus, { coupons, tx });
@@ -200,13 +202,13 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   const audit = new AuditService(repositories.auditLogs);
 
   const promotionCache = new BroadcastingPromotionCache(repositories.promotions, infra.pubsub, logger);
-  const pricing = new PricingService(
+  const pricing = new InstrumentedPricingService(
     new MongoPricingCatalog(),
     new MongoCustomerHistory(),
     promotionCache,
     repositories.promotions,
     repositories.quotes,
-  );
+  ).withMetrics(metrics);
 
   const services = {
     tokens,
@@ -288,7 +290,24 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
 
   const http = { auditTrail: auditTrail(audit) };
 
-  return { env, infra, jobs, limiters, cookies, csrf, http, tx, eventBus, background, repositories, services, guards, controllers, routes };
+  return {
+    env,
+    infra,
+    jobs,
+    metrics,
+    limiters,
+    cookies,
+    csrf,
+    http,
+    tx,
+    eventBus,
+    background,
+    repositories,
+    services,
+    guards,
+    controllers,
+    routes,
+  };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

@@ -52,6 +52,7 @@ const EnvSchema = z
     MEILI_API_KEY: z.string().min(1).optional(),
     MEILI_INDEX: z.string().min(1).default('storefront_products'),
     CATALOG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+    METRICS_TOKEN: z.string().min(16, 'METRICS_TOKEN must be at least 16 characters').optional(),
     EMAIL_FROM: z.string().min(3).default('STOREFRONT <orders@storefront.dev>'),
     SMTP_URL: z.string().url('SMTP_URL must look like smtp://user:pass@host:587').optional(),
     RESEND_API_KEY: z.string().min(1).optional(),

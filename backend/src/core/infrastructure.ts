@@ -9,6 +9,7 @@ import { LocalPubSub, RedisPubSub, type PubSub } from './pubsub';
 import { BullMqJobQueue } from './queue/bullmq-job-queue';
 import { MongoDeadLetterStore, type DeadLetterStore } from './queue/dead-letter.store';
 import type { JobQueue } from './queue/job-queue';
+import type { JobObserver } from './queue/job-runner';
 import { MemoryJobQueue } from './queue/memory-job-queue';
 import { createRedis, pingRedis, type Redis } from './redis';
 
@@ -30,10 +31,10 @@ export interface Infrastructure {
   close(): Promise<void>;
 }
 
-export function memoryInfrastructure(): Infrastructure {
+export function memoryInfrastructure(observer?: JobObserver): Infrastructure {
   const deadLetters = new MongoDeadLetterStore();
   const pubsub = new LocalPubSub();
-  const queue = new MemoryJobQueue(deadLetters, logger);
+  const queue = new MemoryJobQueue(deadLetters, logger, { observer });
   return {
     kind: 'memory',
     queue,
@@ -50,12 +51,12 @@ export function memoryInfrastructure(): Infrastructure {
   };
 }
 
-export function redisInfrastructure(env: Pick<Env, 'REDIS_URL' | 'QUEUE_PREFIX'>): Infrastructure {
+export function redisInfrastructure(env: Pick<Env, 'REDIS_URL' | 'QUEUE_PREFIX'>, observer?: JobObserver): Infrastructure {
   const redis = createRedis(env.REDIS_URL!);
   redis.on('error', err => logger.error({ err }, 'Redis connection error'));
   const deadLetters = new MongoDeadLetterStore();
   const pubsub = new RedisPubSub(redis, logger);
-  const queue = new BullMqJobQueue(redis, deadLetters, logger, { prefix: env.QUEUE_PREFIX });
+  const queue = new BullMqJobQueue(redis, deadLetters, logger, { prefix: env.QUEUE_PREFIX, observer });
   return {
     kind: 'redis',
     redis,
@@ -74,8 +75,8 @@ export function redisInfrastructure(env: Pick<Env, 'REDIS_URL' | 'QUEUE_PREFIX'>
   };
 }
 
-export function buildInfrastructure(env: Env): Infrastructure {
-  return env.REDIS_URL ? redisInfrastructure(env) : memoryInfrastructure();
+export function buildInfrastructure(env: Env, observer?: JobObserver): Infrastructure {
+  return env.REDIS_URL ? redisInfrastructure(env, observer) : memoryInfrastructure(observer);
 }
 
 /** `auto`: process jobs in the API only when there is no shared queue for a separate worker to drain. */

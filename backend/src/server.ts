@@ -5,6 +5,7 @@ import { loadEnv } from './core/config/env';
 import { buildContainer } from './core/container';
 import { buildInfrastructure, runsJobsInProcess } from './core/infrastructure';
 import { logger } from './core/logger';
+import { Metrics } from './core/observability/metrics';
 import { closeHttpServer, GracefulShutdown } from './core/runtime/graceful-shutdown';
 
 try {
@@ -13,8 +14,9 @@ try {
   await connectDB(env.MONGO_URL, env.DB_NAME);
   logger.info({ db: env.DB_NAME }, 'Connected to MongoDB');
 
-  const infra = buildInfrastructure(env);
-  const container = buildContainer(env, infra);
+  const metrics = new Metrics();
+  const infra = buildInfrastructure(env, metrics.jobObserver());
+  const container = buildContainer(env, infra, metrics);
   const server = buildApp(container).listen(env.PORT, env.HOST, () => {
     logger.info(`storefront-api listening on ${env.HOST}:${env.PORT}`);
   });
