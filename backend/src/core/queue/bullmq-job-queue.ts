@@ -1,4 +1,4 @@
-import { Queue, UnrecoverableError, Worker, type Job } from 'bullmq';
+import { Queue, UnrecoverableError, Worker, type Job, type Telemetry } from 'bullmq';
 import type { Logger } from 'pino';
 import { pingRedis, type Redis } from '../redis';
 import type { DeadLetterStore } from './dead-letter.store';
@@ -21,6 +21,8 @@ import { deadLetter, envelope, runJob, type JobObserver } from './job-runner';
 export interface BullMqJobQueueOptions {
   prefix?: string;
   observer?: JobObserver;
+  /** OpenTelemetry bridge: producer and consumer spans are linked across processes. */
+  telemetry?: Telemetry;
 }
 
 /** Redis-backed queue: jobs survive restarts and are shared by any number of worker processes. */
@@ -77,6 +79,7 @@ export class BullMqJobQueue implements JobQueue {
       const worker = new Worker<JobEnvelope>(queueName, job => this.process(job), {
         connection: this.connection,
         prefix: this.prefix,
+        ...(this.options.telemetry && { telemetry: this.options.telemetry }),
         concurrency: Math.max(1, ...definitions.map(d => d.concurrency ?? 1)),
       });
       worker.on('failed', (job, err) => void this.onFailed(job, err));
@@ -121,7 +124,11 @@ export class BullMqJobQueue implements JobQueue {
   private queue(name: QueueName): Queue {
     let queue = this.queues.get(name);
     if (!queue) {
-      queue = new Queue(name, { connection: this.connection, prefix: this.prefix });
+      queue = new Queue(name, {
+        connection: this.connection,
+        prefix: this.prefix,
+        ...(this.options.telemetry && { telemetry: this.options.telemetry }),
+      });
       this.queues.set(name, queue);
     }
     return queue;

@@ -7,6 +7,7 @@ import { buildInfrastructure } from './core/infrastructure';
 import { logger } from './core/logger';
 import { Metrics, metricsHandler } from './core/observability/metrics';
 import { closeHttpServer, GracefulShutdown } from './core/runtime/graceful-shutdown';
+import { shutdownTracing } from './instrumentation';
 
 try {
   const env = loadEnv();
@@ -32,6 +33,7 @@ try {
     .add('background work', () => container.background.stop())
     .add('infrastructure', () => infra.close())
     .add('mongodb', () => disconnectDB())
+    .add('tracing', () => shutdownTracing())
     .listen();
 } catch (err) {
   console.error('[fatal] Failed to start storefront-worker\n', err instanceof Error ? err.message : err);

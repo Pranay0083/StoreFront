@@ -1,3 +1,4 @@
+import { BullMQOtel } from 'bullmq-otel';
 import { MemoryLruCache, RedisCache, type CacheProvider } from './cache/cache';
 import type { Env } from './config/env';
 import { IdempotencyStore, type IdempotencyStorage } from './http/idempotency/idempotency.store';
@@ -56,7 +57,8 @@ export function redisInfrastructure(env: Pick<Env, 'REDIS_URL' | 'QUEUE_PREFIX'>
   redis.on('error', err => logger.error({ err }, 'Redis connection error'));
   const deadLetters = new MongoDeadLetterStore();
   const pubsub = new RedisPubSub(redis, logger);
-  const queue = new BullMqJobQueue(redis, deadLetters, logger, { prefix: env.QUEUE_PREFIX, observer });
+  const telemetry = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ? new BullMQOtel('storefront-jobs') : undefined;
+  const queue = new BullMqJobQueue(redis, deadLetters, logger, { prefix: env.QUEUE_PREFIX, observer, telemetry });
   return {
     kind: 'redis',
     redis,

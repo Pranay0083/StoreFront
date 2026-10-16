@@ -7,6 +7,7 @@ import { buildInfrastructure, runsJobsInProcess } from './core/infrastructure';
 import { logger } from './core/logger';
 import { Metrics } from './core/observability/metrics';
 import { closeHttpServer, GracefulShutdown } from './core/runtime/graceful-shutdown';
+import { shutdownTracing } from './instrumentation';
 
 try {
   const env = loadEnv();
@@ -31,6 +32,7 @@ try {
     .add('background work', () => (inProcess ? container.background.stop() : undefined))
     .add('infrastructure', () => infra.close())
     .add('mongodb', () => disconnectDB())
+    .add('tracing', () => shutdownTracing())
     .listen();
 } catch (err) {
   console.error('[fatal] Failed to start storefront-api\n', err instanceof Error ? err.message : err);
