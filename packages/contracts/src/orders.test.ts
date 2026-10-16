@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADMIN_ORDER_ACTIONS, ORDER_STATUSES, ORDER_TRANSITIONS, canTransition } from './orders';
+import { ADMIN_ORDER_ACTIONS, ORDER_STATUSES, ORDER_TRANSITIONS, canTransition, refundableAmount } from './orders';
 
 describe('order transitions', () => {
   it('defines transitions for every status and only targets known statuses', () => {
@@ -9,8 +9,11 @@ describe('order transitions', () => {
     }
   });
 
-  it('treats refunded as terminal', () => {
+  it('treats refunded as terminal and lets partially refunded orders return more items', () => {
     expect(ORDER_TRANSITIONS.refunded).toEqual([]);
+    expect(canTransition('partially_refunded', 'refund_requested')).toBe(true);
+    expect(canTransition('refund_requested', 'partially_refunded')).toBe(true);
+    expect(canTransition('partially_refunded', 'shipped')).toBe(false);
     expect(canTransition('refunded', 'paid')).toBe(false);
     expect(canTransition('created', 'paid')).toBe(true);
   });
@@ -29,5 +32,20 @@ describe('order transitions', () => {
       expect(ADMIN_ORDER_ACTIONS[status]).not.toContain('paid');
       expect(ADMIN_ORDER_ACTIONS[status]).not.toContain('refunded');
     }
+  });
+});
+
+describe('refundableAmount', () => {
+  it('returns exactly the line total however the units are refunded', () => {
+    const line = { lineTotal: 100_001, qty: 3 };
+    expect(refundableAmount(line, 0, 3)).toBe(100_001);
+    const steps = [refundableAmount(line, 0, 1), refundableAmount(line, 1, 1), refundableAmount(line, 2, 1)];
+    expect(steps).toEqual([33_334, 33_334, 33_333]);
+    expect(refundableAmount(line, 0, 2) + refundableAmount(line, 2, 1)).toBe(100_001);
+    expect(refundableAmount(line, 0, 1) + refundableAmount(line, 1, 2)).toBe(100_001);
+  });
+
+  it('handles lines that were discounted to zero', () => {
+    expect(refundableAmount({ lineTotal: 0, qty: 2 }, 0, 2)).toBe(0);
   });
 });

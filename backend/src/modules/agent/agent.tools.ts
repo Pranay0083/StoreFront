@@ -115,7 +115,7 @@ export const AGENT_TOOL_DEFINITIONS = [
     type: 'function' as const,
     function: {
       name: 'get_store_info',
-      description: 'Store policies: shipping fees & timelines, payments, returns/refunds/cancellation, coupons, size guide.',
+      description: 'Store policies: shipping fees & timelines, payments, returns/refunds/cancellation, offers & promo codes, size guide.',
       parameters: { type: 'object', properties: {} },
     },
   },

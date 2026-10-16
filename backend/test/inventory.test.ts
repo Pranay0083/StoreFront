@@ -55,15 +55,27 @@ describe('inventory reservations', () => {
     expect(await tx().run(s => inventory().release(orderId, 'system', 'too late', s))).toBe(false);
     expect(await stockOf(product._id, 'M')).toBe(6);
 
-    expect(await tx().run(s => inventory().restockSale(orderId, 'RETURN', 'system:refund', 'Refunded', s))).toBe(true);
-    expect(await tx().run(s => inventory().restockSale(orderId, 'RETURN', 'system:refund', 'Refunded', s))).toBe(false);
+    const line = (qty: number) => [{ productId: String(product._id), size: 'M', qty }];
+    expect(await tx().run(s => inventory().restockLines(orderId, line(1), 'RETURN', 'system:refund', 'Refunded', s))).toBe(true);
+    expect(await stockOf(product._id, 'M')).toBe(7);
+    expect(await Reservation.findOne({ orderId }).lean()).toMatchObject({
+      status: 'partially_returned',
+      items: [{ qty: 4, returnedQty: 1 }],
+    });
+    await expect(tx().run(s => inventory().restockLines(orderId, line(4), 'RETURN', 'system:refund', 'Too many', s))).rejects.toThrow(
+      /Cannot return 4/,
+    );
+    expect(await tx().run(s => inventory().restockLines(orderId, line(3), 'RETURN', 'system:refund', 'Refunded', s))).toBe(true);
+    expect(await tx().run(s => inventory().restockLines(orderId, line(1), 'RETURN', 'system:refund', 'Again', s))).toBe(false);
     expect(await stockOf(product._id, 'M')).toBe(10);
+    expect(await Reservation.findOne({ orderId }).lean()).toMatchObject({ status: 'returned' });
 
     const types = (await inventory().movementsFor({ orderId })).map(m => [m.type, m.delta]).reverse();
     expect(types).toEqual([
       ['RESERVE', -4],
       ['SALE', 0],
-      ['RETURN', 4],
+      ['RETURN', 1],
+      ['RETURN', 3],
     ]);
     expect(await inventory().reconcile()).toMatchObject({ ok: true, mismatches: [] });
   });

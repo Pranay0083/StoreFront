@@ -2,13 +2,13 @@ import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { OutboxModel } from '../src/core/events/outbox.model';
 import { ProductModel as Product } from '../src/modules/catalog/product.model';
-import { CouponRedemptionModel as Redemption } from '../src/modules/coupons/coupon-redemption.model';
-import { CouponModel as Coupon } from '../src/modules/coupons/coupon.model';
 import { InventoryMovementModel as Movement } from '../src/modules/inventory/inventory-movement.model';
 import { recordOpeningBalances } from '../src/modules/inventory/opening-balances';
 import { StockReservationModel as Reservation } from '../src/modules/inventory/stock-reservation.model';
 import { OrderModel as Order } from '../src/modules/orders/order.model';
-import { ADDRESS, createCoupon, createProduct, createUser } from './helpers/factories';
+import { PromotionRedemptionModel as Redemption } from '../src/modules/pricing/promotion-redemption.model';
+import { PromotionModel as Promotion } from '../src/modules/pricing/promotion.model';
+import { ADDRESS, createProduct, createPromotion, createUser } from './helpers/factories';
 import { API, bearer, useTestApp } from './helpers/app';
 
 const t = useTestApp();
@@ -18,6 +18,7 @@ const stockOf = async (productId: unknown, size: string) =>
 const outboxNames = async (aggregateId: string) =>
   (await OutboxModel.find({ aggregateId }).sort({ occurredAt: 1 }).lean()).map(e => e.name);
 const drain = () => t.container.services.relay.drain();
+const usedCount = async (code: string) => (await Promotion.findOne({ code }).lean())!.usedCount;
 
 async function product(overrides: Record<string, unknown> = {}) {
   const p = await createProduct(overrides);
@@ -49,14 +50,21 @@ describe('checkout reservations', () => {
   it('rolls back the stock it took when a later step of checkout fails', async () => {
     const buyer = await createUser();
     const p = await product({ price: 200_000 });
-    await createCoupon({ code: 'ONCE', usageLimit: 1, usedCount: 0, minSubtotal: 0 });
-    await Coupon.updateOne({ code: 'ONCE' }, { $set: { usedCount: 1 } });
+    await createPromotion(t.container.services, { code: 'ONCE', usageLimit: 1, conditions: undefined });
+    await t
+      .http()
+      .post(`${API}/pricing/quote`)
+      .send({ items: [{ productId: String(p._id), size: 'M', qty: 1 }], codes: ['ONCE'] });
+    // Someone else redeems the last use after the cache was warmed, so redemption fails after stock was reserved.
+    await Promotion.updateOne({ code: 'ONCE' }, { $set: { usedCount: 1 } });
 
-    await checkout(buyer.token, p._id, { couponCode: 'ONCE' }).expect(400);
+    const res = await checkout(buyer.token, p._id, { codes: ['ONCE'] }).expect(409);
+    expect(res.body.code).toBe('PROMOTION_EXHAUSTED');
     expect(await stockOf(p._id, 'M')).toBe(10);
     expect(await Order.countDocuments()).toBe(0);
     expect(await Reservation.countDocuments()).toBe(0);
     expect(await OutboxModel.countDocuments()).toBe(0);
+    expect(await Redemption.countDocuments()).toBe(0);
   });
 
   it('sells the last unit exactly once under 50 concurrent checkouts', async () => {
@@ -74,28 +82,32 @@ describe('checkout reservations', () => {
     expect(await t.container.services.inventory.reconcile()).toMatchObject({ ok: true });
   });
 
-  it('never over-redeems a limited coupon under concurrency', async () => {
+  it('never over-redeems a limited promotion under 20 concurrent checkouts', async () => {
     const p = await product({ price: 200_000, sizes: [{ size: 'M', stock: 100 }] });
-    await createCoupon({ code: 'FIRST3', usageLimit: 3, minSubtotal: 0 });
-    const buyers = await Promise.all(Array.from({ length: 12 }, () => createUser()));
+    const promo = await createPromotion(t.container.services, { code: 'FIRST5', usageLimit: 5, conditions: undefined });
+    const buyers = await Promise.all(Array.from({ length: 20 }, () => createUser()));
 
-    const results = await Promise.all(buyers.map(b => checkout(b.token, p._id, { couponCode: 'FIRST3' })));
-    expect(results.filter(r => r.status === 201)).toHaveLength(3);
-    expect(results.filter(r => r.status === 400).every(r => r.body.error === 'This coupon has been fully redeemed')).toBe(true);
-    expect((await Coupon.findOne({ code: 'FIRST3' }))!.usedCount).toBe(3);
-    expect(await Redemption.countDocuments({ couponCode: 'FIRST3', status: 'reserved' })).toBe(3);
-    expect(await stockOf(p._id, 'M')).toBe(97);
+    const results = await Promise.all(buyers.map(b => checkout(b.token, p._id, { codes: ['FIRST5'] })));
+    const placed = results.filter(r => r.status === 201);
+    expect(placed).toHaveLength(5);
+    expect(placed.every(r => r.body.pricing.applied.some((a: { promotionId: string }) => a.promotionId === promo._id))).toBe(true);
+    // Losers either lose the redemption race (409) or are priced after the promotion ran out (400).
+    for (const r of results.filter(r => r.status !== 201)) expect(['PROMOTION_EXHAUSTED', 'CODE_REJECTED']).toContain(r.body.code);
+    expect(await usedCount('FIRST5')).toBe(5);
+    expect(await Redemption.countDocuments({ 'promotions.promotionId': promo._id, status: 'reserved' })).toBe(5);
+    expect(await stockOf(p._id, 'M')).toBe(95);
+    expect(await t.container.services.inventory.reconcile()).toMatchObject({ ok: true });
   });
 });
 
 describe('reservation expiry', () => {
-  it('cancels unpaid orders after the payment window, returns stock and the coupon use', async () => {
+  it('cancels unpaid orders after the payment window, returns stock and the promotion use', async () => {
     const buyer = await createUser();
     const p = await product({ price: 200_000 });
-    await createCoupon({ minSubtotal: 0 });
-    const order = (await checkout(buyer.token, p._id, { couponCode: 'WELCOME10' }, 2).expect(201)).body;
+    await createPromotion(t.container.services);
+    const order = (await checkout(buyer.token, p._id, { codes: ['WELCOME10'] }, 2).expect(201)).body;
     expect(await stockOf(p._id, 'M')).toBe(8);
-    expect((await Coupon.findOne({ code: 'WELCOME10' }))!.usedCount).toBe(1);
+    expect(await usedCount('WELCOME10')).toBe(1);
 
     const sweeper = t.container.services.reservationSweeper;
     expect(await sweeper.sweep(new Date())).toBe(0);
@@ -108,7 +120,7 @@ describe('reservation expiry', () => {
     expect(await stockOf(p._id, 'M')).toBe(10);
 
     await drain();
-    expect((await Coupon.findOne({ code: 'WELCOME10' }))!.usedCount).toBe(0);
+    expect(await usedCount('WELCOME10')).toBe(0);
     expect(await outboxNames(order._id)).toEqual(['OrderPlaced', 'OrderCancelled']);
     expect(await t.container.services.inventory.reconcile()).toMatchObject({ ok: true });
   });
@@ -141,16 +153,17 @@ describe('order events', () => {
     expect(await outboxNames(order._id)).toEqual(['OrderPlaced', 'OrderPaid']);
   });
 
-  it('releases stock and the coupon when a customer cancels before paying', async () => {
+  it('releases stock and the promotion use when a customer cancels before paying', async () => {
     const buyer = await createUser();
     const p = await product({ price: 200_000 });
-    await createCoupon({ minSubtotal: 0 });
-    const order = (await checkout(buyer.token, p._id, { couponCode: 'WELCOME10' }, 4).expect(201)).body;
+    await createPromotion(t.container.services);
+    const order = (await checkout(buyer.token, p._id, { codes: ['WELCOME10'] }, 4).expect(201)).body;
+    expect(await usedCount('WELCOME10')).toBe(1);
 
     await t.http().post(`${API}/orders/${order._id}/cancel`).set(bearer(buyer.token)).expect(200);
     expect(await stockOf(p._id, 'M')).toBe(10);
     await drain();
-    expect((await Coupon.findOne({ code: 'WELCOME10' }))!.usedCount).toBe(0);
+    expect(await usedCount('WELCOME10')).toBe(0);
     expect(await Redemption.findOne({ orderId: order._id }).lean()).toMatchObject({ status: 'released' });
   });
 

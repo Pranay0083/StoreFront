@@ -59,7 +59,7 @@ export function buildMcpServer(tools: AgentTools): McpServer {
     'get_store_info',
     {
       title: 'Get store info',
-      description: 'STOREFRONT policies: shipping, payments, returns/refunds, coupons, sizing, support.',
+      description: 'STOREFRONT policies: shipping, payments, returns/refunds, offers & promo codes, sizing, support.',
       inputSchema: {},
     },
     async () => text(await tools.execute('get_store_info', {}, {})),

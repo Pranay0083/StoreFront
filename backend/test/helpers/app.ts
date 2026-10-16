@@ -29,6 +29,7 @@ export function useTestApp(): TestApp {
   beforeEach(async () => {
     const collections = await mongoose.connection.db!.collections();
     await Promise.all(collections.map(c => c.deleteMany({})));
+    ctx.container.services.promotionCache.invalidate();
   });
 
   afterAll(async () => {

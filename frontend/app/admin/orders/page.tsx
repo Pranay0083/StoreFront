@@ -3,10 +3,18 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { RefundDialog } from '@/components/refund-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +24,7 @@ import { cn } from '@/lib/utils';
 
 const STATUSES: (OrderStatus | 'all')[] = ['all', ...ORDER_STATUSES];
 const BULK_TARGETS = [...new Set(Object.values(ADMIN_ORDER_ACTIONS).flat())];
-const label = (s: string) => s.replace('_', ' ');
+const label = (s: string) => s.replaceAll('_', ' ');
 
 export default function AdminOrdersPage() {
   const [data, setData] = useState<{ orders: Order[]; total: number; pages: number; transitions: Record<string, string[]> } | null>(null);
@@ -25,6 +33,7 @@ export default function AdminOrdersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkTo, setBulkTo] = useState<string>('');
   const [busy, setBusy] = useState(false);
+  const [refunding, setRefunding] = useState<Order | null>(null);
 
   const load = useCallback(() => {
     const qs = new URLSearchParams({ page: String(page) });
@@ -198,6 +207,14 @@ export default function AdminOrdersPage() {
                               {label(order.status)} → {label(t)}
                             </DropdownMenuItem>
                           ))}
+                          {allowed.includes('refund_requested') && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem data-testid={`order-refund-items-${order.orderNumber}`} onClick={() => setRefunding(order)}>
+                                Refund items…
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -208,6 +225,17 @@ export default function AdminOrdersPage() {
           </Table>
         )}
       </div>
+
+      {refunding && (
+        <RefundDialog
+          order={refunding}
+          open
+          onOpenChange={o => !o && setRefunding(null)}
+          endpoint={`/admin/orders/${refunding._id}/refund`}
+          onRefunded={() => load()}
+          title={`Refund ${refunding.orderNumber}`}
+        />
+      )}
 
       {data && data.pages > 1 && (
         <div className="mt-5 flex items-center justify-between">

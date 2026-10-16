@@ -1,4 +1,4 @@
-import { ADMIN_ORDER_ACTIONS, REVENUE_STATUSES, type OrderStatus } from '@storefront/contracts';
+import { ADMIN_ORDER_ACTIONS, REVENUE_STATUSES, type OrderStatus, type RefundRequestInput } from '@storefront/contracts';
 import { logger } from '../../core/logger';
 import type { UserRepository } from '../auth/user.repository';
 import type { CartRepository } from '../cart/cart.repository';
@@ -83,6 +83,12 @@ export class AdminService {
     }
     logger.info({ adminId, updated: results.updated, rejected: results.rejected.length }, 'Bulk order transition executed');
     return results;
+  }
+
+  async refundOrder(id: string, input: RefundRequestInput, adminId: string) {
+    const order = await this.ordersService.adminRefund(id, adminId, input);
+    logger.info({ adminId, orderId: id, refund: order.openRefund?.id, lines: input.lines?.length ?? 'all' }, 'Admin refund requested');
+    return order;
   }
 
   async listConversations() {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CartModel as Cart } from '../src/modules/cart/cart.model';
 import { OrderModel as Order } from '../src/modules/orders/order.model';
-import { ADDRESS, createCoupon, createProduct, createUser } from './helpers/factories';
+import { ADDRESS, createProduct, createPromotion, createUser } from './helpers/factories';
 import { API, bearer, useTestApp } from './helpers/app';
 
 const t = useTestApp();
@@ -31,15 +31,35 @@ describe('orders', () => {
     expect((await Cart.findOne({ userId: buyer.user._id }))!.items).toHaveLength(0);
   });
 
-  it('applies coupons and free shipping above the threshold', async () => {
+  it('applies promo codes and free shipping above the threshold', async () => {
     const buyer = await createUser();
     const product = await createProduct({ price: 400_000 });
-    await createCoupon();
+    const promo = await createPromotion(t.container.services);
     const res = await placeOrder(buyer.token, {
       items: [{ productId: String(product._id), size: 'M', qty: 1 }],
-      couponCode: 'welcome10',
+      codes: ['welcome10'],
     }).expect(201);
-    expect(res.body).toMatchObject({ subtotal: 400_000, discount: 40_000, shipping: 0, total: 360_000, couponCode: 'WELCOME10' });
+    expect(res.body).toMatchObject({ subtotal: 400_000, discount: 40_000, shipping: 0, total: 360_000 });
+    expect(res.body.couponCode).toBeUndefined();
+    expect(res.body.items[0]).toMatchObject({ lineTotal: 360_000, discounts: [{ promotionId: promo._id, amount: 40_000 }] });
+    expect(res.body.pricing).toMatchObject({
+      codes: ['WELCOME10'],
+      applied: [{ promotionId: promo._id, version: 1, code: 'WELCOME10', amount: 40_000, stage: 'code' }],
+      stages: { listSubtotal: 400_000, codeDiscount: 40_000, shipping: 0, total: 360_000 },
+    });
+  });
+
+  it('rejects an order whose promo code does not apply', async () => {
+    const buyer = await createUser();
+    const product = await createProduct({ price: 50_000 });
+    await createPromotion(t.container.services);
+    const res = await placeOrder(buyer.token, {
+      items: [{ productId: String(product._id), size: 'M', qty: 1 }],
+      codes: ['WELCOME10', 'NOPE'],
+    }).expect(400);
+    expect(res.body.code).toBe('CODE_REJECTED');
+    expect(res.body.details.map((d: { path: string }) => d.path).sort()).toEqual(['codes.NOPE', 'codes.WELCOME10']);
+    expect(await Order.countDocuments()).toBe(0);
   });
 
   it('rejects unavailable sizes and insufficient stock', async () => {

@@ -3,8 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { connectDB, disconnectDB } from '../../core/config/db';
 import { UserModel } from '../../modules/auth/user.model';
 import { ProductModel } from '../../modules/catalog/product.model';
-import { CouponModel } from '../../modules/coupons/coupon.model';
 import { OrderModel } from '../../modules/orders/order.model';
+import { PromotionModel } from '../../modules/pricing/promotion.model';
 import { seedDemoData } from './demo-seeder';
 
 describe('seedDemoData', () => {
@@ -20,12 +20,13 @@ describe('seedDemoData', () => {
     const counts = async () => ({
       products: await ProductModel.countDocuments(),
       orders: await OrderModel.countDocuments(),
-      coupons: await CouponModel.countDocuments(),
+      promotions: await PromotionModel.countDocuments(),
       users: await UserModel.countDocuments(),
     });
     const first = await counts();
     expect(first.products).toBeGreaterThan(20);
     expect(first.orders).toBe(110);
+    expect(await PromotionModel.exists({ code: 'WELCOME10', status: 'active' })).not.toBeNull();
     expect(await UserModel.exists({ email: 'admin@test.dev', role: 'admin' })).not.toBeNull();
 
     expect(await seedDemoData(env)).toEqual({ catalogSeeded: false });

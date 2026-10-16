@@ -1,5 +1,7 @@
 import type { PriceBreakdown, PriceQuote } from '@storefront/contracts';
+import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
+import { PromotionRedemptionModel } from '../src/modules/pricing/promotion-redemption.model';
 import { QuoteModel } from '../src/modules/pricing/quote.model';
 import { API, bearer, useTestApp } from './helpers/app';
 import { createProduct, createUser } from './helpers/factories';
@@ -165,22 +167,42 @@ describe('POST /pricing/quote', () => {
   });
 });
 
-describe('PricingEngine.redeem', () => {
-  it('counts usage all-or-nothing against usage limits', async () => {
+describe('PricingEngine.redeem / release', () => {
+  const applied = (p: { _id: string }, name: string) =>
+    ({ promotionId: p._id, version: 1, name, actionType: 'percentOff', stage: 'cart', amount: 1, times: 1, description: '' }) as const;
+  const owner = () => ({ orderId: new mongoose.Types.ObjectId().toHexString(), userId: new mongoose.Types.ObjectId().toHexString() });
+
+  it('counts usage all-or-nothing against usage limits inside the caller transaction', async () => {
     const token = await admin();
     const unlimited = await createPromotion(token, { name: 'Unlimited', action: { type: 'percentOff', percent: 5 } });
     const limited = await createPromotion(token, { name: 'Last one', usageLimit: 1, action: { type: 'freeShipping' } });
-    const applied = (p: { _id: string }, name: string) =>
-      ({ promotionId: p._id, version: 1, name, actionType: 'percentOff', stage: 'cart', amount: 1, times: 1, description: '' }) as const;
-    const pricing = t.container.services.pricing;
+    const { pricing } = t.container.services;
+    const both = [applied(unlimited, 'Unlimited'), applied(limited, 'Last one')];
 
-    await pricing.redeem([applied(unlimited, 'Unlimited'), applied(limited, 'Last one')]);
-    await expect(pricing.redeem([applied(unlimited, 'Unlimited'), applied(limited, 'Last one')])).rejects.toMatchObject({
+    const first = owner();
+    await t.container.tx.run(session => pricing.redeem(first, both, session));
+    await expect(t.container.tx.run(session => pricing.redeem(owner(), both, session))).rejects.toMatchObject({
       status: 409,
+      code: 'PROMOTION_EXHAUSTED',
       message: '"Last one" has just been fully redeemed. Please review your cart.',
     });
     const after = await t.http().get(`${API}/admin/promotions/${unlimited._id}`).set(bearer(token)).expect(200);
     expect(after.body.usedCount).toBe(1);
+    expect(await PromotionRedemptionModel.countDocuments()).toBe(1);
+  });
+
+  it('releases an order’s uses exactly once', async () => {
+    const token = await admin();
+    const limited = await createPromotion(token, { name: 'Two only', usageLimit: 2, action: { type: 'freeShipping' } });
+    const { pricing } = t.container.services;
+    const order = owner();
+    await t.container.tx.run(session => pricing.redeem(order, [applied(limited, 'Two only')], session));
+
+    expect(await t.container.tx.run(session => pricing.release(order.orderId, session))).toBe(true);
+    expect(await t.container.tx.run(session => pricing.release(order.orderId, session))).toBe(false);
+    const after = await t.http().get(`${API}/admin/promotions/${limited._id}`).set(bearer(token)).expect(200);
+    expect(after.body.usedCount).toBe(0);
+    expect(await PromotionRedemptionModel.findOne({ orderId: order.orderId }).lean()).toMatchObject({ status: 'released' });
   });
 });
 

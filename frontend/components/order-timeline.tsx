@@ -1,6 +1,7 @@
 import { Ban, Check, RotateCcw } from 'lucide-react';
 import { fmtDateTime } from '@/lib/api';
 import type { Order } from '@storefront/contracts';
+import { fmtINR } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const FLOW = ['created', 'paid', 'packed', 'shipped', 'delivered'] as const;
@@ -9,6 +10,7 @@ export function OrderTimeline({ order }: { order: Order }) {
   const reached = new Set(order.statusHistory.map(e => e.to));
   reached.add(order.status as any);
   const isTerminalBranch = order.status === 'cancelled' || order.status === 'refunded';
+  const openRefund = order.refunds?.find(r => r.status === 'requested' || r.status === 'processing' || r.status === 'pending');
   const lastFlowIdx = Math.max(...FLOW.map((s, i) => (reached.has(s) ? i : -1)));
 
   return (
@@ -51,7 +53,20 @@ export function OrderTimeline({ order }: { order: Order }) {
           data-testid="order-refund-banner"
           className="mt-6 flex items-center gap-3 border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
-          <RotateCcw className="h-4 w-4" />A refund of the full amount is being processed to your original payment method.
+          <RotateCcw className="h-4 w-4" />
+          {openRefund?.kind === 'partial'
+            ? `A refund of ${fmtINR(openRefund.amount)} for the returned items is being processed to your original payment method.`
+            : 'A refund of the full amount is being processed to your original payment method.'}
+        </div>
+      )}
+
+      {order.status === 'partially_refunded' && (
+        <div
+          data-testid="order-partial-refund-banner"
+          className="mt-6 flex items-center gap-3 border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          <RotateCcw className="h-4 w-4" />
+          {fmtINR(order.refundedAmount)} has been refunded for returned items.
         </div>
       )}
 

@@ -1,4 +1,15 @@
-import { ORDER_STATUSES, REFUND_STATES, type Address, type OrderStatus, type RefundState } from '@storefront/contracts';
+import {
+  ORDER_STATUSES,
+  REFUND_KINDS,
+  REFUND_STATES,
+  type Address,
+  type LineDiscount,
+  type OrderPricing,
+  type OrderRefundLine,
+  type OrderStatus,
+  type RefundKind,
+  type RefundState,
+} from '@storefront/contracts';
 import mongoose, { Schema, type HydratedDocument, type Types } from 'mongoose';
 
 export interface OrderItemRecord {
@@ -9,6 +20,11 @@ export interface OrderItemRecord {
   size: string;
   qty: number;
   slug?: string;
+  markdownPerUnit?: number;
+  discounts?: LineDiscount[];
+  lineTotal?: number;
+  refundedQty?: number;
+  refundedAmount?: number;
 }
 
 export interface StatusEventRecord {
@@ -28,8 +44,12 @@ export interface OrderPaymentRecord {
 }
 
 export interface OrderRefundRecord {
+  id: string;
+  kind: RefundKind;
   status: RefundState;
   amount: number;
+  lines: OrderRefundLine[];
+  shippingAmount: number;
   reason: string;
   requestedBy: string;
   requestedAt: Date;
@@ -50,10 +70,12 @@ export interface OrderRecord {
   discount: number;
   couponCode?: string;
   total: number;
+  pricing?: OrderPricing;
   status: OrderStatus;
   statusHistory: StatusEventRecord[];
   payment: OrderPaymentRecord;
-  refund?: OrderRefundRecord;
+  refunds?: OrderRefundRecord[];
+  refundedAmount?: number;
   paidAt?: Date;
   deliveredAt?: Date;
   reservedUntil?: Date;
@@ -77,6 +99,11 @@ const orderSchema = new Schema<OrderRecord>(
         size: { type: String, required: true },
         qty: { type: Number, required: true },
         slug: String,
+        markdownPerUnit: { type: Number, default: 0 },
+        discounts: [{ _id: false, promotionId: { type: String, required: true }, amount: { type: Number, required: true } }],
+        lineTotal: { type: Number, required: true },
+        refundedQty: { type: Number, default: 0 },
+        refundedAmount: { type: Number, default: 0 },
       },
     ],
     address: { name: String, line1: String, city: String, state: String, pincode: String, phone: String },
@@ -85,6 +112,20 @@ const orderSchema = new Schema<OrderRecord>(
     discount: { type: Number, default: 0 },
     couponCode: String,
     total: { type: Number, required: true },
+    pricing: {
+      type: new Schema(
+        {
+          quoteId: String,
+          codes: { type: [String], default: [] },
+          applied: { type: [Schema.Types.Mixed], default: [] },
+          stages: { type: Schema.Types.Mixed, required: true },
+          optimizer: { type: Schema.Types.Mixed, required: true },
+          explanations: { type: [String], default: [] },
+        },
+        { _id: false, minimize: false },
+      ),
+      required: false,
+    },
     status: { type: String, enum: ORDER_STATUSES, default: 'created', required: true },
     statusHistory: [
       {
@@ -102,11 +143,23 @@ const orderSchema = new Schema<OrderRecord>(
       status: { type: String, default: 'pending' },
       capturedAt: Date,
     },
-    refund: {
-      type: new Schema(
+    refunds: [
+      new Schema(
         {
+          id: { type: String, required: true },
+          kind: { type: String, enum: REFUND_KINDS, required: true },
           status: { type: String, enum: REFUND_STATES, required: true },
           amount: { type: Number, required: true },
+          lines: [
+            {
+              _id: false,
+              productId: { type: String, required: true },
+              size: { type: String, required: true },
+              qty: { type: Number, required: true },
+              amount: { type: Number, required: true },
+            },
+          ],
+          shippingAmount: { type: Number, default: 0 },
           reason: { type: String, required: true },
           requestedBy: { type: String, required: true },
           requestedAt: { type: Date, required: true },
@@ -117,8 +170,8 @@ const orderSchema = new Schema<OrderRecord>(
         },
         { _id: false },
       ),
-      required: false,
-    },
+    ],
+    refundedAmount: { type: Number, default: 0 },
     paidAt: Date,
     deliveredAt: Date,
     reservedUntil: Date,
@@ -131,6 +184,6 @@ orderSchema.index({ userId: 1, createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ 'payment.razorpayOrderId': 1 });
 orderSchema.index({ 'payment.razorpayPaymentId': 1 }, { sparse: true });
-orderSchema.index({ 'refund.gatewayRefundId': 1 }, { sparse: true });
+orderSchema.index({ 'refunds.gatewayRefundId': 1 }, { sparse: true });
 
 export const OrderModel = mongoose.model<OrderRecord>('Order', orderSchema);

@@ -23,6 +23,6 @@ export class OrdersController {
   };
 
   requestRefund = async (req: AuthedReq<RefundRequestInput, unknown, IdParams>, res: Response) => {
-    res.json(await this.orders.requestRefund(req.params.id, req.user, req.body.reason));
+    res.json(await this.orders.requestRefund(req.params.id, req.user, req.body));
   };
 }
