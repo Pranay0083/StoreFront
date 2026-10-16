@@ -32,6 +32,7 @@ export interface DomainEventMap {
   };
   RefundCompleted: { orderId: string; orderNumber: string; userId: string; amount: Paise; gatewayRefundId?: string };
   RefundFailed: { orderId: string; orderNumber: string; userId: string; amount: Paise; reason: string; restoredStatus: OrderStatus };
+  ProductChanged: { productId: string; change: 'created' | 'updated' | 'deleted' };
   StockLow: { productId: string; size: string; stock: number; threshold: number };
 }
 

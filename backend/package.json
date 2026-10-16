@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bench:pricing": "tsx scripts/bench-pricing.ts",
+    "search:reindex": "tsx src/modules/search/reindex.cli.ts",
     "lint": "eslint src test scripts vitest.config.ts"
   },
   "dependencies": {

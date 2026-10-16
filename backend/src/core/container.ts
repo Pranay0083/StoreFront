@@ -30,6 +30,8 @@ import { CatalogController } from '../modules/catalog/catalog.controller';
 import { catalogRoutes } from '../modules/catalog/catalog.routes';
 import { CachingCatalog } from '../modules/catalog/caching-catalog';
 import { CatalogService } from '../modules/catalog/catalog.service';
+import { createSearchProvider } from '../modules/search/search.factory';
+import { SearchService } from '../modules/search/search.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
 import { CouponRepository } from '../modules/coupons/coupon.repository';
 import { CouponsController } from '../modules/coupons/coupons.controller';
@@ -125,7 +127,9 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
 
   const tokens = new TokenService({ access: env.JWT_ACCESS_SECRET, refresh: env.JWT_REFRESH_SECRET });
   const inventory = new InventoryService(repositories.products, repositories.inventoryMovements, repositories.stockReservations);
-  const catalog = new CatalogService(repositories.products, inventory, tx);
+  const search = new SearchService(createSearchProvider(env), repositories.products);
+  search.registerIndexing(eventBus, jobs, repositories.orders);
+  const catalog = new CatalogService(repositories.products, inventory, tx, outbox, search);
   const cachedCatalog = new CachingCatalog(catalog, infra.cache, env.CATALOG_CACHE_TTL_SECONDS);
   cachedCatalog.registerInvalidation(eventBus);
   const cart = new CartService(repositories.carts, repositories.products);
@@ -211,6 +215,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     auth: new AuthService(repositories.users, new LoginThrottle(repositories.loginAttempts), repositories.authSessions, tokens),
     catalog,
     cachedCatalog,
+    search,
     inventory,
     reviews: new ReviewsService(repositories.reviews, repositories.products, new DeliveredOrderPurchaseVerifier()),
     cart,
@@ -247,7 +252,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
 
   const controllers = {
     auth: new AuthController(services.auth, cookies, csrf),
-    catalog: new CatalogController(services.cachedCatalog),
+    catalog: new CatalogController(services.cachedCatalog, services.search),
     reviews: new ReviewsController(services.reviews),
     cart: new CartController(services.cart),
     coupons: new CouponsController(services.coupons),

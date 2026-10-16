@@ -75,6 +75,25 @@ export interface ProductListResponse {
   pages: number;
   /** Pass back as `cursor` for the next page; null on the last page. */
   nextCursor: string | null;
+  /** Present on text searches: counts per category and in-stock size within the results. */
+  facets?: SearchFacets;
+}
+
+export interface FacetCount {
+  value: string;
+  count: number;
+}
+
+export interface SearchFacets {
+  categories: FacetCount[];
+  sizes: FacetCount[];
+}
+
+export interface ProductSuggestion {
+  slug: string;
+  title: string;
+  category: string;
+  price: Paise;
 }
 
 export interface Category {
