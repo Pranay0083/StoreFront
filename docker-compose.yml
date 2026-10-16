@@ -1,31 +1,171 @@
+# Local production-like stack. `docker compose up --build` starts the shop; add
+# `--profile observability` for Jaeger, Prometheus and Grafana (then set
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 in .env to export traces).
+# The fallback secrets below are for local use only; real deployments set them in the environment.
+x-backend-env: &backend-env
+  NODE_ENV: production
+  MONGO_URL: mongodb://mongo:27017/?replicaSet=rs0
+  DB_NAME: ${DB_NAME:-storefront}
+  REDIS_URL: redis://redis:6379
+  MEILI_URL: http://meilisearch:7700
+  MEILI_API_KEY: ${MEILI_MASTER_KEY:-local-meili-master-key-change-me}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-access-secret-change-me-0123456789}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-refresh-secret-change-me-0123456789}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@12345}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+  COOKIE_SAMESITE: lax
+  COOKIE_SECURE: 'false'
+  RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+  RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+  RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  SMTP_URL: ${SMTP_URL:-}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+
 services:
-  backend:
+  mongo:
+    image: mongo:7
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initiates the single-node replica set on first boot (transactions need one), then reports its state.
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    # BullMQ requires noeviction; cache entries carry TTLs, so memory stays bounded.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.15
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-local-meili-master-key-change-me}
+      MEILI_NO_ANALYTICS: 'true'
+    volumes:
+      - meili-data:/meili_data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:7700/health']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
     image: ghcr.io/pranay0083/storefront-backend:latest
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: storefront-backend
+    command: ['api']
+    init: true
     restart: unless-stopped
-    env_file: .env
     environment:
-      PORT: '4001'
-      HOST: '0.0.0.0'
+      <<: *backend-env
+      OTEL_SERVICE_NAME: storefront-api
     ports:
       - '4001:4001'
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4001/ready >/dev/null 2>&1 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
-  frontend:
+  worker:
+    image: ghcr.io/pranay0083/storefront-backend:latest
+    command: ['worker']
+    init: true
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      OTEL_SERVICE_NAME: storefront-worker
+    depends_on:
+      api:
+        condition: service_healthy
+
+  search-index:
+    image: ghcr.io/pranay0083/storefront-backend:latest
+    command: ['reindex']
+    environment:
+      <<: *backend-env
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: 'no'
+
+  web:
     image: ghcr.io/pranay0083/storefront-frontend:latest
     build:
       context: .
       dockerfile: frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: '${NEXT_PUBLIC_API_URL:-http://localhost:4001}'
-        INTERNAL_API_URL: 'http://backend:4001'
-    container_name: storefront-frontend
+        INTERNAL_API_URL: 'http://api:4001'
     restart: unless-stopped
-    depends_on:
-      - backend
     environment:
-      - INTERNAL_API_URL=http://backend:4001
+      INTERNAL_API_URL: http://api:4001
     ports:
       - '3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    profiles: ['observability']
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - '16686:16686'
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ['observability']
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - '9090:9090'
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    profiles: ['observability']
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+
+volumes:
+  mongo-data:
+  redis-data:
+  meili-data:
