@@ -1,10 +1,10 @@
 import type { ProductInput, ProductListQuery } from '@storefront/contracts';
 import type { Request, Response } from 'express';
 import type { AuthedReq, IdParams, Req } from '../../core/http/types';
-import type { CatalogService } from './catalog.service';
+import type { Catalog } from './caching-catalog';
 
 export class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(private readonly catalog: Catalog) {}
 
   list = async (req: Req<unknown, ProductListQuery>, res: Response) => {
     res.json(await this.catalog.list(req.query));

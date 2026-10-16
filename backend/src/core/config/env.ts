@@ -48,6 +48,7 @@ const EnvSchema = z
     JOBS_IN_PROCESS: z.enum(['auto', 'true', 'false']).default('auto'),
     WORKER_PORT: z.coerce.number().int().positive().default(4002),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+    CATALOG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     EMAIL_FROM: z.string().min(3).default('STOREFRONT <orders@storefront.dev>'),
     SMTP_URL: z.string().url('SMTP_URL must look like smtp://user:pass@host:587').optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
