@@ -69,7 +69,7 @@ import { ReviewRepository } from '../modules/reviews/review.repository';
 import { ReviewsController } from '../modules/reviews/reviews.controller';
 import { reviewsRoutes } from '../modules/reviews/reviews.routes';
 import { ReviewsService } from '../modules/reviews/reviews.service';
-import { ActivePromotionCache } from '../modules/pricing/active-promotion.cache';
+import { BroadcastingPromotionCache } from '../modules/pricing/broadcasting-promotion.cache';
 import { PricingController, PromotionsController } from '../modules/pricing/pricing.controller';
 import { MongoCustomerHistory, MongoPricingCatalog } from '../modules/pricing/pricing.ports';
 import { adminPromotionsRoutes, pricingRoutes } from '../modules/pricing/pricing.routes';
@@ -196,7 +196,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
 
   const audit = new AuditService(repositories.auditLogs);
 
-  const promotionCache = new ActivePromotionCache(repositories.promotions);
+  const promotionCache = new BroadcastingPromotionCache(repositories.promotions, infra.pubsub, logger);
   const pricing = new PricingService(
     new MongoPricingCatalog(),
     new MongoCustomerHistory(),
