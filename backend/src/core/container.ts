@@ -44,6 +44,8 @@ import {
   recommendationsRoutes,
 } from '../modules/recommendations/recommendations.routes';
 import { RecommendationsService } from '../modules/recommendations/recommendations.service';
+import { RealtimeHub } from '../modules/realtime/realtime.hub';
+import { RealtimeController, realtimeRoutes, registerRealtimeHandlers } from '../modules/realtime/realtime.routes';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
@@ -181,6 +183,8 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     metrics.cacheObserver(),
   );
   recommendations.register(jobs, eventBus);
+  const realtime = new RealtimeHub(infra.pubsub, logger, { bufferSize: 100, heartbeatMs: env.REALTIME_HEARTBEAT_MS });
+  registerRealtimeHandlers(eventBus, realtime);
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -269,6 +273,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     abandonedCarts,
     experiments,
     recommendations,
+    realtime,
   };
 
   const guards = new AuthGuards(services.auth);
@@ -291,6 +296,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     jobs: new JobsController(services.jobsAdmin),
     experiments: new ExperimentsController(services.experiments),
     recommendations: new RecommendationsController(services.recommendations, jobs),
+    realtime: new RealtimeController(services.realtime),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -305,6 +311,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/pricing', pricingRoutes(controllers.pricing, guards)],
     ['/experiments', experimentsRoutes(controllers.experiments, guards)],
+    ['/realtime', realtimeRoutes(controllers.realtime, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin/jobs', jobsAdminRoutes(controllers.jobs, guards)],

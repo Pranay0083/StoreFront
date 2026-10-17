@@ -27,7 +27,10 @@ try {
   logger.info({ infrastructure: infra.kind, jobs: inProcess ? 'in-process' : 'external worker' }, 'Background processing configured');
 
   new GracefulShutdown(logger, env.SHUTDOWN_TIMEOUT_MS)
-    .onBegin(() => container.health.markDraining())
+    .onBegin(() => {
+      container.health.markDraining();
+      container.services.realtime.close();
+    })
     .add('http server', () => closeHttpServer(server))
     .add('background work', () => (inProcess ? container.background.stop() : undefined))
     .add('infrastructure', () => infra.close())
