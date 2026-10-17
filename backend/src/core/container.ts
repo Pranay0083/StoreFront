@@ -38,6 +38,12 @@ import {
   registerExperimentHandlers,
 } from '../modules/experiments/experiments.routes';
 import { ExperimentsService } from '../modules/experiments/experiments.service';
+import {
+  adminRecommendationsRoutes,
+  RecommendationsController,
+  recommendationsRoutes,
+} from '../modules/recommendations/recommendations.routes';
+import { RecommendationsService } from '../modules/recommendations/recommendations.service';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
@@ -168,6 +174,13 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   refunds.register(eventBus);
   const experiments = new ExperimentsService(infra.cache, 30, metrics.cacheObserver());
   registerExperimentHandlers(eventBus, experiments);
+  const recommendations = new RecommendationsService(
+    infra.cache,
+    logger,
+    { rebuildIntervalMs: env.RECOMMENDATIONS_REBUILD_INTERVAL_MS, lookbackDays: env.RECOMMENDATIONS_LOOKBACK_DAYS },
+    metrics.cacheObserver(),
+  );
+  recommendations.register(jobs, eventBus);
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -206,6 +219,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
       relay.start();
       reservationSweeper.start();
       abandonedCarts.start(jobs);
+      recommendations.start(jobs);
       await jobs.start();
     },
     async stop() {
@@ -254,6 +268,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     notificationDispatcher,
     abandonedCarts,
     experiments,
+    recommendations,
   };
 
   const guards = new AuthGuards(services.auth);
@@ -275,10 +290,12 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     promotions: new PromotionsController(services.promotions),
     jobs: new JobsController(services.jobsAdmin),
     experiments: new ExperimentsController(services.experiments),
+    recommendations: new RecommendationsController(services.recommendations, jobs),
   };
 
   const routes: Array<[path: string, router: Router]> = [
     ['/auth', authRoutes(controllers.auth, guards)],
+    ['/products', recommendationsRoutes(controllers.recommendations)],
     ['/products', catalogRoutes(controllers.catalog, guards)],
     ['/reviews', reviewsRoutes(controllers.reviews, guards)],
     ['/cart', cartRoutes(controllers.cart, guards)],
@@ -291,6 +308,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin/jobs', jobsAdminRoutes(controllers.jobs, guards)],
+    ['/admin/recommendations', adminRecommendationsRoutes(controllers.recommendations, guards)],
     ['/admin/flags', adminFlagsRoutes(controllers.experiments, guards)],
     ['/admin/experiments', adminExperimentsRoutes(controllers.experiments, guards)],
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],

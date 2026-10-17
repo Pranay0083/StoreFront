@@ -42,6 +42,12 @@ const EnvSchema = z
     RESERVATION_TTL_MINUTES: z.coerce.number().positive().default(15),
     RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
+    RECOMMENDATIONS_REBUILD_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(6 * 3_600_000),
+    RECOMMENDATIONS_LOOKBACK_DAYS: z.coerce.number().int().positive().default(180),
     LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
     REDIS_URL: z.string().url('REDIS_URL must be a redis:// or rediss:// URL').optional(),
     QUEUE_PREFIX: z.string().min(1).default('storefront'),
