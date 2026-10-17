@@ -30,6 +30,14 @@ import { CatalogController } from '../modules/catalog/catalog.controller';
 import { catalogRoutes } from '../modules/catalog/catalog.routes';
 import { CachingCatalog } from '../modules/catalog/caching-catalog';
 import { CatalogService } from '../modules/catalog/catalog.service';
+import {
+  adminExperimentsRoutes,
+  adminFlagsRoutes,
+  ExperimentsController,
+  experimentsRoutes,
+  registerExperimentHandlers,
+} from '../modules/experiments/experiments.routes';
+import { ExperimentsService } from '../modules/experiments/experiments.service';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
@@ -158,6 +166,8 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   registerPricingHandlers(eventBus, { pricing, tx });
   const refunds = new RefundSaga(orders, inventory, paymentGateway, logger);
   refunds.register(eventBus);
+  const experiments = new ExperimentsService(infra.cache, 30, metrics.cacheObserver());
+  registerExperimentHandlers(eventBus, experiments);
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -243,6 +253,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     notifications,
     notificationDispatcher,
     abandonedCarts,
+    experiments,
   };
 
   const guards = new AuthGuards(services.auth);
@@ -263,6 +274,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     pricing: new PricingController(services.pricing),
     promotions: new PromotionsController(services.promotions),
     jobs: new JobsController(services.jobsAdmin),
+    experiments: new ExperimentsController(services.experiments),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -275,9 +287,12 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/pricing', pricingRoutes(controllers.pricing, guards)],
+    ['/experiments', experimentsRoutes(controllers.experiments, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin/jobs', jobsAdminRoutes(controllers.jobs, guards)],
+    ['/admin/flags', adminFlagsRoutes(controllers.experiments, guards)],
+    ['/admin/experiments', adminExperimentsRoutes(controllers.experiments, guards)],
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
 
