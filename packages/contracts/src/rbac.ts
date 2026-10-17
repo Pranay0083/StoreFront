@@ -13,6 +13,7 @@ export const PERMISSIONS = [
   'audit:read',
   'users:manage',
   'jobs:manage',
+  'experiments:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
