@@ -40,9 +40,28 @@ const EnvSchema = z
     GROQ_API_KEY: z.string().default(''),
     GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
     RESERVATION_TTL_MINUTES: z.coerce.number().positive().default(15),
-    RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+    RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
     LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
+    REDIS_URL: z.string().url('REDIS_URL must be a redis:// or rediss:// URL').optional(),
+    QUEUE_PREFIX: z.string().min(1).default('storefront'),
+    JOBS_IN_PROCESS: z.enum(['auto', 'true', 'false']).default('auto'),
+    WORKER_PORT: z.coerce.number().int().positive().default(4002),
+    SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+    MEILI_URL: z.string().url('MEILI_URL must be the Meilisearch base URL').optional(),
+    MEILI_API_KEY: z.string().min(1).optional(),
+    MEILI_INDEX: z.string().min(1).default('storefront_products'),
+    CATALOG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+    METRICS_TOKEN: z.string().min(16, 'METRICS_TOKEN must be at least 16 characters').optional(),
+    EMAIL_FROM: z.string().min(3).default('STOREFRONT <orders@storefront.dev>'),
+    SMTP_URL: z.string().url('SMTP_URL must look like smtp://user:pass@host:587').optional(),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    ABANDONED_CART_HOURS: z.coerce.number().positive().default(6),
+    ABANDONED_CART_SCAN_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30 * 60_000),
     SEED_DEMO_DATA: bool.default('true'),
   })
   .superRefine((env, ctx) => {

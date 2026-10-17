@@ -17,4 +17,12 @@ export class CartRepository {
   countNonEmpty(): Promise<number> {
     return CartModel.countDocuments({ 'items.0': { $exists: true } });
   }
+
+  /** Non-empty carts last touched inside the window (oldest first), for reminder campaigns. */
+  findIdle(window: { updatedBefore: Date; updatedAfter: Date }, limit: number): Promise<CartRecord[]> {
+    return CartModel.find({ 'items.0': { $exists: true }, updatedAt: { $lt: window.updatedBefore, $gt: window.updatedAfter } })
+      .sort({ updatedAt: 1 })
+      .limit(limit)
+      .lean<CartRecord[]>();
+  }
 }

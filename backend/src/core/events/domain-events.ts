@@ -18,6 +18,8 @@ export interface DomainEventMap {
     paymentId?: string;
     items: StockLine[];
   };
+  OrderShipped: { orderId: string; orderNumber: string; userId: string; by: string; note?: string };
+  OrderDelivered: { orderId: string; orderNumber: string; userId: string; by: string };
   OrderCancelled: { orderId: string; orderNumber: string; userId: string; reason: string; by: string };
   RefundRequested: {
     orderId: string;
@@ -51,6 +53,7 @@ export interface DomainEventMap {
     reason: string;
     restoredStatus: OrderStatus;
   };
+  ProductChanged: { productId: string; change: 'created' | 'updated' | 'deleted' };
   StockLow: { productId: string; size: string; stock: number; threshold: number };
 }
 

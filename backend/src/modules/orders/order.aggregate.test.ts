@@ -86,6 +86,12 @@ describe('Order aggregate', () => {
     expect(order.status).toBe('delivered');
     expect(order.snapshot().deliveredAt).toEqual(at(DAY));
     expect(order.snapshot().statusHistory.map(e => e.to)).toEqual(['created', 'paid', 'packed', 'shipped', 'delivered']);
+    expect(
+      order
+        .pullEvents()
+        .map(e => e.name)
+        .slice(-2),
+    ).toEqual(['OrderShipped', 'OrderDelivered']);
   });
 
   it('runs the refund saga to completion', () => {

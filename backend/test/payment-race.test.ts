@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { OutboxModel } from '../src/core/events/outbox.model';
+import { type MemoryJobQueue } from '../src/core/queue/memory-job-queue';
 import { ProductModel as Product } from '../src/modules/catalog/product.model';
 import { InventoryMovementModel as Movement } from '../src/modules/inventory/inventory-movement.model';
 import { recordOpeningBalances } from '../src/modules/inventory/opening-balances';
@@ -58,6 +59,7 @@ describe('payment confirmation races (Razorpay mode)', () => {
     );
     const responses = await Promise.all(requests);
     expect(responses.map(r => r.status)).toEqual(Array(8).fill(200));
+    await t.settle();
 
     const saved = (await Order.findById(order._id).lean())!;
     expect(saved.status).toBe('paid');
@@ -102,6 +104,7 @@ describe('payment confirmation races (Razorpay mode)', () => {
       .set({ 'Content-Type': 'application/json', 'x-razorpay-signature': hmac(process.env.RAZORPAY_WEBHOOK_SECRET!, payload) })
       .send(payload)
       .expect(200);
+    await (t.container.jobs as MemoryJobQueue).drain();
 
     const saved = (await Order.findById(order._id).lean())!;
     expect(saved.status).toBe('refund_requested');

@@ -1,10 +1,8 @@
-services:
-  - type: web
-    name: storefront-api
-    runtime: node
-    buildCommand: npm ci --workspace backend --include-workspace-root=false
-    startCommand: npm run start -w backend
+envVarGroups:
+  - name: storefront-shared
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: MONGO_URL
         sync: false
       - key: DB_NAME
@@ -15,10 +13,6 @@ services:
         generateValue: true
       - key: CSRF_SECRET
         generateValue: true
-      - key: TRUST_PROXY
-        value: '1'
-      - key: COOKIE_SAMESITE
-        value: none
       - key: FRONTEND_URL
         sync: false
       - key: RAZORPAY_KEY_ID
@@ -31,3 +25,49 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: openai/gpt-oss-120b
+      - key: RESEND_API_KEY
+        sync: false
+      - key: METRICS_TOKEN
+        generateValue: true
+
+services:
+  - type: keyvalue
+    name: storefront-redis
+    plan: free
+    # BullMQ requires noeviction; cache keys carry their own TTLs.
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  - type: web
+    name: storefront-api
+    runtime: node
+    buildCommand: npm ci --workspace backend --include-workspace-root=false
+    startCommand: npm run start -w backend
+    healthCheckPath: /ready
+    envVars:
+      - fromGroup: storefront-shared
+      - key: TRUST_PROXY
+        value: '1'
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: storefront-redis
+          property: connectionString
+
+  # Background workers are a paid Render plan. Without this service, set JOBS_IN_PROCESS=true on the
+  # API (or remove REDIS_URL) and the API processes jobs itself.
+  - type: worker
+    name: storefront-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --workspace backend --include-workspace-root=false
+    startCommand: npm run worker -w backend
+    envVars:
+      - fromGroup: storefront-shared
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: storefront-redis
+          property: connectionString

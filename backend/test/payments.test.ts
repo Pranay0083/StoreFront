@@ -82,7 +82,9 @@ describe('payment webhook', () => {
 
     const headers = { 'Content-Type': 'application/json', 'x-razorpay-signature': sign(payload), 'x-razorpay-event-id': 'evt_1' };
     const first = await t.http().post(`${API}/payments/webhook`).set(headers).send(payload).expect(200);
-    expect(first.body.status).toBe('processed');
+    expect(first.body.status).toBe('accepted');
+    expect((await Order.findById(order._id))!.status).toBe('created');
+    await t.settle();
     expect((await Order.findById(order._id))!.status).toBe('paid');
 
     const dup = await t.http().post(`${API}/payments/webhook`).set(headers).send(payload).expect(200);

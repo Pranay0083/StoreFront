@@ -1,48 +1,34 @@
-# Build context: repository root
-FROM node:20-alpine AS deps
+# Build context: repository root. One image runs the API, the worker or migrations (see docker-entrypoint.sh).
+# Secrets are never baked in: every credential is provided as a runtime environment variable.
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY packages ./packages
+COPY packages/contracts/package.json ./packages/contracts/
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
-RUN npm ci --workspace backend --include-workspace-root=false
+RUN npm ci --workspace backend --include-workspace-root=false --omit=dev --ignore-scripts \
+  && mkdir -p backend/node_modules \
+  && npm cache clean --force
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=4001 \
+    WORKER_PORT=4002
 
-ENV NODE_ENV=production
-ENV HOST=0.0.0.0
-ENV PORT=4001
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=deps --chown=node:node /app/backend/node_modules ./backend/node_modules
+COPY --chown=node:node package.json ./
+COPY --chown=node:node packages/contracts ./packages/contracts
+COPY --chown=node:node backend/package.json backend/tsconfig.json ./backend/
+COPY --chown=node:node backend/src ./backend/src
+COPY --chown=node:node --chmod=0755 backend/docker-entrypoint.sh /usr/local/bin/storefront
 
-ARG MONGO_URL
-ARG DB_NAME=storefront
-ARG JWT_SECRET
-ARG ADMIN_EMAIL=admin@storefront.dev
-ARG ADMIN_PASSWORD
-ARG FRONTEND_URL=http://localhost:3000
-ARG RAZORPAY_KEY_ID=
-ARG RAZORPAY_KEY_SECRET=
-ARG RAZORPAY_WEBHOOK_SECRET=
-ARG GROQ_API_KEY=
-ARG GROQ_MODEL=openai/gpt-oss-120b
-
-ENV MONGO_URL=$MONGO_URL \
-    DB_NAME=$DB_NAME \
-    JWT_SECRET=$JWT_SECRET \
-    ADMIN_EMAIL=$ADMIN_EMAIL \
-    ADMIN_PASSWORD=$ADMIN_PASSWORD \
-    FRONTEND_URL=$FRONTEND_URL \
-    RAZORPAY_KEY_ID=$RAZORPAY_KEY_ID \
-    RAZORPAY_KEY_SECRET=$RAZORPAY_KEY_SECRET \
-    RAZORPAY_WEBHOOK_SECRET=$RAZORPAY_WEBHOOK_SECRET \
-    GROQ_API_KEY=$GROQ_API_KEY \
-    GROQ_MODEL=$GROQ_MODEL
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY package.json ./
-COPY packages ./packages
-COPY backend ./backend
-
+USER node
 WORKDIR /app/backend
-EXPOSE 4001
-CMD ["npm", "start"]
+EXPOSE 4001 4002
+HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1 || wget -qO- "http://127.0.0.1:${WORKER_PORT}/health" >/dev/null 2>&1 || exit 1
+ENTRYPOINT ["storefront"]
+CMD ["api"]

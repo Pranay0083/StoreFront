@@ -75,8 +75,16 @@ export class ProductRepository {
     return res.matchedCount === 1;
   }
 
-  async delete(id: string): Promise<boolean> {
-    return (await ProductModel.findByIdAndDelete(id)) !== null;
+  async delete(id: string, session?: Session): Promise<boolean> {
+    return (await ProductModel.findByIdAndDelete(id, { session })) !== null;
+  }
+
+  /** Keyset batches in _id order, for full reindexing. */
+  findPage(afterId: string | undefined, limit: number): Promise<ProductRecord[]> {
+    return ProductModel.find(afterId ? { _id: { $gt: afterId } } : {})
+      .sort({ _id: 1 })
+      .limit(limit)
+      .lean<ProductRecord[]>();
   }
 
   async categoryCounts(): Promise<Category[]> {

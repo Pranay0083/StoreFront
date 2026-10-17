@@ -21,6 +21,7 @@ declare global {
       user?: AuthUser;
       authz?: AuthzGrant;
       rawBody?: Buffer;
+      requestId?: string;
     }
   }
 }

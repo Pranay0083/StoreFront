@@ -12,6 +12,7 @@ import { auditLog } from './034-audit-log';
 import { promotionRedemptions } from './040-promotion-redemptions';
 import { couponsToPromotions } from './041-coupons-to-promotions';
 import { lineRefunds } from './042-line-refunds';
+import { platformIndexes } from './050-platform-indexes';
 
 export const migrations: readonly Migration[] = [
   ensureIndexes,
@@ -27,4 +28,5 @@ export const migrations: readonly Migration[] = [
   promotionRedemptions,
   couponsToPromotions,
   lineRefunds,
+  platformIndexes,
 ];

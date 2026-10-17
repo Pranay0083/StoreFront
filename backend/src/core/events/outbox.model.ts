@@ -1,6 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 
-export const OUTBOX_STATUSES = ['pending', 'processing', 'done', 'dead'] as const;
+/** `dispatched`: handed to the job queue, which now owns per-handler delivery and retries. */
+export const OUTBOX_STATUSES = ['pending', 'processing', 'dispatched', 'done', 'dead'] as const;
 export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
 
 export interface OutboxRecord {
@@ -16,6 +17,8 @@ export interface OutboxRecord {
   handlersDone: string[];
   lastError?: string;
   processedAt?: Date;
+  dispatchedAt?: Date;
+  requestId?: string;
 }
 
 const outboxSchema = new Schema<OutboxRecord>(
@@ -32,6 +35,8 @@ const outboxSchema = new Schema<OutboxRecord>(
     handlersDone: { type: [String], default: [] },
     lastError: String,
     processedAt: Date,
+    dispatchedAt: Date,
+    requestId: String,
   },
   { versionKey: false, minimize: false },
 );

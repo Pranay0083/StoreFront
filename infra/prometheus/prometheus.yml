@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Scrapes come from the compose network (a private address), which /metrics allows without a
+# token. If METRICS_TOKEN is set, add `authorization: { credentials: <token> }` to each job.
+scrape_configs:
+  - job_name: storefront-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['api:4001']
+        labels: { role: api }
+  - job_name: storefront-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['worker:4002']
+        labels: { role: worker }
