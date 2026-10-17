@@ -25,7 +25,7 @@ jobs:
       - run: npm run typecheck
 
   test:
-    name: Unit & integration tests
+    name: Tests (in-memory infrastructure)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,14 +42,63 @@ jobs:
       - run: npm test -w packages/contracts
       - run: npm test -w backend
 
+  test-redis:
+    name: Tests (Redis, BullMQ & Meilisearch)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
+      meilisearch:
+        image: getmeili/meilisearch:v1.15
+        env:
+          MEILI_MASTER_KEY: ci-meili-master-key-0123456789
+          MEILI_NO_ANALYTICS: 'true'
+        ports:
+          - 7700:7700
+    env:
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+      TEST_MEILI_URL: http://127.0.0.1:7700
+      TEST_MEILI_KEY: ci-meili-master-key-0123456789
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - name: Backend tests including the Redis- and Meilisearch-backed suites
+        run: npm test -w backend
+
   smoke:
-    name: API boot smoke test
+    name: API + worker boot smoke test
     runs-on: ubuntu-latest
     services:
       mongo:
         image: mongo:7
         ports:
           - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      NODE_ENV: production
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: ci_storefront
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_ACCESS_SECRET: ci-access-secret-0123456789abcdefghij
+      JWT_REFRESH_SECRET: ci-refresh-secret-0123456789abcdefghij
+      HOST: 127.0.0.1
+      PORT: 4001
+      WORKER_PORT: 4002
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,27 +106,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Migrate, seed, boot and probe the API
-        env:
-          NODE_ENV: production
-          MONGO_URL: mongodb://127.0.0.1:27017
-          DB_NAME: ci_storefront
-          JWT_ACCESS_SECRET: ci-access-secret-0123456789abcdefghij
-          JWT_REFRESH_SECRET: ci-refresh-secret-0123456789abcdefghij
-          PORT: 4001
-          HOST: 127.0.0.1
+      - name: Migrate, seed, boot the API and worker, then probe them
         run: |
           npm run start -w backend > /tmp/storefront-api.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:4001/api/v1/ > /dev/null; then
-              break
-            fi
-            sleep 1
-          done
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4001/ready > /dev/null 2>&1 && break; sleep 1; done
+          npm run worker -w backend > /tmp/storefront-worker.log 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4002/ready > /dev/null 2>&1 && break; sleep 1; done
+          curl -fsS http://127.0.0.1:4001/ready
+          curl -fsS http://127.0.0.1:4002/ready
           curl -fsS "http://127.0.0.1:4001/api/v1/products?limit=1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const b=JSON.parse(s);if(!b.total){console.error("catalog is empty");process.exit(1)}console.log(`catalog ok: ${b.total} products`)})'
-      - name: Show API log on failure
+          curl -fsS http://127.0.0.1:4001/metrics | grep -q http_request_duration_seconds
+      - name: Show logs on failure
         if: failure()
-        run: cat /tmp/storefront-api.log
+        run: |
+          cat /tmp/storefront-api.log
+          cat /tmp/storefront-worker.log
 
   frontend:
     name: Build web app
@@ -93,3 +136,20 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:4001
         run: npm run build -w frontend
+
+  images:
+    name: Build container images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.image }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
