@@ -46,6 +46,8 @@ import {
 import { RecommendationsService } from '../modules/recommendations/recommendations.service';
 import { RealtimeHub } from '../modules/realtime/realtime.hub';
 import { RealtimeController, realtimeRoutes, registerRealtimeHandlers } from '../modules/realtime/realtime.routes';
+import { ImportsController, importsRoutes } from '../modules/imports/imports.routes';
+import { ImportsService } from '../modules/imports/imports.service';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
@@ -185,6 +187,8 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   recommendations.register(jobs, eventBus);
   const realtime = new RealtimeHub(infra.pubsub, logger, { bufferSize: 100, heartbeatMs: env.REALTIME_HEARTBEAT_MS });
   registerRealtimeHandlers(eventBus, realtime);
+  const imports = new ImportsService(catalog, jobs, logger, { maxBytes: env.IMPORT_MAX_BYTES, maxRows: env.IMPORT_MAX_ROWS });
+  imports.register();
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -274,6 +278,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     experiments,
     recommendations,
     realtime,
+    imports,
   };
 
   const guards = new AuthGuards(services.auth);
@@ -297,6 +302,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     experiments: new ExperimentsController(services.experiments),
     recommendations: new RecommendationsController(services.recommendations, jobs),
     realtime: new RealtimeController(services.realtime),
+    imports: new ImportsController(services.imports),
   };
 
   const routes: Array<[path: string, router: Router]> = [
@@ -315,6 +321,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin/jobs', jobsAdminRoutes(controllers.jobs, guards)],
+    ['/admin/imports', importsRoutes(controllers.imports, guards)],
     ['/admin/recommendations', adminRecommendationsRoutes(controllers.recommendations, guards)],
     ['/admin/flags', adminFlagsRoutes(controllers.experiments, guards)],
     ['/admin/experiments', adminExperimentsRoutes(controllers.experiments, guards)],

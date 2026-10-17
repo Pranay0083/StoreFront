@@ -49,6 +49,12 @@ const EnvSchema = z
       .default(6 * 3_600_000),
     RECOMMENDATIONS_LOOKBACK_DAYS: z.coerce.number().int().positive().default(180),
     REALTIME_HEARTBEAT_MS: z.coerce.number().int().positive().default(25_000),
+    IMPORT_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(5 * 1024 * 1024),
+    IMPORT_MAX_ROWS: z.coerce.number().int().positive().default(5_000),
     LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
     REDIS_URL: z.string().url('REDIS_URL must be a redis:// or rediss:// URL').optional(),
     QUEUE_PREFIX: z.string().min(1).default('storefront'),
