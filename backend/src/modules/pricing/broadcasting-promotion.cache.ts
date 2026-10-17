@@ -12,6 +12,8 @@ export const PROMOTIONS_CHANGED_CHANNEL = 'storefront:pricing:promotions-changed
  */
 export class BroadcastingPromotionCache extends ActivePromotionCache {
   private readonly origin = randomUUID();
+  /** Resolves once this instance is subscribed and will hear peers' invalidations. */
+  readonly ready: Promise<void>;
 
   constructor(
     source: ActivePromotionSource,
@@ -20,9 +22,11 @@ export class BroadcastingPromotionCache extends ActivePromotionCache {
     ttlMs?: number,
   ) {
     super(source, ttlMs);
-    void pubsub.subscribe(PROMOTIONS_CHANGED_CHANNEL, origin => {
-      if (origin !== this.origin) super.invalidate();
-    });
+    this.ready = pubsub
+      .subscribe(PROMOTIONS_CHANGED_CHANNEL, origin => {
+        if (origin !== this.origin) super.invalidate();
+      })
+      .catch(err => this.logger.error({ err }, 'Could not subscribe to promotion invalidations'));
   }
 
   override invalidate(): void {

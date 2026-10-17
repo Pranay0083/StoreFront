@@ -18,6 +18,7 @@ async function scenario(pubsubA: PubSub, pubsubB: PubSub) {
   const sourceB = countingSource();
   const a = new BroadcastingPromotionCache(sourceA, pubsubA, silent, 60_000);
   const b = new BroadcastingPromotionCache(sourceB, pubsubB, silent, 60_000);
+  await Promise.all([a.ready, b.ready]);
   await Promise.all([a.index(), b.index()]);
   await Promise.all([a.index(), b.index()]);
   expect([sourceA.calls, sourceB.calls]).toEqual([1, 1]);
