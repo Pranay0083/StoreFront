@@ -21,7 +21,7 @@ export type ImportStatus = (typeof IMPORT_STATUSES)[number];
 export interface ImportRowError {
   row: number;
   slug?: string;
-  errors: string[];
+  messages: string[];
 }
 
 export interface ImportRecord {
@@ -37,7 +37,7 @@ export interface ImportRecord {
   created: number;
   updated: number;
   failed: number;
-  errors: ImportRowError[];
+  rowErrors: ImportRowError[];
   errorsTruncated: boolean;
   failure?: string;
   startedAt?: Date;
@@ -59,31 +59,31 @@ const importSchema = new Schema<ImportRecord>(
     created: { type: Number, default: 0 },
     updated: { type: Number, default: 0 },
     failed: { type: Number, default: 0 },
-    errors: [{ _id: false, row: Number, slug: String, errors: [String] }],
+    rowErrors: [{ _id: false, row: Number, slug: String, messages: [String] }],
     errorsTruncated: { type: Boolean, default: false },
     failure: String,
     startedAt: Date,
     finishedAt: Date,
   },
-  { timestamps: true, versionKey: false, suppressReservedKeysWarning: true },
+  { timestamps: true, versionKey: false },
 );
 importSchema.index({ sha256: 1 }, { unique: true });
 importSchema.index({ createdAt: -1 });
 export const ProductImportModel = mongoose.model<ImportRecord>('ProductImport', importSchema, 'product_imports');
 
-export interface ImportView extends Omit<ImportRecord, '_id' | 'fileId' | 'errors'> {
+export interface ImportView extends Omit<ImportRecord, '_id' | 'fileId' | 'rowErrors'> {
   id: string;
   progress: number;
   errorCount: number;
 }
 
 const view = (r: ImportRecord): ImportView => {
-  const { _id, fileId: _fileId, errors, ...rest } = r;
+  const { _id, fileId: _fileId, rowErrors, ...rest } = r;
   const done = r.status === 'completed' || r.status === 'completed_with_errors' || r.status === 'failed';
   return {
     ...rest,
     id: String(_id),
-    errorCount: errors?.length ?? 0,
+    errorCount: rowErrors?.length ?? 0,
     progress: done ? 1 : r.size ? Math.min(0.99, r.bytesRead / r.size) : 0,
   };
 };
@@ -123,7 +123,7 @@ export class ImportsService {
     }
     let record: ImportRecord;
     try {
-      record = (await ProductImportModel.create({ ...stored, status: 'queued', createdBy: actor, errors: [] })).toObject();
+      record = (await ProductImportModel.create({ ...stored, status: 'queued', createdBy: actor, rowErrors: [] })).toObject();
     } catch (e) {
       await this.bucket().delete(stored.fileId);
       if ((e as { code?: number }).code === 11000) {
@@ -194,7 +194,7 @@ export class ImportsService {
   async process(importId: string): Promise<ImportView> {
     const record = await ProductImportModel.findOneAndUpdate(
       { _id: importId, status: { $in: ['queued', 'processing'] } },
-      { $set: { status: 'processing', startedAt: new Date(), bytesRead: 0, rows: 0, created: 0, updated: 0, failed: 0, errors: [] } },
+      { $set: { status: 'processing', startedAt: new Date(), bytesRead: 0, rows: 0, created: 0, updated: 0, failed: 0, rowErrors: [] } },
       { new: true },
     ).lean<ImportRecord>();
     if (!record) {
@@ -230,7 +230,7 @@ export class ImportsService {
         const parsed = parseRow(raw);
         if (!parsed.ok) {
           counters.failed++;
-          if (errors.length < MAX_STORED_ERRORS) errors.push({ row: rowNumber, slug: raw.slug || undefined, errors: parsed.errors });
+          if (errors.length < MAX_STORED_ERRORS) errors.push({ row: rowNumber, slug: raw.slug || undefined, messages: parsed.errors });
         } else {
           try {
             const slug = parsed.product.slug || slugify(parsed.product.title);
@@ -246,7 +246,7 @@ export class ImportsService {
           } catch (e) {
             counters.failed++;
             if (errors.length < MAX_STORED_ERRORS)
-              errors.push({ row: rowNumber, slug: raw.slug || undefined, errors: [(e as Error).message] });
+              errors.push({ row: rowNumber, slug: raw.slug || undefined, messages: [(e as Error).message] });
           }
         }
         if (counters.rows % PROGRESS_EVERY_ROWS === 0) await ProductImportModel.updateOne({ _id: record._id }, { $set: { ...counters } });
@@ -259,7 +259,7 @@ export class ImportsService {
             ...counters,
             bytesRead: record.size,
             status,
-            errors,
+            rowErrors: errors,
             errorsTruncated: counters.failed > errors.length,
             finishedAt: new Date(),
           },
@@ -272,7 +272,7 @@ export class ImportsService {
       const failure = (e as Error).message;
       const failed = await ProductImportModel.findByIdAndUpdate(
         record._id,
-        { $set: { ...counters, status: 'failed', failure, errors, finishedAt: new Date() } },
+        { $set: { ...counters, status: 'failed', failure, rowErrors: errors, finishedAt: new Date() } },
         { new: true },
       ).lean<ImportRecord>();
       this.logger.warn({ importId, failure }, 'Product CSV import failed');
@@ -286,14 +286,14 @@ export class ImportsService {
 
   async get(id: string): Promise<ImportView & { errors: ImportRowError[] }> {
     const record = await this.require(id);
-    return { ...view(record), errors: record.errors.slice(0, 50) };
+    return { ...view(record), errors: record.rowErrors.slice(0, 50) };
   }
 
   async errorReport(id: string): Promise<{ filename: string; csv: string }> {
     const record = await this.require(id);
     const lines = [
       'row,slug,error',
-      ...record.errors.flatMap(e => e.errors.map(msg => [String(e.row), e.slug ?? '', msg].map(csvCell).join(','))),
+      ...record.rowErrors.flatMap(e => e.messages.map(msg => [String(e.row), e.slug ?? '', msg].map(csvCell).join(','))),
     ];
     if (record.failure) lines.push(['', '', `Import failed: ${record.failure}`].map(csvCell).join(','));
     return { filename: `${record.filename.replace(/\.csv$/i, '')}-errors.csv`, csv: `${lines.join('\n')}\n` };
