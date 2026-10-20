@@ -1,11 +1,11 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Request, Response } from 'express';
 import { logger } from '../../core/logger';
-import type { AgentTools } from '../agent/agent.tools';
+import type { ToolRegistry } from '../agent/tools';
 import { buildMcpServer } from './mcp.server';
 
 export class McpController {
-  constructor(private readonly tools: AgentTools) {}
+  constructor(private readonly tools: ToolRegistry) {}
 
   post = async (req: Request, res: Response) => {
     const server = buildMcpServer(this.tools);

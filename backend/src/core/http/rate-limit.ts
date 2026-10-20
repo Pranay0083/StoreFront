@@ -55,7 +55,7 @@ export const RATE_LIMIT_POLICIES = {
   agentChat: {
     windowMs: MINUTE,
     limit: 15,
-    matches: route('POST', /^\/agent\/chat\/?$/),
+    matches: route('POST', /^\/agent\/chat(\/stream)?\/?$/, /^\/agent\/actions\/[^/]+\/(confirm|decline)\/?$/),
     message: 'The shopping assistant is getting a lot of messages from you, please wait a moment',
   },
   catalogRead: {
