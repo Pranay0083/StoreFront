@@ -10,7 +10,68 @@ interface ConvoMsg {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   toolName?: string;
+  usage?: { model: string; inputTokens: number; outputTokens: number; costUsd: number; latencyMs: number; llmCalls: number };
+  action?: { type: string; summary: string; status: string };
   at: string;
+}
+
+interface UsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  llmCalls: number;
+}
+
+interface UsageSummary {
+  days: number;
+  totals: UsageTotals & { messages: number };
+  daily: Array<UsageTotals & { date: string; messages: number }>;
+  conversations: Array<UsageTotals & { conversationId: string }>;
+}
+
+const usd = (n: number) => (n === 0 ? '$0' : n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
+const compact = (n: number) => new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+
+function UsagePanel({ usage }: { usage: UsageSummary }) {
+  const { totals } = usage;
+  const tiles = [
+    { label: `Spend · ${usage.days}d`, value: usd(totals.costUsd) },
+    { label: 'Tokens in / out', value: `${compact(totals.inputTokens)} / ${compact(totals.outputTokens)}` },
+    { label: 'Model calls', value: compact(totals.llmCalls) },
+    { label: 'Avg per reply', value: totals.messages ? usd(totals.costUsd / totals.messages) : '—' },
+  ];
+  const recent = usage.daily.slice(-7).reverse();
+  return (
+    <div data-testid="agent-usage-panel" className="mt-8 grid gap-4 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {tiles.map(t => (
+          <div key={t.label} className="border border-black/10 bg-white px-4 py-3">
+            <p className="label-caps text-[10px] text-muted-foreground">{t.label}</p>
+            <p className="mt-1 font-serif text-2xl font-semibold tabular-nums">{t.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="border border-black/10 bg-white px-4 py-3">
+        <p className="label-caps text-[10px] text-muted-foreground">Daily spend</p>
+        {recent.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">No model usage yet.</p>
+        ) : (
+          <table className="mt-2 w-full text-xs tabular-nums">
+            <tbody>
+              {recent.map(d => (
+                <tr key={d.date} className="border-t border-black/5 first:border-0">
+                  <td className="py-1">{d.date}</td>
+                  <td className="py-1 text-right text-muted-foreground">{d.messages} replies</td>
+                  <td className="py-1 text-right text-muted-foreground">{compact(d.inputTokens + d.outputTokens)} tok</td>
+                  <td className="py-1 text-right font-medium">{usd(d.costUsd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
 }
 
 interface Convo {
@@ -55,6 +116,13 @@ export default function AdminChatsPage() {
   const [convos, setConvos] = useState<Convo[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+
+  useEffect(() => {
+    api<UsageSummary>('/admin/agent/usage')
+      .then(setUsage)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     api<Convo[]>('/admin/conversations')
@@ -66,6 +134,7 @@ export default function AdminChatsPage() {
   }, []);
 
   const active = convos?.find(c => c._id === selected);
+  const costOf = (id: string) => usage?.conversations.find(c => c.conversationId === id);
 
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!convos) {
@@ -89,6 +158,8 @@ export default function AdminChatsPage() {
         </p>
       </div>
 
+      {usage && <UsagePanel usage={usage} />}
+
       {convos.length === 0 ? (
         <div className="mt-10 border border-dashed border-black/20 p-16 text-center">
           <MessageSquare className="mx-auto h-8 w-8 text-muted-foreground" strokeWidth={1} />
@@ -110,7 +181,7 @@ export default function AdminChatsPage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm font-medium">{c.userName || c.userEmail || 'Guest visitor'}</p>
                   <span className={cn('label-caps text-[10px]', selected === c._id ? 'text-white/60' : 'text-muted-foreground')}>
-                    {c.messageCount} msgs
+                    {c.messageCount} msgs{costOf(c._id) ? ` · ${usd(costOf(c._id)!.costUsd)}` : ''}
                   </span>
                 </div>
                 <p className={cn('mt-1 truncate text-xs', selected === c._id ? 'text-white/70' : 'text-muted-foreground')}>
@@ -134,6 +205,8 @@ export default function AdminChatsPage() {
                   </p>
                   <p className="label-caps text-[10px] text-muted-foreground">
                     session {active.sessionId.slice(0, 18)}… · {active.toolCallCount} tool calls
+                    {costOf(active._id) &&
+                      ` · ${compact(costOf(active._id)!.inputTokens + costOf(active._id)!.outputTokens)} tokens · ${usd(costOf(active._id)!.costUsd)}`}
                   </p>
                 </div>
                 {active.messages.map((m, i) =>
@@ -157,6 +230,17 @@ export default function AdminChatsPage() {
                         <p className="whitespace-pre-wrap border border-black/10 bg-secondary/60 px-3.5 py-2.5 text-sm leading-relaxed">
                           {m.content}
                         </p>
+                        {m.action && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Proposed action · {m.action.summary} · <span className="font-medium">{m.action.status}</span>
+                          </p>
+                        )}
+                        {m.usage && (
+                          <p className="label-caps mt-1 text-[10px] text-muted-foreground/80">
+                            {m.usage.model} · {m.usage.inputTokens}→{m.usage.outputTokens} tok · {(m.usage.latencyMs / 1000).toFixed(1)}s ·{' '}
+                            {usd(m.usage.costUsd)}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ),
