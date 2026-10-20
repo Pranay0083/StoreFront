@@ -17,7 +17,9 @@
     "test:watch": "vitest",
     "bench:pricing": "tsx scripts/bench-pricing.ts",
     "search:reindex": "tsx src/modules/search/reindex.cli.ts",
-    "lint": "eslint src test scripts vitest.config.ts"
+    "lint": "eslint src test scripts vitest.config.ts",
+    "openapi:generate": "tsx scripts/openapi.ts",
+    "openapi:check": "tsx scripts/openapi.ts --check"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",

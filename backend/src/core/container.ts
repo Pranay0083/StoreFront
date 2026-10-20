@@ -48,6 +48,7 @@ import { RealtimeHub } from '../modules/realtime/realtime.hub';
 import { RealtimeController, realtimeRoutes, registerRealtimeHandlers } from '../modules/realtime/realtime.routes';
 import { ImportsController, importsRoutes } from '../modules/imports/imports.routes';
 import { ImportsService } from '../modules/imports/imports.service';
+import { ApiDocs, docsUiRoutes, OPENAPI_OVERRIDES, openApiRoutes } from '../modules/docs/docs.routes';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
@@ -98,6 +99,8 @@ import type { Env } from './config/env';
 import { CookiePolicy } from './http/cookies';
 import { CsrfProtection } from './http/csrf';
 import { idempotent } from './http/idempotency/idempotency.middleware';
+import { generateOpenApi } from './http/openapi';
+import { API_PREFIX } from './http/paths';
 import { createRateLimiters } from './http/rate-limit';
 import { memoryInfrastructure, type Infrastructure } from './infrastructure';
 import { TransactionRunner } from './persistence/transaction';
@@ -328,6 +331,18 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
 
+  const docs = new ApiDocs(() =>
+    generateOpenApi(routes, {
+      title: 'STOREFRONT API',
+      version: '1.0.0',
+      serverUrl: API_PREFIX,
+      auth: { required: [guards.requireAuth], optional: [guards.optionalAuth], staff: [guards.requireStaff] },
+      overrides: OPENAPI_OVERRIDES,
+      exclude: path => path === '/openapi.json' || path.startsWith('/docs'),
+    }),
+  );
+  routes.push(['/openapi.json', openApiRoutes(docs)], ['/docs', docsUiRoutes(`${API_PREFIX}/openapi.json`)]);
+
   const http = { auditTrail: auditTrail(audit) };
   const health = new HealthMonitor([
     mongoCheck,
@@ -354,6 +369,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     guards,
     controllers,
     routes,
+    docs,
   };
 }
 

@@ -23,6 +23,8 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
+      - name: OpenAPI spec is up to date
+        run: npm run openapi:check -w backend
 
   test:
     name: Tests (in-memory infrastructure)
