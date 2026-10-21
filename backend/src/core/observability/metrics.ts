@@ -15,11 +15,24 @@ export interface PricingMetrics {
   observeQuote(report: { strategy: string; nodesExplored: number }, durationMs: number): void;
 }
 
+/** Port the agent module reports model calls through. */
+export interface AgentMetrics {
+  observeLlmCall(call: {
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    latencyMs: number;
+    outcome: 'ok' | 'error' | 'refusal';
+  }): void;
+}
+
 /**
  * One registry per process (API or worker), scraped at /metrics. Business counters are fed by
  * domain-event subscriptions, so they count facts exactly once per event rather than per request.
  */
-export class Metrics implements PricingMetrics {
+export class Metrics implements PricingMetrics, AgentMetrics {
   readonly registry = new client.Registry();
   private readonly queues: JobQueue[] = [];
   private readonly circuits: CircuitBreaker[] = [];
@@ -80,6 +93,31 @@ export class Metrics implements PricingMetrics {
     help: 'Time to price a cart, by optimizer strategy',
     labelNames: ['strategy'],
     buckets: [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25],
+    registers: [this.registry],
+  });
+  readonly agentLlmCalls = new client.Counter({
+    name: 'storefront_agent_llm_calls_total',
+    help: 'Model calls made by the shopping assistant',
+    labelNames: ['provider', 'model', 'outcome'],
+    registers: [this.registry],
+  });
+  readonly agentTokens = new client.Counter({
+    name: 'storefront_agent_tokens_total',
+    help: 'Tokens consumed by the shopping assistant',
+    labelNames: ['provider', 'model', 'direction'],
+    registers: [this.registry],
+  });
+  readonly agentCost = new client.Counter({
+    name: 'storefront_agent_cost_usd_total',
+    help: 'Estimated model spend of the shopping assistant in USD',
+    labelNames: ['provider', 'model'],
+    registers: [this.registry],
+  });
+  readonly agentLatency = new client.Histogram({
+    name: 'storefront_agent_llm_latency_seconds',
+    help: 'Latency of shopping assistant model calls',
+    labelNames: ['provider'],
+    buckets: [0.25, 0.5, 1, 2, 4, 8, 16, 32],
     registers: [this.registry],
   });
   readonly pricingNodes = new client.Histogram({
@@ -160,6 +198,15 @@ export class Metrics implements PricingMetrics {
       },
       onFailed: (job, final) => this.jobs.inc({ job, outcome: final ? 'dead_lettered' : 'retried' }),
     };
+  }
+
+  observeLlmCall(call: Parameters<AgentMetrics['observeLlmCall']>[0]): void {
+    const { provider, model } = call;
+    this.agentLlmCalls.inc({ provider, model, outcome: call.outcome });
+    if (call.inputTokens) this.agentTokens.inc({ provider, model, direction: 'input' }, call.inputTokens);
+    if (call.outputTokens) this.agentTokens.inc({ provider, model, direction: 'output' }, call.outputTokens);
+    if (call.costUsd) this.agentCost.inc({ provider, model }, call.costUsd);
+    this.agentLatency.observe({ provider }, call.latencyMs / 1000);
   }
 
   observeQuote(report: { strategy: string; nodesExplored: number }, durationMs: number): void {

@@ -1,22 +1,55 @@
 'use client';
 
-import { ArrowUp, MessageSquare, Sparkles, X } from 'lucide-react';
+import type { CartItem } from '@storefront/contracts';
+import { ArrowUp, Check, Loader2, MessageSquare, Sparkles, Square, Wrench, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth, useCart } from '@/components/providers';
-import { api } from '@/lib/api';
+import { api, apiStream } from '@/lib/api';
+
+type ActionStatus = 'pending' | 'executing' | 'completed' | 'declined' | 'failed' | 'expired';
+
+interface AgentAction {
+  id: string;
+  type: 'add_to_cart' | 'cancel_order' | 'request_refund';
+  summary: string;
+  status: ActionStatus;
+  result?: { item?: CartItem | null };
+  error?: string;
+}
 
 interface Msg {
   role: 'user' | 'assistant';
   content: string;
+  action?: AgentAction;
+  tools?: Array<{ name: string; title: string; done: boolean }>;
+  streaming?: boolean;
 }
+
+interface ChatResult {
+  reply: string;
+  actions: AgentAction[];
+}
+
+type StreamEvent =
+  | { event: 'token'; data: { text: string } }
+  | { event: 'tool'; data: { name: string; title: string; status: 'start' | 'end' } }
+  | { event: 'action'; data: { action: AgentAction } }
+  | { event: 'done'; data: ChatResult }
+  | { event: 'error'; data: { error: string } };
 
 const SUGGESTIONS = [
   'Show me featured products',
-  "What's your shipping policy?",
+  'Find me the best price for my bag',
   'Track my latest order',
   'Recommend footwear under ₹3000',
 ];
+
+const ACTION_LABELS: Record<AgentAction['type'], string> = {
+  add_to_cart: 'Add to bag',
+  cancel_order: 'Cancel order',
+  request_refund: 'Request refund',
+};
 
 function getSessionId() {
   let id = localStorage.getItem('sf_agent_session');
@@ -68,6 +101,63 @@ function AssistantText({ content }: { content: string }) {
   );
 }
 
+/** Reads `event:`/`data:` blocks from a fetch body as they arrive. */
+async function* readSse(res: Response): AsyncGenerator<StreamEvent> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let split: number;
+    while ((split = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, split);
+      buffer = buffer.slice(split + 2);
+      const event = /^event: (.+)$/m.exec(block)?.[1];
+      const data = /^data: (.+)$/m.exec(block)?.[1];
+      if (event && data) yield { event, data: JSON.parse(data) } as StreamEvent;
+    }
+  }
+}
+
+function ActionCard({ action, onResolve }: { action: AgentAction; onResolve: (a: AgentAction, decision: 'confirm' | 'decline') => void }) {
+  const busy = action.status === 'executing';
+  return (
+    <div data-testid="agent-action-card" className="mt-2 border border-black bg-white p-3 text-sm">
+      <p className="label-caps text-[10px] text-muted-foreground">{ACTION_LABELS[action.type]} · needs your OK</p>
+      <p className="mt-1 leading-snug">{action.summary}</p>
+      {action.status === 'pending' || busy ? (
+        <div className="mt-3 flex gap-2">
+          <button
+            data-testid="agent-action-confirm"
+            disabled={busy}
+            onClick={() => onResolve(action, 'confirm')}
+            className="flex h-8 items-center gap-1.5 bg-black px-3 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-40"
+          >
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" strokeWidth={1.5} />} Confirm
+          </button>
+          <button
+            data-testid="agent-action-decline"
+            disabled={busy}
+            onClick={() => onResolve(action, 'decline')}
+            className="h-8 border border-black/20 px-3 text-xs transition-colors hover:border-black disabled:opacity-40"
+          >
+            Not now
+          </button>
+        </div>
+      ) : (
+        <p data-testid="agent-action-status" className="mt-2 text-xs text-muted-foreground">
+          {action.status === 'completed' && 'Done.'}
+          {action.status === 'declined' && 'Declined, nothing was changed.'}
+          {action.status === 'expired' && 'This request expired. Ask again if you still want it.'}
+          {action.status === 'failed' && `Couldn't complete this: ${action.error ?? 'please try again.'}`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function AgentWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -75,9 +165,10 @@ export function AgentWidget() {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const { user } = useAuth();
-  const { items } = useCart();
+  const { items, addItem } = useCart();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!open || loaded) return;
@@ -91,28 +182,68 @@ export function AgentWidget() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
 
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const updateLast = (fn: (m: Msg) => Msg) => setMessages(prev => (prev.length ? [...prev.slice(0, -1), fn(prev[prev.length - 1])] : prev));
+
+  const updateAction = (next: AgentAction) =>
+    setMessages(prev => prev.map(m => (m.action?.id === next.id ? { ...m, action: { ...m.action, ...next } } : m)));
+
+  const resolve = async (action: AgentAction, decision: 'confirm' | 'decline') => {
+    updateAction({ ...action, status: 'executing' });
+    try {
+      const { action: done } = await api<{ action: AgentAction }>(`/agent/actions/${action.id}/${decision}`, { method: 'POST' });
+      updateAction(done);
+      if (done.status === 'completed' && done.type === 'add_to_cart' && done.result?.item) addItem(done.result.item);
+    } catch (e) {
+      const err = e as { status?: number; message?: string };
+      updateAction({ ...action, status: err.status === 409 ? 'expired' : 'failed', error: err.message });
+    }
+  };
+
+  const finish = (result: ChatResult) =>
+    updateLast(m => ({ ...m, content: result.reply, action: result.actions.at(-1) ?? m.action, streaming: false }));
+
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || loading) return;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: message }]);
+    setMessages(prev => [...prev, { role: 'user', content: message }, { role: 'assistant', content: '', tools: [], streaming: true }]);
     setLoading(true);
+    const body = {
+      sessionId: getSessionId(),
+      message,
+      context: { path: window.location.pathname, cart: items.map(i => ({ productId: i.productId, size: i.size, qty: i.qty })) },
+    };
+    const abort = new AbortController();
+    abortRef.current = abort;
     try {
-      const d = await api<{ reply: string }>('/agent/chat', {
-        method: 'POST',
-        body: JSON.stringify({
-          sessionId: getSessionId(),
-          message,
-          context: {
-            path: window.location.pathname,
-            cart: items.map(i => ({ title: i.title, size: i.size, qty: i.qty, price: i.price })),
-          },
-        }),
-      });
-      setMessages(prev => [...prev, { role: 'assistant', content: d.reply }]);
-    } catch (e: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: e?.message || 'Something went wrong — please try again.' }]);
+      const res = await apiStream('/agent/chat/stream', body, abort.signal).catch(() => null);
+      if (!res?.ok || !res.body) {
+        finish(await api<ChatResult>('/agent/chat', { method: 'POST', body: JSON.stringify(body) }));
+        return;
+      }
+      for await (const e of readSse(res)) {
+        if (e.event === 'token') updateLast(m => ({ ...m, content: m.content + e.data.text }));
+        else if (e.event === 'tool')
+          updateLast(m => ({
+            ...m,
+            content: e.data.status === 'start' ? '' : m.content,
+            tools:
+              e.data.status === 'start'
+                ? [...(m.tools ?? []), { name: e.data.name, title: e.data.title, done: false }]
+                : (m.tools ?? []).map(t => (t.name === e.data.name ? { ...t, done: true } : t)),
+          }));
+        else if (e.event === 'action') updateLast(m => ({ ...m, action: e.data.action }));
+        else if (e.event === 'done') finish(e.data);
+        else if (e.event === 'error') updateLast(m => ({ ...m, content: e.data.error, streaming: false }));
+      }
+    } catch (e) {
+      if (abort.signal.aborted) updateLast(m => ({ ...m, content: m.content || 'Stopped.', streaming: false }));
+      else updateLast(m => ({ ...m, content: (e as Error)?.message || 'Something went wrong. Please try again.', streaming: false }));
     } finally {
+      updateLast(m => ({ ...m, streaming: false }));
+      abortRef.current = null;
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
@@ -146,8 +277,8 @@ export function AgentWidget() {
             {messages.length === 0 && (
               <div data-testid="agent-empty-state">
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Hi{user && typeof user === 'object' ? ` ${user.name.split(' ')[0]}` : ''} — I can help you find products, check sizes,
-                  track orders, and answer questions about shipping, returns, and payments.
+                  Hi{user && typeof user === 'object' ? ` ${user.name.split(' ')[0]}` : ''}, I can help you find products, check sizes, get
+                  the best price on your bag, track orders, and answer questions about shipping, returns, and payments.
                 </p>
                 <div className="mt-5 space-y-2">
                   {SUGGESTIONS.map(s => (
@@ -172,23 +303,41 @@ export function AgentWidget() {
                 </div>
               ) : (
                 <div key={i} className="flex">
-                  <div
-                    data-testid="agent-message-assistant"
-                    className="max-w-[90%] border border-black/10 bg-secondary/60 px-3.5 py-2.5 text-sm leading-relaxed"
-                  >
-                    <AssistantText content={m.content} />
+                  <div className="max-w-[90%]">
+                    {!!m.tools?.length && (
+                      <div className="mb-1.5 flex flex-wrap gap-1.5">
+                        {m.tools.map((t, j) => (
+                          <span
+                            key={`${t.name}-${j}`}
+                            data-testid="agent-tool-chip"
+                            className="label-caps flex items-center gap-1 border border-black/10 px-2 py-1 text-[10px] text-muted-foreground"
+                          >
+                            {t.done ? <Wrench className="h-3 w-3" strokeWidth={1.5} /> : <Loader2 className="h-3 w-3 animate-spin" />}
+                            {t.title}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {m.content ? (
+                      <div
+                        data-testid="agent-message-assistant"
+                        className="border border-black/10 bg-secondary/60 px-3.5 py-2.5 text-sm leading-relaxed"
+                      >
+                        <AssistantText content={m.content} />
+                      </div>
+                    ) : (
+                      m.streaming && (
+                        <div className="flex items-center gap-1.5 border border-black/10 px-3.5 py-3" data-testid="agent-typing-indicator">
+                          <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:0ms]" />
+                          <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:150ms]" />
+                          <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:300ms]" />
+                        </div>
+                      )
+                    )}
+                    {m.action && <ActionCard action={m.action} onResolve={resolve} />}
                   </div>
                 </div>
               ),
-            )}
-            {loading && (
-              <div className="flex" data-testid="agent-typing-indicator">
-                <div className="flex items-center gap-1.5 border border-black/10 px-3.5 py-3">
-                  <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:0ms]" />
-                  <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:150ms]" />
-                  <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:300ms]" />
-                </div>
-              </div>
             )}
           </div>
 
@@ -204,18 +353,30 @@ export function AgentWidget() {
               data-testid="agent-input"
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder="Ask about products, orders, shipping…"
+              placeholder="Ask about products, prices, orders…"
               className="h-10 flex-1 border border-input bg-white px-3 text-sm outline-none transition-colors focus:border-black"
             />
-            <button
-              type="submit"
-              data-testid="agent-send-button"
-              disabled={loading || !input.trim()}
-              aria-label="Send message"
-              className="flex h-10 w-10 shrink-0 items-center justify-center bg-black text-white transition-opacity hover:opacity-80 disabled:opacity-30"
-            >
-              <ArrowUp className="h-4 w-4" strokeWidth={1.5} />
-            </button>
+            {loading ? (
+              <button
+                type="button"
+                data-testid="agent-stop-button"
+                onClick={() => abortRef.current?.abort()}
+                aria-label="Stop generating"
+                className="flex h-10 w-10 shrink-0 items-center justify-center border border-black text-black transition-colors hover:bg-black hover:text-white"
+              >
+                <Square className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                data-testid="agent-send-button"
+                disabled={!input.trim()}
+                aria-label="Send message"
+                className="flex h-10 w-10 shrink-0 items-center justify-center bg-black text-white transition-opacity hover:opacity-80 disabled:opacity-30"
+              >
+                <ArrowUp className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            )}
           </form>
         </div>
       )}

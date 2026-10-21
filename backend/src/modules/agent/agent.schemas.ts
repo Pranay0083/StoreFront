@@ -1,4 +1,4 @@
-import { PaiseSchema } from '@storefront/contracts';
+import { CartLineSchema } from '@storefront/contracts';
 import { z } from 'zod';
 
 export const ChatSchema = z
@@ -14,10 +14,7 @@ export const ChatSchema = z
     context: z
       .object({
         path: z.string().max(200).optional(),
-        cart: z
-          .array(z.object({ title: z.string(), size: z.string(), qty: z.number(), price: PaiseSchema }))
-          .max(30)
-          .optional(),
+        cart: z.array(CartLineSchema).max(30).optional(),
       })
       .strict()
       .optional(),
@@ -26,3 +23,14 @@ export const ChatSchema = z
 export type ChatBody = z.infer<typeof ChatSchema>;
 
 export const HistoryQuerySchema = z.object({ sessionId: z.string().optional().default('') });
+
+export const ActionParamsSchema = z.object({ id: z.string().regex(/^[a-f\d]{24}$/i, 'Must be a valid id') });
+
+export const UsageQuerySchema = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .positive()
+    .catch(14)
+    .transform(n => Math.min(90, n)),
+});

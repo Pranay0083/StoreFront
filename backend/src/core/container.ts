@@ -9,9 +9,14 @@ import { auditTrail } from '../modules/admin/audit-trail';
 import { AuditService } from '../modules/admin/audit.service';
 import { StaffController } from '../modules/admin/staff.controller';
 import { AgentController } from '../modules/agent/agent.controller';
-import { agentRoutes } from '../modules/agent/agent.routes';
+import { adminAgentRoutes, agentRoutes } from '../modules/agent/agent.routes';
 import { AgentService } from '../modules/agent/agent.service';
-import { AgentTools } from '../modules/agent/agent.tools';
+import { PendingActionService } from '../modules/agent/actions/pending-action.service';
+import { ContextWindow } from '../modules/agent/context/context-window';
+import { LLMProviderFactory } from '../modules/agent/llm/llm-provider.factory';
+import { ModelPricing } from '../modules/agent/llm/model-pricing';
+import { buildToolRegistry } from '../modules/agent/tools';
+import { AgentUsageService } from '../modules/agent/usage/agent-usage.service';
 import { ConversationRepository } from '../modules/agent/conversation.repository';
 import { AuthController } from '../modules/auth/auth.controller';
 import { AuthGuards } from '../modules/auth/auth.guards';
@@ -145,7 +150,17 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
     refundWindowDays: REFUND_WINDOW_DAYS,
   });
-  const agentTools = new AgentTools(catalog, repositories.orders, repositories.users);
+  const llm = LLMProviderFactory.create(env);
+  if (llm) metrics.trackCircuit(llm.breaker);
+  const agentActions = new PendingActionService(cart, orders, repositories.conversations, env.AGENT_ACTION_TTL_MINUTES * 60_000);
+  const agentTools = buildToolRegistry({
+    catalog,
+    reviews: repositories.reviews,
+    orders: repositories.orders,
+    users: repositories.users,
+    pricing,
+    actions: agentActions,
+  });
   const rawGateway = PaymentGatewayFactory.create({
     keyId: env.RAZORPAY_KEY_ID,
     keySecret: env.RAZORPAY_KEY_SECRET,
@@ -207,6 +222,17 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
 
   const audit = new AuditService(repositories.auditLogs);
 
+  const agent: AgentService = new AgentService(
+    llm,
+    agentTools,
+    repositories.conversations,
+    cart,
+    new ContextWindow(env.AGENT_HISTORY_TOKEN_BUDGET, () => agent.currentProvider),
+    ModelPricing.fromEnv(env.AGENT_MODEL_PRICING),
+    { maxToolTurns: env.AGENT_MAX_TOOL_TURNS, maxTokens: 2048 },
+    metrics,
+  );
+
   const services = {
     tokens,
     audit,
@@ -225,7 +251,9 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     relay,
     reservationSweeper,
     agentTools,
-    agent: new AgentService({ apiKey: env.GROQ_API_KEY, model: env.GROQ_MODEL }, agentTools, repositories.conversations),
+    agentActions,
+    agentUsage: new AgentUsageService(repositories.conversations),
+    agent,
     admin: new AdminService(
       repositories.orders,
       orders,
@@ -255,7 +283,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     cart: new CartController(services.cart),
     orders: new OrdersController(services.orders),
     payments: new PaymentsController(services.payments),
-    agent: new AgentController(services.agent),
+    agent: new AgentController(services.agent, services.agentActions, services.agentUsage),
     mcp: new McpController(services.agentTools),
     admin: new AdminController(services.admin),
     inventory: new InventoryController(services.inventory),
@@ -278,6 +306,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin/jobs', jobsAdminRoutes(controllers.jobs, guards)],
+    ['/admin/agent', adminAgentRoutes(controllers.agent, guards)],
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
 

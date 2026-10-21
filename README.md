@@ -219,6 +219,21 @@ low-stock alerts (`$unwind sizes → $match stock < 5`).
 | Audit | Every permission-guarded write is logged after the response (actor, permission, route, targets, redacted diff, status) and browsable at `/admin/audit` with keyset pagination. |
 | Headers & CORS | Deny-all CSP, no-referrer, same-site CORP, HSTS in production; credentialed CORS only for `CORS_ORIGINS`. CodeQL and grouped Dependabot updates run in CI. |
 
+## The shopping assistant
+
+Aria is a tool-using agent, not a chatbot wrapper. The pieces, all in `backend/src/modules/agent`:
+
+| Concern | Design |
+| --- | --- |
+| Tools | Each tool is a **Command object** (zod schema, description, access level, channels, `requiresConfirmation`). One `ToolRegistry` validates arguments, enforces access and generates both the chat tool specs (JSON Schema) and the **MCP server**, so the two can never drift. Pricing tools (`get_best_price`, `suggest_bundles`) call the promotion engine instead of letting the model do arithmetic. |
+| Models | `LLMProvider` interface with **Groq** and **Claude** adapters (Adapter pattern: messages, tool calls, streaming, usage), chosen by `LLMProviderFactory` from `LLM_PROVIDER`. A `ResilientLLMProvider` decorator adds retry with jittered backoff (never after tokens have streamed) and a circuit breaker; the Claude adapter opts into server-side refusal fallbacks. |
+| Streaming | `POST /agent/chat/stream` is Server-Sent Events over POST: `token`, `tool` (start/end), `action`, then `done`. Closing the connection aborts the model call; the widget falls back to `POST /agent/chat`. |
+| Human in the loop | `add_to_cart`, `cancel_order` and `request_refund` only create a **pending action** bound to the signed-in customer and session, expiring after `AGENT_ACTION_TTL_MINUTES`. The widget renders a confirmation card; `POST /agent/actions/:id/confirm` (authenticated, CSRF-protected) claims it atomically and runs it through the normal cart/order services. Guests and MCP clients get no write tools. |
+| Prompt injection | Tool results are wrapped in `<tool_result>` and customer text in `<customer_content>`; instruction-shaped phrases inside them are neutralised. A deterministic `ToolUsePolicy` caps tool calls per message and only lets a write tool through when the customer's **own message** asked for that action, so a review saying "cancel my order" cannot trigger one even if the model obeys it. An output guard blocks replies quoting the system prompt. |
+| Context | Unsummarised turns are kept under `AGENT_HISTORY_TOKEN_BUDGET`; older turns are folded into a rolling summary stored on the conversation (falling back to trimming if summarisation fails). |
+| Cost | Tokens, latency and estimated USD cost (per-model price table, overridable via `AGENT_MODEL_PRICING`) are recorded per reply and per conversation, shown on `/admin/chats` with daily totals, and exported as `storefront_agent_*` Prometheus metrics. |
+| Evals | Six graded scenarios (discovery, best price, order status, add-to-bag, injection resistance, guest writes). `npm test` runs them with scripted reference models plus negative controls that prove the graders catch invented prices, fake links and skipped tools; `npm run eval:agent -w backend` runs them against the configured real model and prints a scorecard. |
+
 ## Indexes
 
 - `products`: `{category:1, price:1}` compound (filters), text index on title+description (search), unique slug
@@ -263,5 +278,6 @@ npm run lint && npm run typecheck && npm run format:check
 npm run db:status -w backend   # applied/pending migrations
 npm run worker -w backend      # job worker (needs REDIS_URL)
 npm run search:reindex -w backend
+npm run eval:agent -w backend  # agent scorecard against the configured model
 TEST_REDIS_URL=redis://localhost:6379 TEST_MEILI_URL=http://localhost:7700 npm test -w backend
 ```

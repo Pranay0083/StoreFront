@@ -39,6 +39,23 @@ const EnvSchema = z
     RAZORPAY_WEBHOOK_SECRET: z.string().default(''),
     GROQ_API_KEY: z.string().default(''),
     GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
+    LLM_PROVIDER: z.enum(['auto', 'anthropic', 'groq']).default('auto'),
+    ANTHROPIC_API_KEY: z.string().default(''),
+    ANTHROPIC_MODEL: z.string().default('claude-opus-5-5'),
+    AGENT_HISTORY_TOKEN_BUDGET: z.coerce.number().int().min(200).default(3000),
+    AGENT_MAX_TOOL_TURNS: z.coerce.number().int().min(1).max(12).default(6),
+    AGENT_ACTION_TTL_MINUTES: z.coerce.number().positive().default(10),
+    AGENT_MODEL_PRICING: z
+      .string()
+      .optional()
+      .refine(v => {
+        if (!v) return true;
+        try {
+          return typeof JSON.parse(v) === 'object';
+        } catch {
+          return false;
+        }
+      }, 'AGENT_MODEL_PRICING must be a JSON object of {model: {input, output}} USD per million tokens'),
     RESERVATION_TTL_MINUTES: z.coerce.number().positive().default(15),
     RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),

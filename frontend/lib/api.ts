@@ -85,6 +85,13 @@ export async function api<T = any>(path: string, options: RequestInit = {}, retr
   return data as T;
 }
 
+/** Streaming POST (e.g. Server-Sent Events) with the same credentials and CSRF header as `api`. */
+export async function apiStream(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'text/event-stream' };
+  if (!isServer) headers['X-CSRF-Token'] = await ensureCsrfToken();
+  return fetch(`${BASE}/api/v1${path}`, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(body), signal });
+}
+
 /** Formats an integer paise amount as rupees, e.g. 249900 → ₹2,499. */
 export { formatINR as fmtINR } from '@storefront/contracts';
 

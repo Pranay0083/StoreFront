@@ -13,6 +13,7 @@ import { promotionRedemptions } from './040-promotion-redemptions';
 import { couponsToPromotions } from './041-coupons-to-promotions';
 import { lineRefunds } from './042-line-refunds';
 import { platformIndexes } from './050-platform-indexes';
+import { agentActions } from './060-agent-actions';
 
 export const migrations: readonly Migration[] = [
   ensureIndexes,
@@ -29,4 +30,5 @@ export const migrations: readonly Migration[] = [
   couponsToPromotions,
   lineRefunds,
   platformIndexes,
+  agentActions,
 ];
