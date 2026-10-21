@@ -1,13 +1,17 @@
 'use client';
 
 import { Sparkles, Tag, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { PriceBreakdown as Breakdown, PricingSuggestion, Product } from '@storefront/contracts';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, fmtINR } from '@/lib/api';
+import { useExperiment } from '@/lib/experiments';
+
+/** A/B test: do near-miss "add one more" nudges lift paid conversion? Variants: shown (control) / hidden. */
+export const NEAR_MISS_EXPERIMENT = 'checkout-near-miss';
 
 function Row({ label, value, tone, testId }: { label: string; value: string; tone?: 'savings' | 'strong'; testId?: string }) {
   return (
@@ -52,6 +56,12 @@ export function PriceSummary({ breakdown, loading }: { breakdown: Breakdown | nu
 export function AppliedOffers({ breakdown }: { breakdown: Breakdown }) {
   const { addItem } = useCart();
   const [adding, setAdding] = useState<string | null>(null);
+  const { variant, expose } = useExperiment(NEAR_MISS_EXPERIMENT);
+  const hasSuggestions = breakdown.suggestions.length > 0;
+  useEffect(() => {
+    if (hasSuggestions) expose();
+  }, [hasSuggestions, expose]);
+  const suggestions = variant === 'hidden' ? [] : breakdown.suggestions;
 
   const addSuggested = async (s: PricingSuggestion) => {
     if (!s.slug || !s.size) return;
@@ -75,7 +85,7 @@ export function AppliedOffers({ breakdown }: { breakdown: Breakdown }) {
     }
   };
 
-  if (!breakdown.applied.length && !breakdown.suggestions.length) return null;
+  if (!breakdown.applied.length && !suggestions.length) return null;
   return (
     <div className="space-y-4" data-testid="applied-offers">
       {breakdown.applied.length > 0 && (
@@ -105,7 +115,7 @@ export function AppliedOffers({ breakdown }: { breakdown: Breakdown }) {
           </ul>
         </details>
       )}
-      {breakdown.suggestions.map(s => (
+      {suggestions.map(s => (
         <div key={s.message} className="flex items-center justify-between gap-3 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <span className="flex items-start gap-2">
             <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { refreshExperiments } from '@/lib/experiments';
 import { api } from '@/lib/api';
 import { MAX_LINE_QTY, toCartLine, type CartItem, type CartLine, type CartResponse, type User } from '@storefront/contracts';
 
@@ -105,18 +106,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const d = await api<{ user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    refreshExperiments();
     setUser(d.user);
     return d.user;
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
     const d = await api<{ user: User }>('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) });
+    refreshExperiments();
     setUser(d.user);
     return d.user;
   }, []);
 
   const logout = useCallback(async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
+    refreshExperiments();
     setUser(false);
   }, []);
 
