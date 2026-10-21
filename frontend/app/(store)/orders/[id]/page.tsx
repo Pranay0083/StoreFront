@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, fmtDate, fmtDateTime, fmtINR } from '@/lib/api';
+import { useLiveEvents } from '@/lib/live';
 
 const DAY_MS = 86_400_000;
 const REFUND_LABELS: Record<Order['refunds'][number]['status'], string> = {
@@ -39,6 +40,10 @@ function OrderDetailContent() {
     load();
     if (search.get('paid')) toast.success('Order confirmed — thank you.');
   }, [load, search]);
+
+  useLiveEvents(['orders'], e => {
+    if ((e.data as { orderId?: string }).orderId === id) load();
+  });
 
   useEffect(() => {
     if (order?.status !== 'refund_requested') return;
