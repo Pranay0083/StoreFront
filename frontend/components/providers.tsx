@@ -42,7 +42,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null | false>(null);
   const [items, setItems] = useState<CartItem[]>([]);
   const [open, setOpen] = useState(false);
-  const syncTimer = useRef<ReturnType<typeof setTimeout>>();
+  const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hydrated = useRef(false);
   /** Lines the server last confirmed; skips redundant PUTs when only display data changed. */
   const syncedSignature = useRef<string | null>(null);

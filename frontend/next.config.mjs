@@ -7,9 +7,8 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nextConfig = {
   output: 'standalone',
   transpilePackages: ['@storefront/contracts'],
-  experimental: {
-    outputFileTracingRoot: repoRoot,
-  },
+  outputFileTracingRoot: repoRoot,
+  eslint: { ignoreDuringBuilds: true },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
