@@ -88,6 +88,15 @@ root (or a module's `register(jobs)`), then `jobs.enqueue(name, data, { jobId, d
 `UnrecoverableJobError` to dead-letter immediately. **Adding an event handler**:
 `eventBus.subscribe('OrderPaid', '<module>.<handler>', fn)`; handlers must be idempotent.
 
+## Growth and back-office tooling
+
+- **Feature flags & A/B experiments**: deterministic SHA-256 bucketing for percentage rollouts, sticky variant assignment that follows an anonymous visitor through sign-in, exposure logging (only visitors who actually saw the tested UI count), OrderPaid conversion attribution, and a results view with a pooled two-proportion z-test, minimum-sample and sample-ratio-mismatch warnings. The live demo experiment `checkout-near-miss` shows or hides "add one more item" nudges in the bag.
+- **Frequently bought together**: a repeatable job mines association rules (support, confidence, lift) from paid baskets; `GET /api/v1/products/:id/recommendations` falls back to same-category bestsellers.
+- **Real-time updates**: domain events fan out over pub/sub to a Server-Sent Events hub (`GET /api/v1/realtime/stream`) with heartbeats and Last-Event-ID replay: customers see their order move, staff see the order queue and low-stock alerts live.
+- **CSV bulk import**: uploads stream into GridFS, are deduplicated by content hash, and are processed by a background job that upserts by slug through the catalog service so stock changes land in the inventory ledger; per-row errors download as CSV.
+- **Promotion builder & simulator**: structured AND/OR/NOT rule editor, version diffs, and a simulator that prices any cart for a segment, time and payment method.
+- **OpenAPI 3.1**: generated from the route table and zod schemas at `/api/v1/openapi.json`, browsable at `/api/v1/docs`; CI fails if `backend/openapi.json` is stale (`npm run openapi:generate -w backend`).
+
 ## The order lifecycle
 
 ```
