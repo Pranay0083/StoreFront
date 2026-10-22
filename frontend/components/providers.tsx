@@ -1,8 +1,11 @@
 'use client';
 
+import { QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { refreshExperiments } from '@/lib/experiments';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
+import { makeQueryClient, queryKeys } from '@/lib/query';
 import { MAX_LINE_QTY, toCartLine, type CartItem, type CartLine, type CartResponse, type User } from '@storefront/contracts';
 
 interface AuthCtx {
@@ -17,6 +20,7 @@ interface CartCtx {
   count: number;
   subtotal: number;
   open: boolean;
+  syncing: boolean;
   setOpen: (v: boolean) => void;
   addItem: (item: CartItem) => void;
   updateQty: (productId: string, size: string, qty: number) => void;
@@ -32,20 +36,29 @@ export const useCart = () => useContext(CartContext);
 
 /** Bumped when the stored cart shape changes (v2: prices in paise). */
 const CART_STORAGE_KEY = 'sf_cart_v2';
+const SYNC_DEBOUNCE_MS = 500;
 
 const keyOf = (i: { productId: string; size: string }) => `${i.productId}::${i.size}`;
 const linesOf = (items: CartItem[]): CartLine[] => items.map(toCartLine);
 const signature = (items: CartItem[]) => JSON.stringify(linesOf(items));
 const maxQtyFor = (item: Pick<CartItem, 'stock'>) => Math.max(1, Math.min(MAX_LINE_QTY, item.stock ?? MAX_LINE_QTY));
 
-export function Providers({ children }: { children: React.ReactNode }) {
+function mergeCarts(server: CartItem[], local: CartItem[]): CartItem[] {
+  const map = new Map(server.map(i => [keyOf(i), i]));
+  for (const l of local) map.set(keyOf(l), { ...l, ...map.get(keyOf(l)), qty: l.qty });
+  return Array.from(map.values());
+}
+
+function SessionProviders({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null | false>(null);
   const [items, setItems] = useState<CartItem[]>([]);
   const [open, setOpen] = useState(false);
-  const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hydrated = useRef(false);
-  /** Lines the server last confirmed; skips redundant PUTs when only display data changed. */
-  const syncedSignature = useRef<string | null>(null);
+  const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  /** The user whose server cart has been merged into the local one; syncing waits for that merge. */
+  const mergedFor = useRef<string | null>(null);
+  const signedIn = Boolean(user && typeof user === 'object');
 
   useEffect(() => {
     let saved: CartItem[] = [];
@@ -67,62 +80,85 @@ export function Providers({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
+  const serverCart = useQuery({
+    queryKey: queryKeys.cart,
+    queryFn: () => api<CartResponse>('/cart'),
+    enabled: signedIn,
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    if (!signedIn || !serverCart.data || typeof user !== 'object' || !user) return;
+    if (mergedFor.current === user.id) return;
+    mergedFor.current = user.id;
+    setItems(local => mergeCarts(serverCart.data.items, local));
+  }, [signedIn, serverCart.data, user]);
+
+  const sync = useMutation({
+    mutationFn: (lines: CartLine[]) => api<CartResponse>('/cart', { method: 'PUT', body: JSON.stringify({ items: lines }) }),
+    onSuccess: (data, sent) => {
+      queryClient.setQueryData(queryKeys.cart, data);
+      // Edits made while the request was in flight win; they will be synced next.
+      setItems(current => (JSON.stringify(linesOf(current)) === JSON.stringify(sent) ? data.items : current));
+    },
+    onError: error => {
+      // The server refused this cart (e.g. a line is no longer sellable): roll back to what it last accepted.
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+        const confirmed = queryClient.getQueryData<CartResponse>(queryKeys.cart);
+        if (confirmed) setItems(confirmed.items);
+        toast.error(error.message);
+      }
+    },
+  });
+
   useEffect(() => {
     if (!hydrated.current) return;
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
     } catch {}
-    if (!user || typeof user !== 'object' || syncedSignature.current === null) return;
-    if (signature(items) === syncedSignature.current) return;
+    if (!signedIn || typeof user !== 'object' || !user || mergedFor.current !== user.id) return;
+    const confirmed = queryClient.getQueryData<CartResponse>(queryKeys.cart);
+    if (confirmed && signature(confirmed.items) === signature(items)) return;
     clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      const sent = signature(items);
-      api<CartResponse>('/cart', { method: 'PUT', body: JSON.stringify({ items: linesOf(items) }) })
-        .then(d => {
-          syncedSignature.current = signature(d.items);
-          // Edits made while the request was in flight win; they will be synced next.
-          setItems(current => (signature(current) === sent ? d.items : current));
-        })
-        .catch(() => {});
-    }, 500);
-  }, [items, user]);
+    syncTimer.current = setTimeout(() => sync.mutate(linesOf(items)), SYNC_DEBOUNCE_MS);
+    // `sync` is stable for our purposes; depending on it would re-run on every mutation state change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, signedIn, user, queryClient]);
 
-  const mergeServerCart = useCallback(async () => {
-    try {
-      const server = await api<CartResponse>('/cart');
-      syncedSignature.current = signature(server.items);
-      setItems(local => {
-        const map = new Map(server.items.map(i => [keyOf(i), i]));
-        for (const l of local) map.set(keyOf(l), { ...l, ...map.get(keyOf(l)), qty: l.qty });
-        return Array.from(map.values());
-      });
-    } catch {}
-  }, []);
+  const onSignedIn = useCallback(
+    (next: User) => {
+      refreshExperiments();
+      mergedFor.current = null;
+      queryClient.invalidateQueries();
+      setUser(next);
+      return next;
+    },
+    [queryClient],
+  );
 
-  useEffect(() => {
-    if (user && typeof user === 'object') mergeServerCart();
-    else syncedSignature.current = null;
-  }, [user, mergeServerCart]);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const d = await api<{ user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+      return onSignedIn(d.user);
+    },
+    [onSignedIn],
+  );
 
-  const login = useCallback(async (email: string, password: string) => {
-    const d = await api<{ user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-    refreshExperiments();
-    setUser(d.user);
-    return d.user;
-  }, []);
-
-  const register = useCallback(async (name: string, email: string, password: string) => {
-    const d = await api<{ user: User }>('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) });
-    refreshExperiments();
-    setUser(d.user);
-    return d.user;
-  }, []);
+  const register = useCallback(
+    async (name: string, email: string, password: string) => {
+      const d = await api<{ user: User }>('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) });
+      return onSignedIn(d.user);
+    },
+    [onSignedIn],
+  );
 
   const logout = useCallback(async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
     refreshExperiments();
+    mergedFor.current = null;
+    queryClient.clear();
     setUser(false);
-  }, []);
+  }, [queryClient]);
 
   const addItem = useCallback((item: CartItem) => {
     setItems(prev => {
@@ -155,9 +191,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, login, register, logout }}>
-      <CartContext.Provider value={{ items, count, subtotal, open, setOpen, addItem, updateQty, removeItem, clear }}>
+      <CartContext.Provider
+        value={{ items, count, subtotal, open, syncing: sync.isPending, setOpen, addItem, updateQty, removeItem, clear }}
+      >
         {children}
       </CartContext.Provider>
     </AuthContext.Provider>
+  );
+}
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(makeQueryClient);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SessionProviders>{children}</SessionProviders>
+    </QueryClientProvider>
   );
 }
