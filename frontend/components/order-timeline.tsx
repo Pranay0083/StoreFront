@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils';
 const FLOW = ['created', 'paid', 'packed', 'shipped', 'delivered'] as const;
 
 export function OrderTimeline({ order }: { order: Order }) {
-  const reached = new Set(order.statusHistory.map(e => e.to));
-  reached.add(order.status as any);
+  const reached = new Set<string>(order.statusHistory.map(e => e.to));
+  reached.add(order.status);
   const isTerminalBranch = order.status === 'cancelled' || order.status === 'refunded';
   const openRefund = order.refunds?.find(r => r.status === 'requested' || r.status === 'processing' || r.status === 'pending');
   const lastFlowIdx = Math.max(...FLOW.map((s, i) => (reached.has(s) ? i : -1)));

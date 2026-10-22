@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/api';
 import { useAuth } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,8 +29,8 @@ export default function RegisterPage() {
       const u = await register(name, email, password);
       toast.success(`Welcome, ${u.name}`);
       router.replace('/');
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      toast.error(errorMessage(err));
     } finally {
       setLoading(false);
     }
