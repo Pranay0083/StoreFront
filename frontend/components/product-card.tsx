@@ -3,8 +3,11 @@ import Link from 'next/link';
 import { fmtINR } from '@/lib/api';
 import type { Product } from '@storefront/contracts';
 
-export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
-  const totalStock = product.sizes.reduce((s, v) => s + v.stock, 0);
+export type CardProduct = Pick<Product, '_id' | 'title' | 'slug' | 'price' | 'compareAtPrice' | 'images' | 'category'> &
+  Partial<Pick<Product, 'sizes'>>;
+
+export function ProductCard({ product, index = 0 }: { product: CardProduct; index?: number }) {
+  const totalStock = product.sizes?.reduce((s, v) => s + v.stock, 0) ?? Infinity;
   return (
     <Link
       href={`/products/${product.slug}`}
@@ -20,9 +23,9 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
-        {product.compareAtPrice && (
+        {product.compareAtPrice ? (
           <span className="absolute left-3 top-3 bg-black px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-white">Sale</span>
-        )}
+        ) : null}
         {totalStock <= 5 && totalStock > 0 && (
           <span className="absolute right-3 top-3 bg-white/90 px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-destructive">
             Low stock
@@ -34,7 +37,12 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         <h3 className="mt-1 font-serif text-lg font-medium leading-snug">{product.title}</h3>
         <p className="mt-1 text-sm">
           <span className="font-semibold">{fmtINR(product.price)}</span>
-          {product.compareAtPrice && <span className="ml-2 text-muted-foreground line-through">{fmtINR(product.compareAtPrice)}</span>}
+          {product.compareAtPrice ? (
+            <span className="ml-2 text-muted-foreground line-through">
+              <span className="sr-only">Was </span>
+              {fmtINR(product.compareAtPrice)}
+            </span>
+          ) : null}
         </p>
       </div>
     </Link>
