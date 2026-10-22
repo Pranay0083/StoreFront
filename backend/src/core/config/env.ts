@@ -34,6 +34,8 @@ const EnvSchema = z
     ADMIN_EMAIL: z.string().email().default('admin@storefront.dev'),
     ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD must be at least 8 characters').optional(),
     FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+    STOREFRONT_REVALIDATE_URL: z.string().url().optional(),
+    STOREFRONT_REVALIDATE_SECRET: z.string().min(16, 'STOREFRONT_REVALIDATE_SECRET must be at least 16 characters').optional(),
     RAZORPAY_KEY_ID: z.string().default(''),
     RAZORPAY_KEY_SECRET: z.string().default(''),
     RAZORPAY_WEBHOOK_SECRET: z.string().default(''),

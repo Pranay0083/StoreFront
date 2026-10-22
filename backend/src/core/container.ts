@@ -53,6 +53,7 @@ import { RealtimeHub } from '../modules/realtime/realtime.hub';
 import { RealtimeController, realtimeRoutes, registerRealtimeHandlers } from '../modules/realtime/realtime.routes';
 import { ImportsController, importsRoutes } from '../modules/imports/imports.routes';
 import { ImportsService } from '../modules/imports/imports.service';
+import { StorefrontRevalidator } from '../modules/storefront/storefront-revalidator';
 import { ApiDocs, docsUiRoutes, OPENAPI_OVERRIDES, openApiRoutes } from '../modules/docs/docs.routes';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
@@ -207,6 +208,13 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   registerRealtimeHandlers(eventBus, realtime);
   const imports = new ImportsService(catalog, jobs, logger, { maxBytes: env.IMPORT_MAX_BYTES, maxRows: env.IMPORT_MAX_ROWS });
   imports.register();
+  if (env.STOREFRONT_REVALIDATE_SECRET) {
+    new StorefrontRevalidator(
+      { url: env.STOREFRONT_REVALIDATE_URL ?? `${env.FRONTEND_URL}/api/revalidate`, secret: env.STOREFRONT_REVALIDATE_SECRET },
+      repositories.products,
+      logger,
+    ).register(eventBus, jobs, repositories.orders);
+  }
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
