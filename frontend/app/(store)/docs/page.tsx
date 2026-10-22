@@ -34,6 +34,7 @@ function Endpoint({ method, path, desc, auth }: { method: string; path: string; 
 export default function DocsPage() {
   const [origin, setOrigin] = useState('https://your-storefront-host');
   useEffect(() => setOrigin(window.location.origin), []);
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || origin;
 
   return (
     <div data-testid="docs-page" className="mx-auto max-w-4xl px-5 py-16 sm:px-8">
@@ -69,17 +70,28 @@ export default function DocsPage() {
             sent as an httpOnly cookie or an <code className="bg-secondary px-1.5 py-0.5 text-xs">Authorization: Bearer</code> header. Admin
             routes require an admin-role token.
           </p>
-          <div className="space-y-2">
-            <Endpoint method="POST" path="/api/v1/auth/register" desc="Create an account, returns JWT cookie" />
-            <Endpoint method="POST" path="/api/v1/auth/login" desc="Sign in, returns JWT cookie + user" />
-            <Endpoint method="GET" path="/api/v1/products" desc="List products — q, category, size, minPrice, maxPrice, sort, page" />
-            <Endpoint method="GET" path="/api/v1/products/categories" desc="Categories with counts" />
-            <Endpoint method="GET" path="/api/v1/products/:slug" desc="Single product with per-size stock" />
-            <Endpoint method="GET" path="/api/v1/cart" desc="Server-side cart" auth="auth" />
-            <Endpoint method="POST" path="/api/v1/orders" desc="Place an order (state machine: created → …)" auth="auth" />
-            <Endpoint method="GET" path="/api/v1/orders" desc="Your orders with audit timeline" auth="auth" />
-            <Endpoint method="POST" path="/api/v1/agent/chat" desc="Talk to Aria — sessionId + message" />
-            <Endpoint method="GET" path="/api/v1/admin/conversations" desc="All agent conversations w/ transcripts" auth="admin" />
+          <p>
+            The full reference is generated from the server&apos;s own route table and request schemas, so it never drifts from the code:
+            every path, parameter, request body and the permission each admin route needs.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={`${apiBase}/api/v1/docs/`}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="docs-api-reference"
+              className="label-caps bg-black px-4 py-2 text-white transition-opacity hover:opacity-80"
+            >
+              Interactive API reference
+            </a>
+            <a
+              href={`${apiBase}/api/v1/openapi.json`}
+              target="_blank"
+              rel="noreferrer"
+              className="label-caps border border-black/15 px-4 py-2 transition-colors hover:bg-black hover:text-white"
+            >
+              OpenAPI 3.1 spec
+            </a>
           </div>
           <p className="label-caps pt-2 text-muted-foreground">Example — search products</p>
           <Code>{`curl "${origin}/api/v1/products?q=jacket&maxPrice=500000&sort=rating"`}</Code>

@@ -1,6 +1,19 @@
 'use client';
 
-import { ArrowLeft, LayoutDashboard, LogOut, MessageSquare, Package, ScrollText, ShoppingBag, TicketPercent, Users } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  FileUp,
+  FlaskConical,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Package,
+  ScrollText,
+  ShoppingBag,
+  TicketPercent,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -13,10 +26,13 @@ const LINKS: Array<{ href: string; label: string; icon: typeof LayoutDashboard; 
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
   { href: '/admin/orders', label: 'Order queue', icon: Package, permission: 'orders:read' },
   { href: '/admin/products', label: 'Products', icon: ShoppingBag, permission: 'catalog:write' },
+  { href: '/admin/imports', label: 'Imports', icon: FileUp, permission: 'catalog:write' },
   { href: '/admin/promotions', label: 'Promotions', icon: TicketPercent, permission: 'promotions:write' },
+  { href: '/admin/experiments', label: 'Experiments', icon: FlaskConical, permission: 'experiments:manage' },
   { href: '/admin/chats', label: 'Agent chats', icon: MessageSquare, permission: 'chats:read' },
   { href: '/admin/users', label: 'Team', icon: Users, permission: 'users:manage' },
   { href: '/admin/audit', label: 'Audit log', icon: ScrollText, permission: 'audit:read' },
+  { href: '/admin/operations', label: 'Operations', icon: Activity, permission: 'jobs:manage' },
 ];
 
 const isStaffUser = (user: User | null | false): user is User => !!user && typeof user === 'object' && isStaff(user.role);

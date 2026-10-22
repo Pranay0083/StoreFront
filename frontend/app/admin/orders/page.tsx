@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { api, fmtDateTime, fmtINR } from '@/lib/api';
+import { useLiveEvents } from '@/lib/live';
 import { ADMIN_ORDER_ACTIONS, ORDER_STATUSES, type Order, type OrderStatus } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +47,12 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     load();
   }, [load]);
+  const live = useLiveEvents(['admin-orders'], e => {
+    const { orderNumber } = e.data as { orderNumber?: string };
+    if (e.event === 'order.placed') toast(`New order ${orderNumber ?? ''}`.trim());
+    if (e.event === 'order.paid') toast.success(`Payment received for ${orderNumber ?? 'an order'}`);
+    load();
+  });
   useEffect(() => {
     setSelected(new Set());
     setPage(1);
@@ -84,7 +91,14 @@ export default function AdminOrdersPage() {
 
   return (
     <div data-testid="admin-orders-page">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Order queue</h1>
+      <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
+        Order queue
+        <span
+          data-testid="admin-orders-live"
+          title={live ? 'Receiving live updates' : 'Live updates paused; reconnecting'}
+          className={cn('h-2 w-2 rounded-full', live ? 'bg-emerald-600' : 'bg-black/20')}
+        />
+      </h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Every transition is validated by the state machine and audited. Illegal moves are rejected.
       </p>

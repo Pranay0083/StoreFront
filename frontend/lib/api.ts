@@ -92,6 +92,21 @@ export async function apiStream(path: string, body: unknown, signal?: AbortSigna
   return fetch(`${BASE}/api/v1${path}`, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(body), signal });
 }
 
+/** Multipart upload (e.g. CSV import); lets the browser set the boundary and still sends the CSRF token. */
+export async function apiUpload<T = unknown>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${BASE}/api/v1${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-CSRF-Token': await ensureCsrfToken() },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(data?.error || 'Upload failed', res.status, data?.code);
+  return data as T;
+}
+
+export const apiUrl = (path: string) => `${BASE}/api/v1${path}`;
+
 /** Formats an integer paise amount as rupees, e.g. 249900 → ₹2,499. */
 export { formatINR as fmtINR } from '@storefront/contracts';
 

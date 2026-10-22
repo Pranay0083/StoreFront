@@ -45,23 +45,25 @@ export class AuthGuards {
   };
 
   /** Requires every listed permission and records the grant for the audit trail. */
-  requirePermission(...required: [Permission, ...Permission[]]): RequestHandler {
-    return async (req: Request, _res: Response, next: NextFunction) => {
+  requirePermission(...required: [Permission, ...Permission[]]): RequestHandler & { permissions: Permission[] } {
+    const guard = async (req: Request, _res: Response, next: NextFunction) => {
       const user = await this.resolve(req);
       const missing = required.find(p => !user.permissions.includes(p));
       if (missing) throw new ForbiddenError(`Missing permission: ${missing}`);
       req.authz = { permissions: [...new Set([...(req.authz?.permissions ?? []), ...required])] };
       next();
     };
+    return Object.assign(guard, { permissions: required });
   }
 
-  requireRole(role: Role): RequestHandler {
-    return async (req: Request, _res: Response, next: NextFunction) => {
+  requireRole(role: Role): RequestHandler & { role: Role } {
+    const guard = async (req: Request, _res: Response, next: NextFunction) => {
       const user = await this.resolve(req);
       if (user.role !== role) throw new ForbiddenError(`${role} access required`);
       req.authz = { permissions: [`role:${role}`] };
       next();
     };
+    return Object.assign(guard, { role });
   }
 
   /** @deprecated Prefer `requirePermission(...)`; kept so admin-only routes keep working. */

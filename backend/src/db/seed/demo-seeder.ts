@@ -8,6 +8,7 @@ import { ProductModel } from '../../modules/catalog/product.model';
 import { recordOpeningBalances } from '../../modules/inventory/opening-balances';
 import { OrderModel } from '../../modules/orders/order.model';
 import { ReviewModel } from '../../modules/reviews/review.model';
+import { seedDemoExperiments } from './demo-experiments';
 import { seedDemoPromotions } from './demo-promotions';
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=900&q=80&auto=format&fit=crop`;
@@ -292,6 +293,7 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
   await seedAdmin(env);
   const customer = await seedCustomer('customer@storefront.dev', 'Demo Customer', 'Customer@123');
   await seedDemoPromotions(mongoose.connection.db!);
+  await seedDemoExperiments(mongoose.connection.db!);
   if ((await ProductModel.countDocuments()) > 0) return { catalogSeeded: false };
 
   const products = await ProductModel.insertMany(PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));

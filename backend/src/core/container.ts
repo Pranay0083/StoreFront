@@ -35,6 +35,25 @@ import { CatalogController } from '../modules/catalog/catalog.controller';
 import { catalogRoutes } from '../modules/catalog/catalog.routes';
 import { CachingCatalog } from '../modules/catalog/caching-catalog';
 import { CatalogService } from '../modules/catalog/catalog.service';
+import {
+  adminExperimentsRoutes,
+  adminFlagsRoutes,
+  ExperimentsController,
+  experimentsRoutes,
+  registerExperimentHandlers,
+} from '../modules/experiments/experiments.routes';
+import { ExperimentsService } from '../modules/experiments/experiments.service';
+import {
+  adminRecommendationsRoutes,
+  RecommendationsController,
+  recommendationsRoutes,
+} from '../modules/recommendations/recommendations.routes';
+import { RecommendationsService } from '../modules/recommendations/recommendations.service';
+import { RealtimeHub } from '../modules/realtime/realtime.hub';
+import { RealtimeController, realtimeRoutes, registerRealtimeHandlers } from '../modules/realtime/realtime.routes';
+import { ImportsController, importsRoutes } from '../modules/imports/imports.routes';
+import { ImportsService } from '../modules/imports/imports.service';
+import { ApiDocs, docsUiRoutes, OPENAPI_OVERRIDES, openApiRoutes } from '../modules/docs/docs.routes';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
 import { ProductRepository } from '../modules/catalog/product.repository';
@@ -85,6 +104,8 @@ import type { Env } from './config/env';
 import { CookiePolicy } from './http/cookies';
 import { CsrfProtection } from './http/csrf';
 import { idempotent } from './http/idempotency/idempotency.middleware';
+import { generateOpenApi } from './http/openapi';
+import { API_PREFIX } from './http/paths';
 import { createRateLimiters } from './http/rate-limit';
 import { memoryInfrastructure, type Infrastructure } from './infrastructure';
 import { TransactionRunner } from './persistence/transaction';
@@ -173,6 +194,19 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   registerPricingHandlers(eventBus, { pricing, tx });
   const refunds = new RefundSaga(orders, inventory, paymentGateway, logger);
   refunds.register(eventBus);
+  const experiments = new ExperimentsService(infra.cache, 30, metrics.cacheObserver());
+  registerExperimentHandlers(eventBus, experiments);
+  const recommendations = new RecommendationsService(
+    infra.cache,
+    logger,
+    { rebuildIntervalMs: env.RECOMMENDATIONS_REBUILD_INTERVAL_MS, lookbackDays: env.RECOMMENDATIONS_LOOKBACK_DAYS },
+    metrics.cacheObserver(),
+  );
+  recommendations.register(jobs, eventBus);
+  const realtime = new RealtimeHub(infra.pubsub, logger, { bufferSize: 100, heartbeatMs: env.REALTIME_HEARTBEAT_MS });
+  registerRealtimeHandlers(eventBus, realtime);
+  const imports = new ImportsService(catalog, jobs, logger, { maxBytes: env.IMPORT_MAX_BYTES, maxRows: env.IMPORT_MAX_ROWS });
+  imports.register();
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -211,6 +245,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
       relay.start();
       reservationSweeper.start();
       abandonedCarts.start(jobs);
+      recommendations.start(jobs);
       await jobs.start();
     },
     async stop() {
@@ -271,6 +306,10 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     notifications,
     notificationDispatcher,
     abandonedCarts,
+    experiments,
+    recommendations,
+    realtime,
+    imports,
   };
 
   const guards = new AuthGuards(services.auth);
@@ -291,10 +330,15 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     pricing: new PricingController(services.pricing),
     promotions: new PromotionsController(services.promotions),
     jobs: new JobsController(services.jobsAdmin),
+    experiments: new ExperimentsController(services.experiments),
+    recommendations: new RecommendationsController(services.recommendations, jobs),
+    realtime: new RealtimeController(services.realtime),
+    imports: new ImportsController(services.imports),
   };
 
   const routes: Array<[path: string, router: Router]> = [
     ['/auth', authRoutes(controllers.auth, guards)],
+    ['/products', recommendationsRoutes(controllers.recommendations)],
     ['/products', catalogRoutes(controllers.catalog, guards)],
     ['/reviews', reviewsRoutes(controllers.reviews, guards)],
     ['/cart', cartRoutes(controllers.cart, guards)],
@@ -303,12 +347,30 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/pricing', pricingRoutes(controllers.pricing, guards)],
+    ['/experiments', experimentsRoutes(controllers.experiments, guards)],
+    ['/realtime', realtimeRoutes(controllers.realtime, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
     ['/admin/promotions', adminPromotionsRoutes(controllers.promotions, guards)],
     ['/admin/jobs', jobsAdminRoutes(controllers.jobs, guards)],
     ['/admin/agent', adminAgentRoutes(controllers.agent, guards)],
+    ['/admin/imports', importsRoutes(controllers.imports, guards)],
+    ['/admin/recommendations', adminRecommendationsRoutes(controllers.recommendations, guards)],
+    ['/admin/flags', adminFlagsRoutes(controllers.experiments, guards)],
+    ['/admin/experiments', adminExperimentsRoutes(controllers.experiments, guards)],
     ['/admin', adminRoutes(controllers.admin, controllers.staff, guards)],
   ];
+
+  const docs = new ApiDocs(() =>
+    generateOpenApi(routes, {
+      title: 'STOREFRONT API',
+      version: '1.0.0',
+      serverUrl: API_PREFIX,
+      auth: { required: [guards.requireAuth], optional: [guards.optionalAuth], staff: [guards.requireStaff] },
+      overrides: OPENAPI_OVERRIDES,
+      exclude: path => path === '/openapi.json' || path.startsWith('/docs'),
+    }),
+  );
+  routes.push(['/openapi.json', openApiRoutes(docs)], ['/docs', docsUiRoutes(`${API_PREFIX}/openapi.json`)]);
 
   const http = { auditTrail: auditTrail(audit) };
   const health = new HealthMonitor([
@@ -336,6 +398,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     guards,
     controllers,
     routes,
+    docs,
   };
 }
 

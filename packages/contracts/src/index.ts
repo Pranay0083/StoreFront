@@ -3,6 +3,7 @@ export * from './auth';
 export * from './cart';
 export * from './catalog';
 export * from './errors';
+export * from './experiments';
 export * from './money';
 export * from './orders';
 export * from './pricing';
