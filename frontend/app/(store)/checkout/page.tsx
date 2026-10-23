@@ -5,29 +5,39 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { AppliedOffers, PriceSummary, PromoCodes } from '@/components/price-breakdown';
+import { AppliedOffers, LinePrice, PriceSummary, PromoCodes, lineKey } from '@/components/price-breakdown';
 import { useAuth, useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { api, ApiError, fmtINR } from '@/lib/api';
+import { api, ApiError, errorMessage, fmtINR } from '@/lib/api';
 import { REQUOTE_CODES, usePriceQuote } from '@/lib/use-price-quote';
 import type { Order } from '@storefront/contracts';
 
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
+interface RazorpaySuccess {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
 }
 
-function LineTotal({ listTotal, paid }: { listTotal: number; paid?: number }) {
-  if (paid === undefined || paid === listTotal) return <p className="text-sm font-medium">{fmtINR(listTotal)}</p>;
-  return (
-    <p className="text-right text-sm font-medium">
-      <span className="block text-xs text-muted-foreground line-through">{fmtINR(listTotal)}</span>
-      {fmtINR(paid)}
-    </p>
-  );
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  order_id: string;
+  name: string;
+  description: string;
+  prefill: { name: string; contact: string };
+  handler: (res: RazorpaySuccess) => void;
+}
+
+type PaymentSetup =
+  { mode: 'demo' } | { mode: 'razorpay'; keyId: string; amount: number; currency: string; razorpayOrderId: string; orderId: string };
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => { open: () => void };
+  }
 }
 
 export default function CheckoutPage() {
@@ -43,7 +53,7 @@ export default function CheckoutPage() {
 
   const breakdown = quote?.breakdown ?? null;
   const total = breakdown?.total ?? 0;
-  const paidFor = new Map((breakdown?.lines ?? []).map(l => [`${l.productId}::${l.size}`, l.lineTotal]));
+  const pricedLines = new Map((breakdown?.lines ?? []).map(l => [lineKey(l), l]));
 
   useEffect(() => {
     if (user === false) router.replace('/login?next=/checkout');
@@ -71,7 +81,7 @@ export default function CheckoutPage() {
   };
 
   const payWithRazorpay = async (order: Order) => {
-    const setup = await api<any>('/payments/create', {
+    const setup = await api<PaymentSetup>('/payments/create', {
       method: 'POST',
       headers: { 'Idempotency-Key': `payment-session:${order._id}` },
       body: JSON.stringify({ orderId: order._id }),
@@ -92,7 +102,9 @@ export default function CheckoutPage() {
       script.onerror = () => reject(new Error('Failed to load Razorpay'));
       document.body.appendChild(script);
     });
-    const rzp = new window.Razorpay({
+    const Razorpay = window.Razorpay;
+    if (!Razorpay) throw new Error('Failed to load Razorpay');
+    const rzp = new Razorpay({
       key: setup.keyId,
       amount: setup.amount,
       currency: setup.currency,
@@ -100,15 +112,15 @@ export default function CheckoutPage() {
       name: 'STOREFRONT',
       description: order.orderNumber,
       prefill: { name: address.name, contact: address.phone },
-      handler: async (res: any) => {
+      handler: async res => {
         try {
           const result = await api<{ order: Order }>('/payments/verify', {
             method: 'POST',
             body: JSON.stringify({ orderId: order._id, ...res }),
           });
           finishPayment(result.order);
-        } catch (e: any) {
-          toast.error(e.message);
+        } catch (e) {
+          toast.error(errorMessage(e));
         }
       },
     });
@@ -124,7 +136,7 @@ export default function CheckoutPage() {
       pincode: 'Pincode',
       phone: 'Phone',
     })) {
-      if (!(address as any)[k]) return toast.error(`${label} is required`);
+      if (!address[k as keyof typeof address]) return toast.error(`${label} is required`);
     }
     if (!quote || quoting) return;
     if (breakdown?.rejectedCodes.length) return toast.error('Remove the promo codes that cannot be applied first');
@@ -144,12 +156,12 @@ export default function CheckoutPage() {
         body,
       });
       await payWithRazorpay(order);
-    } catch (e: any) {
+    } catch (e) {
       if (e instanceof ApiError && e.code && REQUOTE_CODES.has(e.code)) {
         const fresh = await refresh();
         toast.warning(fresh ? `${e.message} Your new total is ${fmtINR(fresh.breakdown.total)}.` : e.message);
       } else {
-        toast.error(e.message);
+        toast.error(errorMessage(e));
       }
     } finally {
       setPaying(false);
@@ -234,7 +246,7 @@ export default function CheckoutPage() {
           <div className="mt-6 max-h-72 space-y-4 overflow-y-auto">
             {items.map(i => (
               <div key={`${i.productId}-${i.size}`} className="flex items-center gap-3">
-                <div className="relative h-16 w-13 w-14 shrink-0 overflow-hidden bg-muted">
+                <div className="relative h-16 w-14 shrink-0 overflow-hidden bg-muted">
                   <Image src={i.image} alt={i.title} fill sizes="56px" className="object-cover" />
                 </div>
                 <div className="flex-1 text-sm">
@@ -243,7 +255,7 @@ export default function CheckoutPage() {
                     {i.size} × {i.qty}
                   </p>
                 </div>
-                <LineTotal listTotal={i.price * i.qty} paid={paidFor.get(`${i.productId}::${i.size}`)} />
+                <LinePrice listTotal={i.price * i.qty} line={pricedLines.get(lineKey(i))} breakdown={breakdown} />
               </div>
             ))}
           </div>

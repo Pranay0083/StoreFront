@@ -4,7 +4,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { StockNote } from '@/components/cart-sheet';
-import { AppliedOffers, PriceSummary } from '@/components/price-breakdown';
+import { AppliedOffers, LinePrice, PriceSummary, lineKey } from '@/components/price-breakdown';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { fmtINR } from '@/lib/api';
@@ -16,6 +16,7 @@ export default function CartPage() {
   const { items, updateQty, removeItem } = useCart();
   const { quote, loading, error } = usePriceQuote(items, NO_CODES);
   const breakdown = quote?.breakdown ?? null;
+  const pricedLines = new Map((breakdown?.lines ?? []).map(l => [lineKey(l), l]));
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8" data-testid="cart-page">
@@ -49,6 +50,7 @@ export default function CartPage() {
                     </div>
                     <button
                       data-testid={`cart-page-remove-${item.slug}`}
+                      aria-label={`Remove ${item.title} (${item.size})`}
                       onClick={() => removeItem(item.productId, item.size)}
                       className="p-1 text-muted-foreground transition-colors hover:text-destructive"
                     >
@@ -58,13 +60,17 @@ export default function CartPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center border border-black/15">
                       <button
+                        aria-label={`Decrease quantity of ${item.title}`}
                         onClick={() => updateQty(item.productId, item.size, item.qty - 1)}
                         className="flex h-9 w-9 items-center justify-center hover:bg-black/5"
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </button>
-                      <span className="w-10 text-center text-sm">{item.qty}</span>
+                      <span className="w-10 text-center text-sm" aria-live="polite">
+                        {item.qty}
+                      </span>
                       <button
+                        aria-label={`Increase quantity of ${item.title}`}
                         onClick={() => updateQty(item.productId, item.size, item.qty + 1)}
                         disabled={item.stock !== undefined && item.qty >= item.stock}
                         className="flex h-9 w-9 items-center justify-center hover:bg-black/5 disabled:opacity-30"
@@ -72,7 +78,12 @@ export default function CartPage() {
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <p className="font-semibold">{fmtINR(item.price * item.qty)}</p>
+                    <LinePrice
+                      listTotal={item.price * item.qty}
+                      line={pricedLines.get(lineKey(item))}
+                      breakdown={breakdown}
+                      testId={`cart-line-price-${item.slug}`}
+                    />
                   </div>
                 </div>
               </div>

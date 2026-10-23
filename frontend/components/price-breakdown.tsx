@@ -3,7 +3,7 @@
 import { Sparkles, Tag, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import type { PriceBreakdown as Breakdown, PricingSuggestion, Product } from '@storefront/contracts';
+import type { PriceBreakdown as Breakdown, PricedLine, PricingSuggestion, Product } from '@storefront/contracts';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,48 @@ function Row({ label, value, tone, testId }: { label: string; value: string; ton
   );
 }
 
+/** Per-line price after offers: the list total struck through, the allocated total, and which offers paid for it. */
+export function LinePrice({
+  listTotal,
+  line,
+  breakdown,
+  testId,
+}: {
+  listTotal: number;
+  line?: PricedLine;
+  breakdown?: Breakdown | null;
+  testId?: string;
+}) {
+  if (!line || line.lineTotal === listTotal) {
+    return (
+      <p className="text-right text-sm font-medium" data-testid={testId}>
+        {fmtINR(listTotal)}
+      </p>
+    );
+  }
+  const names = new Map((breakdown?.applied ?? []).map(a => [a.promotionId, a.name]));
+  return (
+    <div className="text-right text-sm" data-testid={testId}>
+      <p className="text-xs text-muted-foreground line-through">
+        <span className="sr-only">Was </span>
+        {fmtINR(listTotal)}
+      </p>
+      <p className="font-medium">{fmtINR(line.lineTotal)}</p>
+      {line.discounts.length > 0 && (
+        <ul className="mt-0.5 text-[11px] text-emerald-800">
+          {line.discounts.map(d => (
+            <li key={d.promotionId}>
+              {names.get(d.promotionId) ?? 'Offer'} −{fmtINR(d.amount)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export const lineKey = (l: { productId: string; size: string }) => `${l.productId}::${l.size}`;
+
 /** Stage-by-stage totals for a server price quote. */
 export function PriceSummary({ breakdown, loading }: { breakdown: Breakdown | null; loading?: boolean }) {
   if (!breakdown) {
@@ -31,7 +73,12 @@ export function PriceSummary({ breakdown, loading }: { breakdown: Breakdown | nu
   }
   const shippingCharged = breakdown.shipping - breakdown.shippingDiscount;
   return (
-    <div className={`space-y-3 text-sm transition-opacity ${loading ? 'opacity-60' : ''}`} data-testid="price-summary">
+    <div
+      className={`space-y-3 text-sm transition-opacity ${loading ? 'opacity-60' : ''}`}
+      data-testid="price-summary"
+      aria-busy={loading}
+      aria-live="polite"
+    >
       <Row label="Subtotal" value={fmtINR(breakdown.listSubtotal)} testId="summary-subtotal" />
       {breakdown.markdownTotal > 0 && <Row label="Sale prices" value={`−${fmtINR(breakdown.markdownTotal)}`} tone="savings" />}
       {breakdown.bundleDiscount > 0 && <Row label="Bundle offers" value={`−${fmtINR(breakdown.bundleDiscount)}`} tone="savings" />}
@@ -91,9 +138,13 @@ export function AppliedOffers({ breakdown }: { breakdown: Breakdown }) {
       {breakdown.applied.length > 0 && (
         <ul className="space-y-2">
           {breakdown.applied.map(a => (
-            <li key={a.promotionId} className="flex items-start justify-between gap-3 text-sm">
+            <li
+              key={a.promotionId}
+              className="flex items-start justify-between gap-3 text-sm"
+              data-testid={`applied-offer-${a.promotionId}`}
+            >
               <span className="flex items-start gap-2">
-                <Tag className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-800" />
+                <Tag className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-800" aria-hidden />
                 <span>
                   <span className="font-medium">{a.name}</span>
                   {a.code && <span className="ml-1 text-xs text-muted-foreground">({a.code})</span>}
@@ -116,9 +167,13 @@ export function AppliedOffers({ breakdown }: { breakdown: Breakdown }) {
         </details>
       )}
       {suggestions.map(s => (
-        <div key={s.message} className="flex items-center justify-between gap-3 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div
+          key={s.message}
+          data-testid="near-miss-suggestion"
+          className="flex items-center justify-between gap-3 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+        >
           <span className="flex items-start gap-2">
-            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             {s.message}
           </span>
           {s.kind === 'add-item' && s.slug && (
@@ -161,11 +216,20 @@ export function PromoCodes({
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
+        <label htmlFor="promo-code" className="sr-only">
+          Promo code
+        </label>
         <Input
+          id="promo-code"
           data-testid="promo-code-input"
           value={input}
           onChange={e => setInput(e.target.value.toUpperCase())}
-          onKeyDown={e => e.key === 'Enter' && add()}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              add();
+            }
+          }}
           placeholder="Promo code (try WELCOME10)"
           className="h-10 flex-1"
         />
