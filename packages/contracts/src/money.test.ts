@@ -15,6 +15,12 @@ describe('money helpers', () => {
     expect(formatINR(10_000_000_00)).toBe('₹1,00,00,000');
     expect(formatINR(249_950)).toBe('₹2,499.50');
     expect(formatINR(undefined)).toBe('₹0');
+    expect(formatINR(1)).toBe('₹0.01');
+    expect(formatINR(12_345_678)).toBe('₹1,23,456.78');
+  });
+
+  it('formats alternately whole and fractional amounts with the right precision', () => {
+    expect([100, 150, 200, 205].map(formatINR)).toEqual(['₹1', '₹1.50', '₹2', '₹2.05']);
   });
 
   it('floors percentage discounts to whole paise', () => {
