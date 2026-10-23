@@ -2,12 +2,14 @@
 
 import { AlertTriangle, IndianRupee, Package, TrendingUp, Users } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { paiseToRupees } from '@storefront/contracts';
 import { api, fmtINR } from '@/lib/api';
+import { useLiveEvents } from '@/lib/live';
+import { queryKeys } from '@/lib/query';
 
 interface Stats {
   revenue: number;
@@ -18,30 +20,48 @@ interface Stats {
   pendingOrders: number;
 }
 
-export default function AdminDashboard() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [revenue, setRevenue] = useState<{ date: string; revenue: number; orders: number }[] | null>(null);
-  const [funnel, setFunnel] = useState<{ stage: string; count: number }[] | null>(null);
-  const [top, setTop] = useState<any[] | null>(null);
-  const [lowStock, setLowStock] = useState<any[] | null>(null);
+interface RevenueDay {
+  date: string;
+  revenue: number;
+  orders: number;
+}
 
-  useEffect(() => {
-    api<Stats>('/admin/stats')
-      .then(setStats)
-      .catch(() => {});
-    api<any[]>('/admin/revenue-by-day?days=30')
-      .then(setRevenue)
-      .catch(() => setRevenue([]));
-    api<any[]>('/admin/funnel')
-      .then(setFunnel)
-      .catch(() => setFunnel([]));
-    api<any[]>('/admin/top-products')
-      .then(setTop)
-      .catch(() => setTop([]));
-    api<any[]>('/admin/low-stock')
-      .then(setLowStock)
-      .catch(() => setLowStock([]));
-  }, []);
+interface FunnelStage {
+  stage: string;
+  count: number;
+}
+
+interface TopProduct {
+  _id: string;
+  title: string;
+  image?: string;
+  units: number;
+  revenue: number;
+}
+
+interface LowStockRow {
+  _id: string;
+  title: string;
+  image?: string;
+  size: string;
+  stock: number;
+}
+
+/** A dashboard panel's rows: null while loading, empty on failure so the panel still renders. */
+function useAdminList<T>(path: string) {
+  const q = useQuery({ queryKey: [...queryKeys.adminStats, path], queryFn: () => api<T[]>(path) });
+  return q.data ?? (q.isError ? [] : null);
+}
+
+export default function AdminDashboard() {
+  const statsQuery = useQuery({ queryKey: queryKeys.adminStats, queryFn: () => api<Stats>('/admin/stats') });
+  const stats = statsQuery.data ?? null;
+  const revenue = useAdminList<RevenueDay>('/admin/revenue-by-day?days=30');
+  const funnel = useAdminList<FunnelStage>('/admin/funnel');
+  const top = useAdminList<TopProduct>('/admin/top-products');
+  const lowStock = useAdminList<LowStockRow>('/admin/low-stock');
+
+  useLiveEvents(['admin-orders'], () => void statsQuery.refetch());
 
   const kpis = stats
     ? [
@@ -102,7 +122,7 @@ export default function AdminDashboard() {
                     width={40}
                   />
                   <Tooltip
-                    formatter={(v: any) => [fmtINR(Number(v)), 'Revenue']}
+                    formatter={(v: number | string) => [fmtINR(Number(v)), 'Revenue']}
                     contentStyle={{ borderRadius: 0, border: '1px solid rgba(0,0,0,0.15)', fontSize: 12 }}
                   />
                   <Area type="monotone" dataKey="revenue" stroke="#0A0A0A" strokeWidth={1.75} fill="url(#rev)" />

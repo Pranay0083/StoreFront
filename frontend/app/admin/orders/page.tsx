@@ -1,7 +1,8 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { RefundDialog } from '@/components/refund-dialog';
 import { StatusBadge } from '@/components/status-badge';
@@ -18,8 +19,9 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { api, fmtDateTime, fmtINR } from '@/lib/api';
+import { api, errorMessage, fmtDateTime, fmtINR } from '@/lib/api';
 import { useLiveEvents } from '@/lib/live';
+import { queryKeys } from '@/lib/query';
 import { ADMIN_ORDER_ACTIONS, ORDER_STATUSES, type Order, type OrderStatus } from '@storefront/contracts';
 import { cn } from '@/lib/utils';
 
@@ -27,26 +29,29 @@ const STATUSES: (OrderStatus | 'all')[] = ['all', ...ORDER_STATUSES];
 const BULK_TARGETS = [...new Set(Object.values(ADMIN_ORDER_ACTIONS).flat())];
 const label = (s: string) => s.replaceAll('_', ' ');
 
+interface AdminOrdersResponse {
+  orders: Order[];
+  total: number;
+  pages: number;
+  transitions: Record<string, string[]>;
+}
+
 export default function AdminOrdersPage() {
-  const [data, setData] = useState<{ orders: Order[]; total: number; pages: number; transitions: Record<string, string[]> } | null>(null);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkTo, setBulkTo] = useState<string>('');
-  const [busy, setBusy] = useState(false);
   const [refunding, setRefunding] = useState<Order | null>(null);
 
-  const load = useCallback(() => {
-    const qs = new URLSearchParams({ page: String(page) });
-    if (status !== 'all') qs.set('status', status);
-    api<any>(`/admin/orders?${qs}`)
-      .then(setData)
-      .catch(() => {});
-  }, [status, page]);
+  const params = { page: String(page), ...(status !== 'all' && { status }) };
+  const { data } = useQuery({
+    queryKey: queryKeys.adminOrders(params),
+    queryFn: () => api<AdminOrdersResponse>(`/admin/orders?${new URLSearchParams(params)}`),
+    placeholderData: keepPreviousData,
+  });
+  const load = () => queryClient.invalidateQueries({ queryKey: queryKeys.adminOrdersAll });
 
-  useEffect(() => {
-    load();
-  }, [load]);
   const live = useLiveEvents(['admin-orders'], e => {
     const { orderNumber } = e.data as { orderNumber?: string };
     if (e.event === 'order.placed') toast(`New order ${orderNumber ?? ''}`.trim());
@@ -71,23 +76,22 @@ export default function AdminOrdersPage() {
       return next;
     });
 
-  const transition = async (ids: string[], to: string) => {
-    setBusy(true);
-    try {
-      const result = await api<{ updated: number; rejected: { id: string; reason: string }[] }>('/admin/orders/bulk-transition', {
+  const bulk = useMutation({
+    mutationFn: ({ ids, to }: { ids: string[]; to: string }) =>
+      api<{ updated: number; rejected: { id: string; reason: string }[] }>('/admin/orders/bulk-transition', {
         method: 'POST',
         body: JSON.stringify({ ids, to }),
-      });
+      }),
+    onSuccess: (result, { to }) => {
       if (result.updated) toast.success(`${result.updated} order${result.updated > 1 ? 's' : ''} → ${to}`);
       for (const r of result.rejected) toast.error(`${r.id}: ${r.reason}`);
       setSelected(new Set());
-      load();
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    onError: e => toast.error(errorMessage(e)),
+    onSettled: () => load(),
+  });
+  const busy = bulk.isPending;
+  const transition = (ids: string[], to: string) => bulk.mutate({ ids, to });
 
   return (
     <div data-testid="admin-orders-page">
@@ -152,7 +156,7 @@ export default function AdminOrdersPage() {
       )}
 
       <div className="mt-5 border border-black/10 bg-white">
-        {data === null ? (
+        {!data ? (
           <div className="space-y-3 p-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-10 w-full" />
