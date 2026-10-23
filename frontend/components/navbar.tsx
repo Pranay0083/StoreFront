@@ -92,7 +92,7 @@ export function Navbar() {
             data-testid="nav-cart-button"
             onClick={() => setOpen(true)}
             className="relative flex h-10 w-10 items-center justify-center transition-colors hover:bg-black/5"
-            aria-label="Cart"
+            aria-label={count > 0 ? `Open bag, ${count} item${count === 1 ? '' : 's'}` : 'Open bag'}
           >
             <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
             {count > 0 && (
