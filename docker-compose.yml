@@ -13,6 +13,8 @@ x-backend-env: &backend-env
   JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-refresh-secret-change-me-0123456789}
   ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@12345}
   FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+  STOREFRONT_REVALIDATE_URL: http://web:3000/api/revalidate
+  STOREFRONT_REVALIDATE_SECRET: ${STOREFRONT_REVALIDATE_SECRET:-local-revalidate-secret-change-me}
   COOKIE_SAMESITE: lax
   COOKIE_SECURE: 'false'
   RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
@@ -127,9 +129,11 @@ services:
       args:
         NEXT_PUBLIC_API_URL: '${NEXT_PUBLIC_API_URL:-http://localhost:4001}'
         INTERNAL_API_URL: 'http://api:4001'
+        NEXT_PUBLIC_SITE_URL: '${FRONTEND_URL:-http://localhost:3000}'
     restart: unless-stopped
     environment:
       INTERNAL_API_URL: http://api:4001
+      STOREFRONT_REVALIDATE_SECRET: ${STOREFRONT_REVALIDATE_SECRET:-local-revalidate-secret-change-me}
     ports:
       - '3000:3000'
     depends_on:
