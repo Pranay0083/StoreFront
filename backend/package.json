@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "bench:pricing": "tsx scripts/bench-pricing.ts",
     "eval:agent": "LOG_LEVEL=warn tsx scripts/eval-agent.ts",
+    "e2e:api": "tsx scripts/e2e-server.ts",
     "search:reindex": "tsx src/modules/search/reindex.cli.ts",
     "lint": "eslint src test scripts vitest.config.ts",
     "openapi:generate": "tsx scripts/openapi.ts",

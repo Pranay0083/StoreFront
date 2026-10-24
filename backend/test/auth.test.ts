@@ -40,6 +40,14 @@ describe('auth', () => {
     await t.http().get(`${API}/auth/me`).expect(401);
   });
 
+  it('reports guests from /auth/session without an error status', async () => {
+    const { password } = await createUser({ email: 'ananya@test.dev' });
+    expect((await t.http().get(`${API}/auth/session`).expect(200)).body).toEqual({ user: null });
+    const res = await t.http().post(`${API}/auth/login`).send({ email: 'ananya@test.dev', password }).expect(200);
+    const session = await t.http().get(`${API}/auth/session`).set(bearer(res.body.token)).expect(200);
+    expect(session.body.user.email).toBe('ananya@test.dev');
+  });
+
   it('throttles the account after repeated failed attempts', async () => {
     const { password } = await createUser({ email: 'meera@test.dev' });
     for (let i = 0; i < 3; i++) {

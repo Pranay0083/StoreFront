@@ -59,7 +59,7 @@ export function CartSheet() {
                         data-testid={`cart-item-remove-${item.slug}`}
                         onClick={() => removeItem(item.productId, item.size)}
                         className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                        aria-label="Remove"
+                        aria-label={`Remove ${item.title} (${item.size})`}
                       >
                         <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                       </button>
@@ -68,16 +68,18 @@ export function CartSheet() {
                       <div className="flex items-center border border-black/15">
                         <button
                           data-testid={`cart-item-decrease-${item.slug}`}
+                          aria-label={`Decrease quantity of ${item.title}`}
                           onClick={() => updateQty(item.productId, item.size, item.qty - 1)}
                           className="flex h-7 w-7 items-center justify-center hover:bg-black/5"
                         >
                           <Minus className="h-3 w-3" />
                         </button>
-                        <span data-testid={`cart-item-qty-${item.slug}`} className="w-8 text-center text-sm">
+                        <span data-testid={`cart-item-qty-${item.slug}`} className="w-8 text-center text-sm" aria-live="polite">
                           {item.qty}
                         </span>
                         <button
                           data-testid={`cart-item-increase-${item.slug}`}
+                          aria-label={`Increase quantity of ${item.title}`}
                           onClick={() => updateQty(item.productId, item.size, item.qty + 1)}
                           disabled={item.stock !== undefined && item.qty >= item.stock}
                           className="flex h-7 w-7 items-center justify-center hover:bg-black/5 disabled:opacity-30"

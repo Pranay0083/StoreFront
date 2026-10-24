@@ -59,7 +59,7 @@ function refreshSession(): Promise<boolean> {
   return refreshRequest;
 }
 
-export async function api<T = any>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+export async function api<T = unknown>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...((options.headers as Record<string, string>) || {}) };
   if (!isServer && !SAFE_METHODS.has(method)) headers['X-CSRF-Token'] = await ensureCsrfToken();
@@ -85,6 +85,16 @@ export async function api<T = any>(path: string, options: RequestInit = {}, retr
   return data as T;
 }
 
+/**
+ * The signed-in user, or null for guests. A guest is not an error (no 401 in the console); when the
+ * access token has expired but a session is likely, the refresh token is tried once.
+ */
+export async function loadSession<U>(): Promise<U | null> {
+  const first = await api<{ user: U | null }>('/auth/session');
+  if (first.user || isServer || !sessionHint.get()) return first.user;
+  return (await refreshSession()) ? (await api<{ user: U | null }>('/auth/session')).user : null;
+}
+
 /** Streaming POST (e.g. Server-Sent Events) with the same credentials and CSRF header as `api`. */
 export async function apiStream(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'text/event-stream' };
@@ -106,6 +116,8 @@ export async function apiUpload<T = unknown>(path: string, form: FormData): Prom
 }
 
 export const apiUrl = (path: string) => `${BASE}/api/v1${path}`;
+
+export const errorMessage = (e: unknown, fallback = 'Something went wrong') => (e instanceof Error && e.message ? e.message : fallback);
 
 /** Formats an integer paise amount as rupees, e.g. 249900 → ₹2,499. */
 export { formatINR as fmtINR } from '@storefront/contracts';

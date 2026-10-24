@@ -4,27 +4,29 @@ import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useAuth } from '@/components/providers';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, fmtDate, fmtINR } from '@/lib/api';
+import { useLiveEvents } from '@/lib/live';
+import { queryKeys } from '@/lib/query';
 import type { Order } from '@storefront/contracts';
 
 export default function OrdersPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [orders, setOrders] = useState<Order[] | null>(null);
+  const signedIn = Boolean(user && typeof user === 'object');
+  const { data, isError, refetch } = useQuery({ queryKey: queryKeys.orders, queryFn: () => api<Order[]>('/orders'), enabled: signedIn });
+  const orders = data ?? (isError ? [] : null);
 
   useEffect(() => {
     if (user === false) router.replace('/login?next=/orders');
-    if (user && typeof user === 'object') {
-      api<Order[]>('/orders')
-        .then(setOrders)
-        .catch(() => setOrders([]));
-    }
   }, [user, router]);
+
+  useLiveEvents(['orders'], () => void refetch(), signedIn);
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8" data-testid="orders-page">

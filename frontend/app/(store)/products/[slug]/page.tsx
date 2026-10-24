@@ -1,137 +1,146 @@
-'use client';
-
-import { Minus, Plus, Star } from 'lucide-react';
-import Image from 'next/image';
+import { Star } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { useAuth, useCart } from '@/components/providers';
-import { Button } from '@/components/ui/button';
+import { notFound } from 'next/navigation';
+import { JsonLd } from '@/components/json-ld';
+import { BundleOffers } from '@/components/product/bundle-offers';
+import { ProductGallery } from '@/components/product/product-gallery';
+import { PurchasePanel } from '@/components/product/purchase-panel';
+import { ReviewsSection } from '@/components/product/reviews-section';
+import { ProductCard } from '@/components/product-card';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
-import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
-import { api, fmtDate, fmtINR } from '@/lib/api';
-import type { Product, Review } from '@storefront/contracts';
-import { cn } from '@/lib/utils';
+import { fmtINR } from '@/lib/api';
+import { serverApi } from '@/lib/server-api';
+import { SITE_NAME, absoluteUrl } from '@/lib/site';
+import type { BundleOffer, Product, Review } from '@storefront/contracts';
 
-export default function ProductDetailPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const { addItem } = useCart();
-  const { user } = useAuth();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [imageIdx, setImageIdx] = useState(0);
-  const [size, setSize] = useState('');
-  const [qty, setQty] = useState(1);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+export const revalidate = 300;
+export const dynamicParams = true;
 
-  useEffect(() => {
-    api<Product>(`/products/${slug}`)
-      .then(p => {
-        setProduct(p);
-        if (p.sizes.length === 1) setSize(p.sizes[0].size);
-        api<Review[]>(`/reviews/product/${p._id}`)
-          .then(setReviews)
-          .catch(() => {});
-      })
-      .catch(() => setNotFound(true));
-  }, [slug]);
+/** Pages are rendered on first request and then served from the ISR cache until revalidated. */
+export function generateStaticParams() {
+  return [];
+}
 
-  if (notFound) {
-    return (
-      <div className="mx-auto max-w-7xl px-5 py-32 text-center sm:px-8">
-        <p className="font-serif text-4xl">This piece doesn&apos;t exist.</p>
-        <Button asChild className="mt-6">
-          <Link href="/products">Back to the collection</Link>
-        </Button>
-      </div>
-    );
-  }
+type Props = { params: Promise<{ slug: string }> };
 
-  if (!product) {
-    return (
-      <div className="mx-auto grid max-w-7xl gap-12 px-5 py-12 sm:px-8 lg:grid-cols-2">
-        <Skeleton className="aspect-[3/4] w-full" />
-        <div className="space-y-4">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-10 w-3/4" />
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      </div>
-    );
-  }
+const paiseToDecimal = (paise: number) => (paise / 100).toFixed(2);
 
-  const selected = product.sizes.find(s => s.size === size);
-
-  const handleAdd = () => {
-    if (!size) return toast.error('Select a size first');
-    if (!selected || selected.stock < 1) return toast.error('This size is out of stock');
-    addItem({
-      productId: product._id,
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await serverApi.product(slug);
+  if (!product) return { title: 'Not found — STOREFRONT' };
+  const url = absoluteUrl(`/products/${product.slug}`);
+  const description = product.description.slice(0, 160) || `${product.title} — ${product.category} at ${SITE_NAME}.`;
+  return {
+    title: `${product.title} — ${SITE_NAME}`,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      url,
+      siteName: SITE_NAME,
       title: product.title,
-      image: product.images[0],
-      price: product.price,
-      size,
-      qty,
-      slug: product.slug,
-    });
-    toast.success(`${product.title} added to your bag`);
+      description,
+      images: product.images.slice(0, 4).map(src => ({ url: src, alt: product.title })),
+    },
+    twitter: { card: 'summary_large_image', title: product.title, description, images: product.images.slice(0, 1) },
   };
+}
 
-  const submitReview = async () => {
-    setSubmitting(true);
-    try {
-      await api('/reviews', { method: 'POST', body: JSON.stringify({ productId: product._id, rating, comment }) });
-      toast.success('Review submitted');
-      setComment('');
-      api<Review[]>(`/reviews/product/${product._id}`)
-        .then(setReviews)
-        .catch(() => {});
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+function productJsonLd(product: Product, reviews: Review[]) {
+  const url = absoluteUrl(`/products/${product.slug}`);
+  const inStock = product.sizes.some(s => s.stock > 0);
+  return [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.title,
+      description: product.description,
+      image: product.images,
+      sku: product.slug,
+      category: product.category,
+      brand: { '@type': 'Brand', name: SITE_NAME },
+      offers: {
+        '@type': 'Offer',
+        url,
+        priceCurrency: 'INR',
+        price: paiseToDecimal(product.price),
+        availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        itemCondition: 'https://schema.org/NewCondition',
+      },
+      ...(product.numReviews > 0 && {
+        aggregateRating: { '@type': 'AggregateRating', ratingValue: product.rating, reviewCount: product.numReviews, bestRating: 5 },
+        review: reviews.slice(0, 5).map(r => ({
+          '@type': 'Review',
+          author: { '@type': 'Person', name: r.userName },
+          datePublished: r.createdAt.slice(0, 10),
+          reviewBody: r.comment,
+          reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5 },
+        })),
+      }),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: product.category,
+          item: absoluteUrl(`/products?category=${encodeURIComponent(product.category)}`),
+        },
+        { '@type': 'ListItem', position: 3, name: product.title, item: url },
+      ],
+    },
+  ];
+}
+
+async function bundleProducts(offers: BundleOffer[], current: Product): Promise<Record<string, Product>> {
+  const slugs = [...new Set(offers.flatMap(o => o.components?.map(c => c.slug) ?? []))];
+  const loaded = await Promise.all(slugs.map(s => (s === current.slug ? current : serverApi.product(s).catch(() => null))));
+  return Object.fromEntries(loaded.filter((p): p is Product => p !== null).map(p => [p.slug, p]));
+}
+
+export default async function ProductDetailPage({ params }: Props) {
+  const { slug } = await params;
+  const product = await serverApi.product(slug);
+  if (!product) notFound();
+
+  const [reviews, bundles, recommendations] = await Promise.all([
+    serverApi.reviews(product._id).catch(() => []),
+    serverApi.bundles(product._id).catch(() => ({ offers: [] })),
+    serverApi.recommendations(product._id).catch(() => ({ items: [], source: 'none' })),
+  ]);
+  const componentProducts = await bundleProducts(bundles.offers, product);
+  const related = recommendations.items.filter(p => p.slug !== product.slug);
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8" data-testid="product-detail-page">
+      <JsonLd data={productJsonLd(product, reviews)} />
+      <nav aria-label="Breadcrumb" className="mb-8 text-xs text-muted-foreground">
+        <ol className="flex flex-wrap gap-2">
+          <li>
+            <Link href="/" className="hover:underline">
+              Home
+            </Link>{' '}
+            /
+          </li>
+          <li>
+            <Link href={`/products?category=${encodeURIComponent(product.category)}`} className="hover:underline">
+              {product.category}
+            </Link>{' '}
+            /
+          </li>
+          <li aria-current="page" className="text-foreground">
+            {product.title}
+          </li>
+        </ol>
+      </nav>
+
       <div className="grid gap-12 lg:grid-cols-2">
-        <div>
-          <div className="relative aspect-[3/4] max-h-[80vh] w-full overflow-hidden bg-muted">
-            <Image
-              src={product.images[imageIdx] || product.images[0]}
-              alt={product.title}
-              fill
-              priority
-              sizes="(max-width:1024px) 100vw, 50vw"
-              className="object-cover"
-            />
-          </div>
-          {product.images.length > 1 && (
-            <div className="mt-4 flex gap-3">
-              {product.images.map((img, i) => (
-                <button
-                  key={i}
-                  data-testid={`product-thumb-${i}`}
-                  onClick={() => setImageIdx(i)}
-                  className={cn(
-                    'relative h-24 w-20 overflow-hidden border transition-colors',
-                    i === imageIdx ? 'border-black' : 'border-transparent',
-                  )}
-                >
-                  <Image src={img} alt="" fill sizes="80px" className="object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductGallery images={product.images} title={product.title} />
 
         <div className="lg:pt-6">
           <p className="label-caps text-muted-foreground">{product.category}</p>
@@ -142,132 +151,45 @@ export default function ProductDetailPage() {
             <p data-testid="product-price" className="text-xl font-semibold">
               {fmtINR(product.price)}
             </p>
-            {product.compareAtPrice && <p className="text-muted-foreground line-through">{fmtINR(product.compareAtPrice)}</p>}
+            {product.compareAtPrice ? (
+              <p className="text-muted-foreground line-through">
+                <span className="sr-only">Was </span>
+                {fmtINR(product.compareAtPrice)}
+              </p>
+            ) : null}
             {product.numReviews > 0 && (
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                <Star className="h-4 w-4 fill-black text-black" /> {product.rating} ({product.numReviews})
+                <Star className="h-4 w-4 fill-black text-black" aria-hidden /> {product.rating}
+                <span className="sr-only"> out of 5 from</span> ({product.numReviews}
+                <span className="sr-only"> reviews</span>)
               </span>
             )}
           </div>
 
           <p className="mt-6 max-w-lg text-base leading-relaxed text-muted-foreground">{product.description}</p>
 
-          <div className="mt-9">
-            <p className="label-caps mb-3 text-muted-foreground">Size</p>
-            <div className="flex flex-wrap gap-2">
-              {product.sizes.map(s => (
-                <button
-                  key={s.size}
-                  data-testid={`product-size-${s.size.toLowerCase().replace(/\s/g, '-')}`}
-                  disabled={s.stock < 1}
-                  onClick={() => setSize(s.size)}
-                  className={cn(
-                    'min-w-12 border px-4 py-2.5 text-sm transition-colors',
-                    size === s.size ? 'border-black bg-black text-white' : 'border-black/20 hover:border-black',
-                    s.stock < 1 && 'cursor-not-allowed opacity-30 line-through',
-                  )}
-                >
-                  {s.size}
-                </button>
-              ))}
-            </div>
-            {selected && selected.stock <= 5 && (
-              <p data-testid="product-low-stock-note" className="mt-2 text-xs text-destructive">
-                Only {selected.stock} left in {selected.size}
-              </p>
-            )}
-          </div>
-
-          <div className="mt-8 flex items-center gap-4">
-            <div className="flex items-center border border-black/20">
-              <button
-                data-testid="product-qty-decrease"
-                onClick={() => setQty(Math.max(1, qty - 1))}
-                className="flex h-11 w-11 items-center justify-center hover:bg-black/5"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span data-testid="product-qty" className="w-10 text-center">
-                {qty}
-              </span>
-              <button
-                data-testid="product-qty-increase"
-                onClick={() => setQty(Math.min(10, qty + 1))}
-                className="flex h-11 w-11 items-center justify-center hover:bg-black/5"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <Button data-testid="product-add-to-cart" size="lg" className="flex-1" onClick={handleAdd}>
-              Add to bag — {fmtINR(product.price * qty)}
-            </Button>
-          </div>
-
-          <p className="mt-6 text-xs text-muted-foreground">
-            Free shipping over {fmtINR(FREE_SHIPPING_THRESHOLD)} · Cancel any time before shipping · Audited order tracking
-          </p>
+          <PurchasePanel product={product} />
         </div>
       </div>
 
+      <BundleOffers offers={bundles.offers} products={componentProducts} />
+
+      {related.length > 0 && (
+        <section aria-labelledby="fbt-heading" data-testid="recommendations" className="mt-20">
+          <h2 id="fbt-heading" className="font-serif text-3xl font-semibold tracking-tight">
+            {recommendations.source === 'frequently-bought-together' ? 'Frequently bought together' : `More in ${product.category}`}
+          </h2>
+          <div className="mt-8 grid grid-cols-2 gap-8 lg:grid-cols-4">
+            {related.slice(0, 4).map((p, i) => (
+              <ProductCard key={p._id} product={p} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <Separator className="my-20" />
 
-      <section className="max-w-3xl" data-testid="reviews-section">
-        <h2 className="font-serif text-3xl font-semibold tracking-tight">
-          Reviews {product.numReviews > 0 && <span className="text-muted-foreground">({product.numReviews})</span>}
-        </h2>
-
-        {user && typeof user === 'object' ? (
-          <div className="mt-8 border border-black/10 bg-white p-6">
-            <p className="label-caps mb-4 text-muted-foreground">Leave a review</p>
-            <div className="mb-4 flex gap-1">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button key={n} data-testid={`review-star-${n}`} onClick={() => setRating(n)} aria-label={`${n} stars`}>
-                  <Star className={cn('h-6 w-6 transition-colors', n <= rating ? 'fill-black text-black' : 'text-black/25')} />
-                </button>
-              ))}
-            </div>
-            <Textarea
-              data-testid="review-comment-input"
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-              placeholder="How does it wear?"
-            />
-            <Button data-testid="review-submit-button" className="mt-4" onClick={submitReview} disabled={submitting}>
-              {submitting ? 'Submitting…' : 'Submit review'}
-            </Button>
-          </div>
-        ) : (
-          <p className="mt-6 text-sm text-muted-foreground">
-            <Link href="/login" className="underline">
-              Sign in
-            </Link>{' '}
-            to leave a review.
-          </p>
-        )}
-
-        <div className="mt-10 space-y-8">
-          {reviews.length === 0 && <p className="text-sm text-muted-foreground">No reviews yet.</p>}
-          {reviews.map(r => (
-            <div key={r._id} className="border-b border-black/5 pb-6">
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center bg-black font-serif text-white">{r.userName?.[0] || '?'}</span>
-                <div>
-                  <p className="text-sm font-medium">{r.userName}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="flex">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star key={i} className={cn('h-3.5 w-3.5', i < r.rating ? 'fill-black text-black' : 'text-black/20')} />
-                      ))}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{fmtDate(r.createdAt)}</span>
-                  </div>
-                </div>
-              </div>
-              {r.comment && <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{r.comment}</p>}
-            </div>
-          ))}
-        </div>
-      </section>
+      <ReviewsSection productId={product._id} initialReviews={reviews} numReviews={product.numReviews} />
     </div>
   );
 }

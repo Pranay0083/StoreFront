@@ -7,9 +7,10 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nextConfig = {
   output: 'standalone',
   transpilePackages: ['@storefront/contracts'],
-  experimental: {
-    outputFileTracingRoot: repoRoot,
-  },
+  outputFileTracingRoot: repoRoot,
+  eslint: { ignoreDuringBuilds: true },
+  // Render metadata in <head> for every client (not only known bots) so crawlers and audits see it.
+  htmlLimitedBots: /.*/,
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },

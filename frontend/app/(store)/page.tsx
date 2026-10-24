@@ -1,14 +1,15 @@
-'use client';
-
 import { ArrowRight, RefreshCcw, ShieldCheck, Truck } from 'lucide-react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { connection } from 'next/server';
+import { Suspense } from 'react';
+import { JsonLd } from '@/components/json-ld';
 import { ProductCard } from '@/components/product-card';
 import { ProductGridSkeleton } from '@/components/skeletons';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
-import type { Product } from '@storefront/contracts';
+import { serverApi } from '@/lib/server-api';
+import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
 
 const HERO = 'https://images.unsplash.com/photo-1603189343302-e603f7add05a?w=1400&q=85&auto=format&fit=crop';
 const EDITORIAL = 'https://images.unsplash.com/photo-1664076458686-3449062080ac?w=1200&q=85&auto=format&fit=crop';
@@ -23,17 +24,47 @@ const CATEGORIES = [
 
 const MARQUEE = 'FREE SHIPPING OVER ₹2,999 — 30-DAY EASY RETURNS — NEW SEASON DROP — SECURE CHECKOUT — ';
 
+export const metadata: Metadata = {
+  title: 'STOREFRONT — Considered Clothing',
+  description: 'Twenty-four pieces across Men, Women, Footwear and Accessories. Free shipping over ₹2,999 and 30-day returns.',
+  alternates: { canonical: absoluteUrl('/') },
+  openGraph: { type: 'website', url: absoluteUrl('/'), siteName: SITE_NAME, images: [{ url: HERO, width: 1400, alt: 'AW/26 editorial' }] },
+};
+
+async function FeaturedGrid() {
+  await connection();
+  const featured = await serverApi
+    .featured()
+    .then(d => d.items)
+    .catch(() => []);
+  if (!featured.length) {
+    return <p className="text-sm text-muted-foreground">The featured edit is being restocked — browse the full collection.</p>;
+  }
+  return (
+    <div data-testid="featured-grid" className="grid grid-cols-2 gap-8 lg:grid-cols-4">
+      {featured.map((p, i) => (
+        <ProductCard key={p._id} product={p} index={i} />
+      ))}
+    </div>
+  );
+}
+
 export default function HomePage() {
-  const [featured, setFeatured] = useState<Product[] | null>(null);
-
-  useEffect(() => {
-    api<{ items: Product[] }>('/products?featured=true&limit=8')
-      .then(d => setFeatured(d.items))
-      .catch(() => setFeatured([]));
-  }, []);
-
   return (
     <div data-testid="home-page">
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: SITE_NAME,
+          url: SITE_URL,
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: `${SITE_URL}/products?q={search_term_string}`,
+            'query-input': 'required name=search_term_string',
+          },
+        }}
+      />
       <section className="mx-auto max-w-7xl px-5 pt-8 sm:px-8 sm:pt-12">
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="relative order-2 aspect-[4/5] max-h-[80vh] w-full overflow-hidden lg:order-1 lg:col-span-7 lg:aspect-auto lg:min-h-[620px]">
@@ -97,15 +128,9 @@ export default function HomePage() {
             View all <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        {featured === null ? (
-          <ProductGridSkeleton count={8} />
-        ) : (
-          <div data-testid="featured-grid" className="grid grid-cols-2 gap-8 lg:grid-cols-4">
-            {featured.map((p, i) => (
-              <ProductCard key={p._id} product={p} index={i} />
-            ))}
-          </div>
-        )}
+        <Suspense fallback={<ProductGridSkeleton count={8} />}>
+          <FeaturedGrid />
+        </Suspense>
       </section>
 
       <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
@@ -144,7 +169,7 @@ export default function HomePage() {
             >
               <Image
                 src={c.image}
-                alt={c.name}
+                alt=""
                 fill
                 sizes="(max-width:1024px) 50vw, 25vw"
                 className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"

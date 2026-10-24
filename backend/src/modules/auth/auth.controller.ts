@@ -67,6 +67,11 @@ export class AuthController {
     res.json({ user: req.user });
   };
 
+  /** Like `me`, but a guest is a normal answer (200, `user: null`) rather than an error. */
+  session = (req: Request, res: Response) => {
+    res.json({ user: req.user ?? null });
+  };
+
   private setCookies(res: Response, session: Session) {
     res.cookie(ACCESS_COOKIE, session.accessToken, this.cookies.access(ACCESS_TOKEN_TTL_MS));
     res.cookie(REFRESH_COOKIE, session.refreshToken, this.cookies.refresh(session.refreshExpiresAt.getTime() - Date.now()));

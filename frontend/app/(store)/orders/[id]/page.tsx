@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Suspense, useEffect, useState } from 'react';
 import { CUSTOMER_CANCELLABLE_STATUSES, PARTIAL_REFUND_STATUSES, REFUND_WINDOW_DAYS, type Order } from '@storefront/contracts';
 import { toast } from 'sonner';
 import { OrderTimeline } from '@/components/order-timeline';
@@ -11,8 +12,9 @@ import { RefundDialog } from '@/components/refund-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api, fmtDate, fmtDateTime, fmtINR } from '@/lib/api';
+import { ApiError, api, errorMessage, fmtDate, fmtDateTime, fmtINR } from '@/lib/api';
 import { useLiveEvents } from '@/lib/live';
+import { queryKeys } from '@/lib/query';
 
 const DAY_MS = 86_400_000;
 const REFUND_LABELS: Record<Order['refunds'][number]['status'], string> = {
@@ -26,30 +28,51 @@ const REFUND_LABELS: Record<Order['refunds'][number]['status'], string> = {
 function OrderDetailContent() {
   const { id } = useParams<{ id: string }>();
   const search = useSearchParams();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const queryClient = useQueryClient();
   const [refundOpen, setRefundOpen] = useState(false);
 
-  const load = useCallback(() => {
-    api<Order>(`/orders/${id}`)
-      .then(setOrder)
-      .catch(() => {});
-  }, [id]);
+  const orderQuery = useQuery({
+    queryKey: queryKeys.order(id),
+    queryFn: () => api<Order>(`/orders/${id}`),
+    // Refunds settle asynchronously at the provider; poll only while one is in flight.
+    refetchInterval: q => (q.state.data?.status === 'refund_requested' ? 3_000 : false),
+  });
+  const order = orderQuery.data;
+  const setOrder = (next: Order) => {
+    queryClient.setQueryData(queryKeys.order(id), next);
+    queryClient.invalidateQueries({ queryKey: queryKeys.orders, exact: true });
+  };
 
   useEffect(() => {
-    load();
     if (search.get('paid')) toast.success('Order confirmed — thank you.');
-  }, [load, search]);
+  }, [search]);
 
-  useLiveEvents(['orders'], e => {
-    if ((e.data as { orderId?: string }).orderId === id) load();
+  const live = useLiveEvents(['orders'], e => {
+    if ((e.data as { orderId?: string }).orderId !== id) return;
+    queryClient.invalidateQueries({ queryKey: queryKeys.order(id) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.orders, exact: true });
   });
 
-  useEffect(() => {
-    if (order?.status !== 'refund_requested') return;
-    const timer = setInterval(load, 3_000);
-    return () => clearInterval(timer);
-  }, [order?.status, load]);
+  const cancel = useMutation({
+    mutationFn: ({ orderId }: { orderId: string; wasPaid: boolean }) => api<Order>(`/orders/${orderId}/cancel`, { method: 'POST' }),
+    onSuccess: (updated, { wasPaid }) => {
+      setOrder(updated);
+      toast.success(wasPaid ? 'Order cancelled — your refund is on its way' : 'Order cancelled');
+    },
+    onError: e => toast.error(errorMessage(e)),
+  });
+
+  if (orderQuery.isError && !order) {
+    const missing = orderQuery.error instanceof ApiError && (orderQuery.error.status === 404 || orderQuery.error.status === 403);
+    return (
+      <div className="mx-auto max-w-4xl px-5 py-24 text-center sm:px-8" role="alert">
+        <h1 className="font-serif text-3xl">{missing ? 'We couldn’t find that order.' : 'We couldn’t load this order.'}</h1>
+        <Button asChild className="mt-6">
+          <Link href="/orders">Back to your orders</Link>
+        </Button>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -67,19 +90,6 @@ function OrderDetailContent() {
   const refundable =
     PARTIAL_REFUND_STATUSES.includes(order.status) && deliveredAt !== null && Date.now() - deliveredAt <= REFUND_WINDOW_DAYS * DAY_MS;
 
-  const cancel = async () => {
-    setCancelling(true);
-    try {
-      const updated = await api<Order>(`/orders/${order._id}/cancel`, { method: 'POST' });
-      setOrder(updated);
-      toast.success(paidAlready ? 'Order cancelled — your refund is on its way' : 'Order cancelled');
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setCancelling(false);
-    }
-  };
-
   return (
     <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8" data-testid="order-detail-page">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -88,13 +98,26 @@ function OrderDetailContent() {
             ← All orders
           </Link>
           <h1 className="mt-2 font-mono text-3xl font-semibold tracking-tight">{order.orderNumber}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Placed {fmtDate(order.createdAt)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Placed {fmtDate(order.createdAt)}
+            {live && (
+              <span className="ml-3 inline-flex items-center gap-1.5 text-xs" data-testid="order-live-indicator">
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-600" /> Live updates
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={order.status} testId="order-detail-status" />
           {cancellable && (
-            <Button variant="destructive" size="sm" data-testid="order-cancel-button" onClick={cancel} disabled={cancelling}>
-              {cancelling ? 'Cancelling…' : paidAlready ? 'Cancel & refund' : 'Cancel order'}
+            <Button
+              variant="destructive"
+              size="sm"
+              data-testid="order-cancel-button"
+              onClick={() => cancel.mutate({ orderId: order._id, wasPaid: paidAlready })}
+              disabled={cancel.isPending}
+            >
+              {cancel.isPending ? 'Cancelling…' : paidAlready ? 'Cancel & refund' : 'Cancel order'}
             </Button>
           )}
           {refundable && (

@@ -2,7 +2,8 @@
 
 import { Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { paiseToRupees, rupeesToPaise } from '@storefront/contracts';
-import { api, fmtINR } from '@/lib/api';
+import { api, errorMessage, fmtINR } from '@/lib/api';
+import { queryKeys } from '@/lib/query';
 import type { Product } from '@storefront/contracts';
 
 const CATEGORIES = ['Men', 'Women', 'Footwear', 'Accessories'];
@@ -42,22 +44,53 @@ const emptyForm: FormState = {
   featured: false,
 };
 
+type ProductPayload = Pick<Product, 'title' | 'category' | 'price' | 'description' | 'images' | 'sizes' | 'featured'> & {
+  compareAtPrice?: number;
+};
+
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState<Product[] | null>(null);
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [saving, setSaving] = useState(false);
 
-  const load = useCallback(() => {
-    api<{ items: Product[] }>('/products?limit=48')
-      .then(d => setProducts(d.items))
-      .catch(() => setProducts([]));
-  }, []);
+  const productsQuery = useQuery({
+    queryKey: queryKeys.adminProducts,
+    queryFn: () => api<{ items: Product[] }>('/products?limit=48').then(d => d.items),
+  });
+  const products = productsQuery.data ?? (productsQuery.isError ? [] : null);
+  const load = () => queryClient.invalidateQueries({ queryKey: queryKeys.adminProducts });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const saveMutation = useMutation({
+    mutationFn: ({ id, payload }: { id?: string; payload: ProductPayload }) =>
+      id
+        ? api(`/products/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+        : api('/products', { method: 'POST', body: JSON.stringify(payload) }),
+    onSuccess: (_, { id }) => {
+      toast.success(id ? 'Product updated' : 'Product created');
+      setOpen(false);
+      load();
+    },
+    onError: e => toast.error(errorMessage(e)),
+  });
+  const saving = saveMutation.isPending;
+
+  const removeMutation = useMutation({
+    mutationFn: (p: Product) => api(`/products/${p._id}`, { method: 'DELETE' }),
+    // Optimistic: the row disappears at once and comes back if the delete fails.
+    onMutate: async p => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.adminProducts });
+      const previous = queryClient.getQueryData<Product[]>(queryKeys.adminProducts);
+      queryClient.setQueryData<Product[]>(queryKeys.adminProducts, list => list?.filter(x => x._id !== p._id));
+      return { previous };
+    },
+    onError: (e, _, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(queryKeys.adminProducts, ctx.previous);
+      toast.error(errorMessage(e));
+    },
+    onSuccess: (_, p) => toast.success(`${p.title} deleted`),
+    onSettled: () => load(),
+  });
 
   const openCreate = () => {
     setEditing(null);
@@ -95,7 +128,7 @@ export default function AdminProductsPage() {
     if (!form.title || !form.price || images.length === 0 || sizes.length === 0) {
       return toast.error('Title, price, at least one image URL and one size are required');
     }
-    const payload: any = {
+    const payload: ProductPayload = {
       title: form.title,
       category: form.category,
       price: rupeesToPaise(Number(form.price)),
@@ -105,33 +138,10 @@ export default function AdminProductsPage() {
       featured: form.featured,
     };
     if (form.compareAtPrice) payload.compareAtPrice = rupeesToPaise(Number(form.compareAtPrice));
-    setSaving(true);
-    try {
-      if (editing) {
-        await api(`/products/${editing._id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        toast.success('Product updated');
-      } else {
-        await api('/products', { method: 'POST', body: JSON.stringify(payload) });
-        toast.success('Product created');
-      }
-      setOpen(false);
-      load();
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setSaving(false);
-    }
+    saveMutation.mutate({ id: editing?._id, payload });
   };
 
-  const remove = async (p: Product) => {
-    try {
-      await api(`/products/${p._id}`, { method: 'DELETE' });
-      toast.success(`${p.title} deleted`);
-      load();
-    } catch (e: any) {
-      toast.error(e.message);
-    }
-  };
+  const remove = (p: Product) => removeMutation.mutate(p);
 
   return (
     <div data-testid="admin-products-page">

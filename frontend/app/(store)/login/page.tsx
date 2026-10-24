@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/api';
 import { useAuth } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,8 +33,8 @@ function LoginContent() {
       const u = await login(email, password);
       toast.success(`Welcome back, ${u.name}`);
       router.replace(search.get('next') || (isStaff(u.role) ? '/admin' : '/'));
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      toast.error(errorMessage(err));
     } finally {
       setLoading(false);
     }
