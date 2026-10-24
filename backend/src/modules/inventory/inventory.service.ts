@@ -1,3 +1,4 @@
+import { isValidObjectId } from 'mongoose';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import type { Session } from '../../core/persistence/transaction';
 import type { ProductRepository } from '../catalog/product.repository';
@@ -46,6 +47,21 @@ export class InventoryService {
     private readonly movements: InventoryMovementRepository,
     private readonly reservations: StockReservationRepository,
   ) {}
+
+  /**
+   * Snapshot check outside any transaction, so checkouts for a sold-out variant are refused before
+   * they contend for the product document. `reserve` remains the authoritative check.
+   */
+  async assertAvailable(items: readonly StockItem[]): Promise<void> {
+    for (const item of items) {
+      if (!isValidObjectId(item.productId)) continue;
+      const product = await this.products.findStockLevels(item.productId);
+      const variant = product?.sizes.find(s => s.size === item.size);
+      if (product && variant && variant.stock < item.qty) {
+        throw new InsufficientStockError(item.productId, item.size, variant.stock, product.title);
+      }
+    }
+  }
 
   /** Takes stock for an order (all-or-nothing within the caller's transaction) and holds it until `expiresAt`. */
   async reserve(orderId: string, items: ReservableItem[], expiresAt: Date, actor: string, session: Session): Promise<void> {

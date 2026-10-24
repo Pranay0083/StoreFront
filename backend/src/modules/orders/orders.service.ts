@@ -115,6 +115,7 @@ export class OrdersService {
       ...(input.paymentMethod && { paymentMethod: input.paymentMethod }),
     };
     const caller = { userId: user.id };
+    await this.inventory.assertAvailable(input.items);
 
     const order = await this.tx.run(async session => {
       const breakdown = input.quoteId
@@ -130,8 +131,10 @@ export class OrdersService {
         ...priced,
         reservedUntil: new Date(Date.now() + this.config.reservationTtlMs),
       });
-      await this.orders.insert(placed, session);
+      // The stock decrement is the write concurrent checkouts conflict on, so it goes first:
+      // a losing attempt aborts before doing any other work.
       await this.inventory.reserve(placed.id, priced.items, placed.snapshot().reservedUntil!, `user:${user.id}`, session);
+      await this.orders.insert(placed, session);
       await this.pricing.redeem({ orderId: placed.id, userId: user.id }, breakdown.applied, session);
       await this.outbox.append(placed.pullEvents(), session);
       return placed;
