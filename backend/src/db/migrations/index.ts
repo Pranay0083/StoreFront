@@ -17,6 +17,7 @@ import { agentActions } from './060-agent-actions';
 import { experimentsIndexes } from './070-experiments';
 import { recommendationsIndexes } from './071-recommendations';
 import { productImportsIndexes } from './072-product-imports';
+import { catalogListingIndexes } from './080-catalog-listing-indexes';
 
 export const migrations: readonly Migration[] = [
   ensureIndexes,
@@ -37,4 +38,5 @@ export const migrations: readonly Migration[] = [
   experimentsIndexes,
   recommendationsIndexes,
   productImportsIndexes,
+  catalogListingIndexes,
 ];
