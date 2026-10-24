@@ -61,8 +61,9 @@ describe('recommendations', () => {
   });
 
   it('ranks a large category once and shares the bounded pool across its products', async () => {
-    const products = [];
-    for (let i = 0; i < 40; i++) products.push(await createProduct({ title: `Pool Rec ${i}`, category: 'Footwear' }));
+    const products = await Promise.all(
+      Array.from({ length: 40 }, (_, i) => createProduct({ title: `Pool Rec ${i}`, category: 'Footwear' })),
+    );
     for (const [i, p] of products.entries()) await ProductModel.updateOne({ _id: p._id }, { $set: { rating: (i * 7) % 50 } });
     const aggregate = vi.spyOn(OrderModel, 'aggregate');
     try {
