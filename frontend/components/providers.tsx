@@ -4,7 +4,7 @@ import { QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tan
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { refreshExperiments } from '@/lib/experiments';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, loadSession } from '@/lib/api';
 import { makeQueryClient, queryKeys } from '@/lib/query';
 import { MAX_LINE_QTY, toCartLine, type CartItem, type CartLine, type CartResponse, type User } from '@storefront/contracts';
 
@@ -67,8 +67,11 @@ function SessionProviders({ children }: { children: React.ReactNode }) {
     } catch {}
     setItems(saved);
     hydrated.current = true;
-    api<{ user: User }>('/auth/me')
-      .then(d => setUser(d.user))
+    loadSession<User>()
+      .then(u => {
+        if (!u) throw new Error('guest');
+        setUser(u);
+      })
       .catch(() => {
         setUser(false);
         // Guests keep the cart locally, but titles, prices and stock are refreshed from the server.

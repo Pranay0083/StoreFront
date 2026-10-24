@@ -13,6 +13,7 @@ export function authRoutes(controller: AuthController, guards: AuthGuards): Rout
   router.post('/logout', handler(controller.logout));
   router.post('/logout-all', guards.requireAuth, handler(controller.logoutAll));
   router.get('/me', guards.requireAuth, handler(controller.me));
+  router.get('/session', guards.optionalAuth, handler(controller.session));
   router.post('/refresh', handler(controller.refresh));
   router.get('/sessions', guards.requireAuth, handler(controller.sessions));
   router.delete('/sessions/:id', guards.requireAuth, validate({ params: SessionIdParamsSchema }), handler(controller.revokeSession));
