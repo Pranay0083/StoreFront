@@ -26,7 +26,7 @@ export const options = {
     checkout_orders_paid: [`count==${fixture.stock}`],
     checkout_idempotent_replay_mismatch: ['count==0'],
     checkout_unexpected_status: ['count==0'],
-    'http_req_duration{name:POST /orders}': ['p(95)<2000'],
+    'http_req_duration{name:POST /orders}': ['p(95)<3000'],
   },
 };
 

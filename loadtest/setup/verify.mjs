@@ -1,5 +1,5 @@
 // Post-run correctness checks. Usage: node loadtest/setup/verify.mjs <checkout|webhooks>
-import { adminToken, call, mongo, readData } from './lib.mjs';
+import { adminToken, call, mongo, readData, transactionCounters } from './lib.mjs';
 
 const mode = process.argv[2];
 const admin = await adminToken();
@@ -76,6 +76,14 @@ if (mode === 'checkout') {
 } else {
   console.error('usage: verify.mjs <checkout|webhooks>');
   process.exit(1);
+}
+
+const fixture = readData(mode === 'checkout' ? 'checkout.json' : 'webhooks.json');
+if (fixture.transactions) {
+  const now = transactionCounters();
+  console.log(
+    `mongo transactions during the run: ${now.committed - fixture.transactions.committed} committed, ${now.aborted - fixture.transactions.aborted} aborted`,
+  );
 }
 
 const reconcile = await call('GET', '/admin/inventory/reconcile', { token: admin });

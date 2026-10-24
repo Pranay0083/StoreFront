@@ -31,6 +31,7 @@ case "${1:-}" in
   browse | search | pricing | soak)
     scenario="$1"
     shift
+    node loadtest/setup/fixtures.mjs snapshot
     k6 "$scenario" "$@"
     ;;
   checkout)
@@ -48,6 +49,7 @@ case "${1:-}" in
     exit "${status:-0}"
     ;;
   smoke)
+    node loadtest/setup/fixtures.mjs snapshot
     k6 browse -e RATE=40 -e DURATION=20s
     k6 pricing -e RATE=15 -e DURATION=20s
     HOT_STOCK=20 BUYERS=80 node loadtest/setup/fixtures.mjs checkout

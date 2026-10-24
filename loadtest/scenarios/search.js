@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check } from 'k6';
-import { API, latencyThresholds, loadCatalog, pick } from '../lib/common.js';
+import { words } from '../lib/catalog.js';
+import { API, latencyThresholds, pick } from '../lib/common.js';
 
 const RATE = Number(__ENV.RATE || 100);
 const DURATION = __ENV.DURATION || '2m';
@@ -28,13 +29,7 @@ const typo = word => {
   return word.slice(0, i) + word[i + 1] + word[i] + word.slice(i + 2);
 };
 
-export function setup() {
-  const { products } = loadCatalog();
-  const words = [...new Set(products.flatMap(p => p.title.toLowerCase().split(/\s+/)).filter(w => w.length > 3))];
-  return { words };
-}
-
-export default function ({ words }) {
+export default function () {
   const word = pick(words);
   if (Math.random() < 0.6) {
     const prefix = word.slice(0, 2 + Math.floor(Math.random() * (word.length - 1)));

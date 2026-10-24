@@ -1,4 +1,4 @@
-import { latencyThresholds, loadCatalog } from '../lib/common.js';
+import { latencyThresholds } from '../lib/common.js';
 import browse from './browse.js';
 import quote from './pricing.js';
 import search from './search.js';
@@ -40,13 +40,6 @@ export const options = {
   thresholds: latencyThresholds(300, 800),
 };
 
-export function setup() {
-  const catalog = loadCatalog();
-  const words = [...new Set(catalog.products.flatMap(p => p.title.toLowerCase().split(/\s+/)).filter(w => w.length > 3))];
-  const products = catalog.products.filter(p => p.sizes.length > 0);
-  return { ...catalog, products, promoted: products.filter(p => !/-\d+$/.test(p.slug)), words };
-}
-
-export const browsing = data => browse(data);
-export const searching = data => search(data);
-export const quoting = data => quote(data);
+export const browsing = () => browse();
+export const searching = () => search();
+export const quoting = () => quote();

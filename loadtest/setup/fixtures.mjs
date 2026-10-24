@@ -1,11 +1,33 @@
 // Prepares data for the stateful scenarios. Usage: node loadtest/setup/fixtures.mjs <checkout|webhooks>
-import { ADDRESS, adminToken, call, createProduct, idempotencyKey, inBatches, mongo, registerBuyers, writeData } from './lib.mjs';
+import {
+  ADDRESS,
+  adminToken,
+  call,
+  createProduct,
+  idempotencyKey,
+  inBatches,
+  mongo,
+  registerBuyers,
+  transactionCounters,
+  writeData,
+} from './lib.mjs';
 
 const mode = process.argv[2];
 const run = Date.now().toString(36);
 const admin = await adminToken();
 
-if (mode === 'catalog') {
+if (mode === 'snapshot') {
+  // k6 copies setup() data into every VU, so the catalog is handed over as a file read once into a SharedArray.
+  const snapshot = mongo(`
+    const products = db.products.find({}, { slug: 1, title: 1, category: 1, sizes: 1 }).toArray().map(p => ({
+      id: String(p._id), slug: p.slug, title: p.title, category: p.category,
+      sizes: p.sizes.filter(s => s.stock > 0).map(s => s.size),
+    }));
+    print(JSON.stringify({ products, categories: db.products.distinct('category') }));
+  `);
+  writeData('catalog.json', snapshot);
+  console.log(`catalog snapshot: ${snapshot.products.length} products, ${snapshot.categories.length} categories`);
+} else if (mode === 'catalog') {
   // The demo seed has two dozen products; grow it so caches and indexes see a realistic key space.
   const count = Number(process.env.CATALOG_SIZE || 1000);
   const adjectives = [
@@ -53,7 +75,7 @@ if (mode === 'catalog') {
   const buyers = Number(process.env.BUYERS || 300);
   const product = await createProduct(admin, `Loadtest Hot Drop ${run}`, stock);
   const tokens = await registerBuyers(run, buyers);
-  writeData('checkout.json', { run, stock, productId: product._id, size: 'M', tokens });
+  writeData('checkout.json', { run, stock, productId: product._id, size: 'M', tokens, transactions: transactionCounters() });
   console.log(`checkout fixtures: ${tokens.length} buyers racing for ${stock} units of ${product.slug}`);
 } else if (mode === 'webhooks') {
   const orders = Number(process.env.WEBHOOK_ORDERS || 150);
@@ -76,6 +98,7 @@ if (mode === 'catalog') {
   `);
   writeData('webhooks.json', {
     run,
+    transactions: transactionCounters(),
     productId: product._id,
     orders: pairs.map(([orderId, gatewayOrderId]) => ({ orderId, gatewayOrderId })),
   });

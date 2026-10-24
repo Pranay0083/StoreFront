@@ -88,3 +88,8 @@ export function writeData(name, data) {
 }
 
 export const readData = name => JSON.parse(readFileSync(join(DATA_DIR, name), 'utf8'));
+
+export const transactionCounters = () =>
+  mongo(
+    `const t = db.serverStatus().transactions; print(JSON.stringify({ committed: Number(t.totalCommitted), aborted: Number(t.totalAborted) }))`,
+  );

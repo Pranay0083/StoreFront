@@ -1,7 +1,8 @@
 import http from 'k6/http';
 import { check } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
-import { API, json, latencyThresholds, loadCatalog, pick, skewedPick } from '../lib/common.js';
+import { inStock, promoted } from '../lib/catalog.js';
+import { API, json, latencyThresholds, pick, skewedPick } from '../lib/common.js';
 
 const RATE = Number(__ENV.RATE || 60);
 const DURATION = __ENV.DURATION || '2m';
@@ -26,20 +27,12 @@ export const options = {
   },
 };
 
-export function setup() {
-  const catalog = loadCatalog();
-  const products = catalog.products.filter(p => p.sizes.length > 0);
-  // Demo-seeded products are the ones the seeded promotions target; load-test fillers end in "-<n>".
-  const promoted = products.filter(p => !/-\d+$/.test(p.slug));
-  return { products, promoted };
-}
-
 /** Mixed carts: mostly small, some large enough to make the optimizer search. */
-function cart(products, promoted) {
+function cart() {
   const lines = Math.random() < 0.8 ? 1 + Math.floor(Math.random() * 4) : 5 + Math.floor(Math.random() * 6);
   const items = new Map();
   for (let i = 0; i < lines; i++) {
-    const p = promoted.length && Math.random() < 0.7 ? pick(promoted) : skewedPick(products, 0.6);
+    const p = promoted.length && Math.random() < 0.7 ? pick(promoted) : skewedPick(inStock);
     const size = pick(p.sizes);
     const key = `${p.id}:${size}`;
     const qty = (items.get(key)?.qty || 0) + (Math.random() < 0.25 ? 2 : 1);
@@ -48,8 +41,8 @@ function cart(products, promoted) {
   return [...items.values()];
 }
 
-export default function ({ products, promoted }) {
-  const items = cart(products, promoted);
+export default function () {
+  const items = cart();
   cartUnits.add(items.reduce((s, i) => s + i.qty, 0));
   const body = { items, codes: Math.random() < 0.3 ? ['WELCOME10'] : [] };
   const res = http.post(`${API}/pricing/quote`, JSON.stringify(body), { headers: json, tags: { name: 'POST /pricing/quote' } });

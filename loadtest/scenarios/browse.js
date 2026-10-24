@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, group } from 'k6';
-import { API, latencyThresholds, loadCatalog, pick, skewedPick } from '../lib/common.js';
+import { categories, products } from '../lib/catalog.js';
+import { API, latencyThresholds, pick, skewedPick } from '../lib/common.js';
 
 const RATE = Number(__ENV.RATE || 200);
 const DURATION = __ENV.DURATION || '2m';
@@ -28,15 +29,11 @@ export const options = {
   },
 };
 
-export function setup() {
-  return loadCatalog();
-}
-
-export default function (data) {
+export default function () {
   const roll = Math.random();
   if (roll < 0.45) {
     group('product page', () => {
-      const product = skewedPick(data.products);
+      const product = skewedPick(products);
       const res = http.get(`${API}/products/${product.slug}`, { tags: { page: 'product', name: 'GET /products/:slug' } });
       check(res, { 'product 200': r => r.status === 200 });
       http.get(`${API}/products/${product.id}/recommendations?limit=4`, {
@@ -45,7 +42,7 @@ export default function (data) {
     });
   } else if (roll < 0.9) {
     const params = [`sort=${pick(SORTS)}`, 'limit=24'];
-    if (Math.random() < 0.7) params.push(`category=${encodeURIComponent(skewedPick(data.categories))}`);
+    if (Math.random() < 0.7) params.push(`category=${encodeURIComponent(pick(categories))}`);
     if (Math.random() < 0.15) params.push('featured=true');
     const res = http.get(`${API}/products?${params.join('&')}`, { tags: { page: 'listing', name: 'GET /products' } });
     check(res, { 'listing 200': r => r.status === 200 });

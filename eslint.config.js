@@ -37,6 +37,10 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    files: ['loadtest/setup/**/*.js'],
+    languageOptions: { globals: { db: 'readonly', print: 'readonly' } },
+  },
+  {
     files: ['loadtest/{lib,scenarios}/**/*.js'],
     languageOptions: { globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly', open: 'readonly' } },
   },
