@@ -66,3 +66,8 @@ dump.rdb
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Playwright and Lighthouse CI output
+test-results/
+playwright-report/
+.lighthouseci/

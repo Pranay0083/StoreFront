@@ -8,7 +8,9 @@
     "build": "next build",
     "serve": "next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint app components lib"
+    "lint": "eslint app components lib",
+    "e2e:build": "NEXT_PUBLIC_API_URL=http://127.0.0.1:4801 NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3100 next build",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "1.2.3",
@@ -32,6 +34,8 @@
     "tailwindcss-animate": "1.0.7"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.64.1",
     "@types/node": "20.14.0",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
