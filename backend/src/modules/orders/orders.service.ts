@@ -12,6 +12,7 @@ import type { OutboxRelay } from '../../core/events/outbox-relay';
 import type { OutboxStore } from '../../core/events/outbox.store';
 import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
+import { KeyedMutex } from '../../core/persistence/keyed-mutex';
 import type { Session, TransactionRunner } from '../../core/persistence/transaction';
 import type { CartService } from '../cart/cart.service';
 import type { InventoryService } from '../inventory/inventory.service';
@@ -101,6 +102,7 @@ export class OrdersService {
     private readonly relay: OutboxRelay,
     private readonly tx: TransactionRunner,
     private readonly config: OrdersConfig,
+    private readonly stockLocks: KeyedMutex = new KeyedMutex(),
   ) {}
 
   /**
@@ -115,9 +117,31 @@ export class OrdersService {
       ...(input.paymentMethod && { paymentMethod: input.paymentMethod }),
     };
     const caller = { userId: user.id };
-    await this.inventory.assertAvailable(input.items);
+    const stockKeys = input.items.map(i => `${i.productId}:${i.size}`);
 
-    const order = await this.tx.run(async session => {
+    // Checkouts for the same variant queue here instead of aborting each other in MongoDB.
+    const order = await this.stockLocks.run(stockKeys, async () => {
+      await this.inventory.assertAvailable(input.items);
+      return this.place(input, cart, caller, user);
+    });
+
+    await this.cart.clear(user.id);
+    this.relay.notify();
+    logger.info(
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        userId: user.id,
+        total: order.total,
+        promotions: order.snapshot().pricing?.applied.map(a => a.promotionId) ?? [],
+      },
+      'Order created',
+    );
+    return order;
+  }
+
+  private place(input: CreateOrderInput, cart: PricingCart, caller: { userId: string }, user: AuthUser): Promise<Order> {
+    return this.tx.run(async session => {
       const breakdown = input.quoteId
         ? await this.pricing.verifyQuote(input.quoteId, cart, caller)
         : await this.pricing.price(cart, caller);
@@ -139,20 +163,6 @@ export class OrdersService {
       await this.outbox.append(placed.pullEvents(), session);
       return placed;
     });
-
-    await this.cart.clear(user.id);
-    this.relay.notify();
-    logger.info(
-      {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        userId: user.id,
-        total: order.total,
-        promotions: order.snapshot().pricing?.applied.map(a => a.promotionId) ?? [],
-      },
-      'Order created',
-    );
-    return order;
   }
 
   listForUser(userId: string): Promise<OrderRecord[]> {
