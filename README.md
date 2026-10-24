@@ -276,6 +276,13 @@ Razorpay modal (`/api/v1/payments/config` reports the mode). Register the webhoo
   infrastructure and again against Redis + Meilisearch service containers, an API + worker boot
   smoke test, the frontend build and both container image builds.
 
+## Storefront rendering
+
+- **Server Components + ISR.** Home, listing and product pages render on the server from a tagged data cache (`products`, `product:<slug>`, `product-id:<id>`); product pages are generated on first request and cached. When catalog or stock changes, the API's `storefront.revalidate` job (coalesced, best-effort) calls `POST /api/revalidate` on the web app with `STOREFRONT_REVALIDATE_SECRET`, so pages refresh in seconds instead of waiting out the 5-minute TTL.
+- **SEO.** Per-page metadata with OpenGraph/Twitter cards, Product/Offer/AggregateRating/BreadcrumbList/ItemList JSON-LD, `sitemap.xml` and `robots.txt`; filtered and search listings are `noindex`.
+- **Client state.** TanStack Query owns server data (orders, admin tables, reviews, search suggestions, infinite catalog pages) and is invalidated by the realtime SSE stream; the bag stays local-first and syncs through a mutation that rolls back when the server rejects a line.
+- **Quality gates.** Playwright journeys (`npm run e2e:build -w frontend && npm run e2e -w frontend`) drive a production build against the API on an in-memory replica set; Lighthouse CI (`npm run lhci -w frontend`, desktop preset) enforces ≥ 0.85 performance and ≥ 0.95 accessibility/SEO on the home and product pages.
+
 ## Local scripts
 
 ```bash
@@ -288,5 +295,7 @@ npm run db:status -w backend   # applied/pending migrations
 npm run worker -w backend      # job worker (needs REDIS_URL)
 npm run search:reindex -w backend
 npm run eval:agent -w backend  # agent scorecard against the configured model
+npm run e2e:build -w frontend && npm run e2e -w frontend   # Playwright (boots the seeded e2e API itself)
+npm run lhci -w frontend       # Lighthouse budgets (needs the e2e API on :4801 and web on :3100)
 TEST_REDIS_URL=redis://localhost:6379 TEST_MEILI_URL=http://localhost:7700 npm test -w backend
 ```
