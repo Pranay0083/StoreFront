@@ -60,6 +60,8 @@ type ProductRow = RecommendedProduct & { sizes: Array<{ stock: number }> };
 
 const SUMMARY_FIELDS = { title: 1, slug: 1, price: 1, compareAtPrice: 1, images: 1, category: 1, rating: 1, numReviews: 1, sizes: 1 };
 const inStock = (p: { sizes?: Array<{ stock: number }> }) => (p.sizes ?? []).some(s => s.stock > 0);
+/** Larger than the biggest page (12) plus the product itself. */
+const BESTSELLER_POOL = 24;
 
 export class RecommendationsService {
   private readonly cache: CacheNamespace;
@@ -142,6 +144,15 @@ export class RecommendationsService {
   }
 
   private async categoryBestsellers(product: { _id: Types.ObjectId; category: string }, limit: number): Promise<RecommendedProduct[]> {
+    const pool = await this.cache.getOrLoad(`bestsellers:${product.category}`, () => this.rankCategory(product.category));
+    return pool.filter(p => p._id !== String(product._id)).slice(0, limit);
+  }
+
+  /**
+   * A bounded, per-category ranking shared by every product in the category: best sellers first,
+   * then top-rated. Only the candidates are loaded, never the whole category.
+   */
+  private async rankCategory(category: string): Promise<RecommendedProduct[]> {
     const sold = await OrderModel.aggregate<{ _id: Types.ObjectId; units: number }>([
       { $match: { status: { $in: REVENUE_STATUSES } } },
       { $unwind: '$items' },
@@ -150,13 +161,15 @@ export class RecommendationsService {
       { $limit: 200 },
     ]);
     const rank = new Map(sold.map((s, i) => [String(s._id), i]));
-    const candidates = await ProductModel.find({ category: product.category, _id: { $ne: product._id } }, SUMMARY_FIELDS).lean<
-      ProductRow[]
-    >();
-    return candidates
+    const [bestSellers, topRated] = await Promise.all([
+      ProductModel.find({ category, _id: { $in: sold.map(s => s._id) } }, SUMMARY_FIELDS).lean<ProductRow[]>(),
+      ProductModel.find({ category }, SUMMARY_FIELDS).sort({ rating: -1, _id: -1 }).limit(BESTSELLER_POOL).lean<ProductRow[]>(),
+    ]);
+    const candidates = new Map([...bestSellers, ...topRated].map(p => [String(p._id), p]));
+    return [...candidates.values()]
       .filter(inStock)
       .sort((a, b) => (rank.get(String(a._id)) ?? Infinity) - (rank.get(String(b._id)) ?? Infinity) || b.rating - a.rating)
-      .slice(0, limit)
+      .slice(0, BESTSELLER_POOL)
       .map(p => this.summary(p));
   }
 
