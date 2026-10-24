@@ -169,7 +169,7 @@ export default function HomePage() {
             >
               <Image
                 src={c.image}
-                alt={c.name}
+                alt=""
                 fill
                 sizes="(max-width:1024px) 50vw, 25vw"
                 className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
