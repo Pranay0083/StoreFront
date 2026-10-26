@@ -44,7 +44,7 @@ export default function DocsPage() {
       </h1>
       <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground">
         Three ways in: a REST API for programmatic access, an MCP server so any AI client can talk to the store, and Aria — the on-site AI
-        shopping concierge powered by Groq.
+        shopping concierge, running on Claude or Groq.
       </p>
 
       <nav className="mt-8 flex flex-wrap gap-3">
@@ -67,8 +67,9 @@ export default function DocsPage() {
         <Section id="api" label="01 — REST" title="REST API">
           <p>
             All routes live under <code className="bg-secondary px-1.5 py-0.5 text-xs">{origin}/api/v1</code>. Authentication uses JWT —
-            sent as an httpOnly cookie or an <code className="bg-secondary px-1.5 py-0.5 text-xs">Authorization: Bearer</code> header. Admin
-            routes require an admin-role token.
+            sent as an httpOnly cookie or an <code className="bg-secondary px-1.5 py-0.5 text-xs">Authorization: Bearer</code> header.
+            Cookie-authenticated writes also send an <code className="bg-secondary px-1.5 py-0.5 text-xs">X-CSRF-Token</code> header, and
+            staff routes require a permission such as <code className="bg-secondary px-1.5 py-0.5 text-xs">orders:manage</code>.
           </p>
           <p>
             The full reference is generated from the server&apos;s own route table and request schemas, so it never drifts from the code:
@@ -99,9 +100,11 @@ export default function DocsPage() {
 
         <Section id="agent" label="02 — AI" title="AI Agent (Aria)">
           <p>
-            Aria is the floating assistant in the bottom-right corner of every store page. She runs on Groq with server-side tool calling
-            against live store data: product search, per-size stock, order status (scoped to the signed-in customer), cart context, and
-            store policies. Every conversation is persisted and reviewable by admins under <strong>Admin → Agent chats</strong>.
+            Aria is the floating assistant in the bottom-right corner of every store page. She runs on Claude or Groq with server-side tool
+            calling against live store data: product search, per-size stock, best prices and bundle offers from the promotion engine, order
+            status (scoped to the signed-in customer), cart context, and store policies. Replies stream in as they are generated, and any
+            change to your bag or orders waits for you to confirm it. Every conversation is persisted and reviewable by staff under{' '}
+            <strong>Admin → Agent chats</strong>.
           </p>
           <p>You can also call the agent directly:</p>
           <Code>{`curl -X POST "${origin}/api/v1/agent/chat" \\
@@ -129,6 +132,8 @@ export default function DocsPage() {
             <Endpoint method="tool" path="get_product_details" desc="Full product detail incl. per-size stock" />
             <Endpoint method="tool" path="list_categories" desc="Categories with counts" />
             <Endpoint method="tool" path="get_order_status" desc="Order status + timeline (order number + email)" />
+            <Endpoint method="tool" path="get_best_price" desc="Price a cart with the promotion engine (lowest combination of offers)" />
+            <Endpoint method="tool" path="suggest_bundles" desc="Bundle offers that include a product" />
             <Endpoint method="tool" path="get_store_info" desc="Shipping, returns, payments, offers & promo codes, sizing" />
           </div>
           <p className="label-caps pt-1 text-muted-foreground">Claude Desktop / Cursor config</p>
