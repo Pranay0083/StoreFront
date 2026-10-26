@@ -4,20 +4,21 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium tracking-wide transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-black/80',
-        outline: 'border border-foreground bg-transparent text-foreground hover:bg-foreground hover:text-background',
-        ghost: 'hover:bg-black/5 text-foreground',
+        default: 'bg-primary text-primary-foreground hover:bg-primary/85',
+        // A tone step, not a 1px outlined box.
+        outline: 'bg-secondary text-foreground hover:bg-accent',
+        ghost: 'text-foreground hover:bg-foreground/[0.06]',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/85',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-accent',
+        secondary: 'bg-card text-card-foreground hover:bg-secondary',
       },
       size: {
         default: 'h-11 px-6',
-        sm: 'h-9 px-4 text-xs',
-        lg: 'h-13 px-10 py-4 text-base',
+        sm: 'h-9 px-4 text-[13px]',
+        lg: 'h-14 px-8 text-base',
         icon: 'h-10 w-10',
       },
     },

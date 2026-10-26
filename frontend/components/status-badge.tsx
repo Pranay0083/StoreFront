@@ -16,7 +16,7 @@ const VARIANTS: Record<OrderStatus, 'secondary' | 'default' | 'success' | 'warni
 export function StatusBadge({ status, testId }: { status: OrderStatus; testId?: string }) {
   return (
     <Badge variant={VARIANTS[status] || 'secondary'} data-testid={testId || `status-badge-${status}`}>
-      {status.replaceAll('_', ' ')}
+      {status.charAt(0).toUpperCase() + status.slice(1).replaceAll('_', ' ')}
     </Badge>
   );
 }
