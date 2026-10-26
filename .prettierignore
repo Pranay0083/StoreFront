@@ -6,3 +6,5 @@ package-lock.json
 *.md
 frontend/next-env.d.ts
 backend/openapi.json
+loadtest/.data
+loadtest/results

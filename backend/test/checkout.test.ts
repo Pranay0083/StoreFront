@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { OutboxModel } from '../src/core/events/outbox.model';
 import { ProductModel as Product } from '../src/modules/catalog/product.model';
 import { InventoryMovementModel as Movement } from '../src/modules/inventory/inventory-movement.model';
@@ -80,6 +80,19 @@ describe('checkout reservations', () => {
     expect(await stockOf(p._id, 'M')).toBe(0);
     expect(await Order.countDocuments()).toBe(1);
     expect(await t.container.services.inventory.reconcile()).toMatchObject({ ok: true });
+  });
+
+  it('refuses a sold-out variant before opening a transaction', async () => {
+    const p = await product({ sizes: [{ size: 'M', stock: 0 }] });
+    const buyer = await createUser();
+    const run = vi.spyOn(t.container.tx, 'run');
+    try {
+      const res = await checkout(buyer.token, p._id).expect(409);
+      expect(res.body.error).toMatch(/Only 0 left/);
+      expect(run).not.toHaveBeenCalled();
+    } finally {
+      run.mockRestore();
+    }
   });
 
   it('never over-redeems a limited promotion under 20 concurrent checkouts', async () => {

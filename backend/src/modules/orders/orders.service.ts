@@ -12,6 +12,7 @@ import type { OutboxRelay } from '../../core/events/outbox-relay';
 import type { OutboxStore } from '../../core/events/outbox.store';
 import type { AuthUser } from '../../core/http/types';
 import { logger } from '../../core/logger';
+import { KeyedMutex } from '../../core/persistence/keyed-mutex';
 import type { Session, TransactionRunner } from '../../core/persistence/transaction';
 import type { CartService } from '../cart/cart.service';
 import type { InventoryService } from '../inventory/inventory.service';
@@ -101,6 +102,7 @@ export class OrdersService {
     private readonly relay: OutboxRelay,
     private readonly tx: TransactionRunner,
     private readonly config: OrdersConfig,
+    private readonly stockLocks: KeyedMutex = new KeyedMutex(),
   ) {}
 
   /**
@@ -115,26 +117,12 @@ export class OrdersService {
       ...(input.paymentMethod && { paymentMethod: input.paymentMethod }),
     };
     const caller = { userId: user.id };
+    const stockKeys = input.items.map(i => `${i.productId}:${i.size}`);
 
-    const order = await this.tx.run(async session => {
-      const breakdown = input.quoteId
-        ? await this.pricing.verifyQuote(input.quoteId, cart, caller)
-        : await this.pricing.price(cart, caller);
-      if (breakdown.rejectedCodes.length) throw new CodeRejectedError(breakdown.rejectedCodes);
-      const priced = orderPricingFrom(breakdown, cart.codes ?? [], input.quoteId);
-
-      const placed = Order.place({
-        orderNumber: generateOrderNumber(),
-        userId: user.id,
-        address: input.address,
-        ...priced,
-        reservedUntil: new Date(Date.now() + this.config.reservationTtlMs),
-      });
-      await this.orders.insert(placed, session);
-      await this.inventory.reserve(placed.id, priced.items, placed.snapshot().reservedUntil!, `user:${user.id}`, session);
-      await this.pricing.redeem({ orderId: placed.id, userId: user.id }, breakdown.applied, session);
-      await this.outbox.append(placed.pullEvents(), session);
-      return placed;
+    // Checkouts for the same variant queue here instead of aborting each other in MongoDB.
+    const order = await this.stockLocks.run(stockKeys, async () => {
+      await this.inventory.assertAvailable(input.items);
+      return this.place(input, cart, caller, user);
     });
 
     await this.cart.clear(user.id);
@@ -150,6 +138,31 @@ export class OrdersService {
       'Order created',
     );
     return order;
+  }
+
+  private place(input: CreateOrderInput, cart: PricingCart, caller: { userId: string }, user: AuthUser): Promise<Order> {
+    return this.tx.run(async session => {
+      const breakdown = input.quoteId
+        ? await this.pricing.verifyQuote(input.quoteId, cart, caller)
+        : await this.pricing.price(cart, caller);
+      if (breakdown.rejectedCodes.length) throw new CodeRejectedError(breakdown.rejectedCodes);
+      const priced = orderPricingFrom(breakdown, cart.codes ?? [], input.quoteId);
+
+      const placed = Order.place({
+        orderNumber: generateOrderNumber(),
+        userId: user.id,
+        address: input.address,
+        ...priced,
+        reservedUntil: new Date(Date.now() + this.config.reservationTtlMs),
+      });
+      // The stock decrement is the write concurrent checkouts conflict on, so it goes first:
+      // a losing attempt aborts before doing any other work.
+      await this.inventory.reserve(placed.id, priced.items, placed.snapshot().reservedUntil!, `user:${user.id}`, session);
+      await this.orders.insert(placed, session);
+      await this.pricing.redeem({ orderId: placed.id, userId: user.id }, breakdown.applied, session);
+      await this.outbox.append(placed.pullEvents(), session);
+      return placed;
+    });
   }
 
   listForUser(userId: string): Promise<OrderRecord[]> {

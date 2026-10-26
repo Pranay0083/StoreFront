@@ -18,7 +18,18 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "loadtest:up": "loadtest/run.sh up",
+    "loadtest:catalog": "node loadtest/setup/fixtures.mjs catalog",
+    "loadtest:browse": "loadtest/run.sh browse",
+    "loadtest:search": "loadtest/run.sh search",
+    "loadtest:pricing": "loadtest/run.sh pricing",
+    "loadtest:checkout": "loadtest/run.sh checkout",
+    "loadtest:webhooks": "loadtest/run.sh webhooks",
+    "loadtest:soak": "loadtest/run.sh soak",
+    "loadtest:smoke": "loadtest/run.sh smoke",
+    "loadtest:metrics": "loadtest/run.sh metrics",
+    "loadtest:down": "loadtest/run.sh down"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

@@ -21,7 +21,13 @@ const productSchema = new Schema(
   { timestamps: true },
 );
 
-productSchema.index({ category: 1, price: 1 });
+productSchema.index({ createdAt: -1, _id: -1 });
+productSchema.index({ category: 1, createdAt: -1, _id: -1 });
+productSchema.index({ featured: 1, createdAt: -1, _id: -1 });
+productSchema.index({ price: 1, _id: 1 });
+productSchema.index({ category: 1, price: 1, _id: 1 });
+productSchema.index({ rating: -1, _id: -1 });
+productSchema.index({ category: 1, rating: -1, _id: -1 });
 productSchema.index({ title: 'text', description: 'text' });
 
 export type ProductRecord = InferSchemaType<typeof productSchema> & { _id: Types.ObjectId; createdAt: Date; updatedAt: Date };

@@ -1,0 +1,49 @@
+# Overlay for load tests: `docker compose -f docker-compose.yml -f loadtest/docker-compose.loadtest.yml ...`
+# Pins container limits so numbers are comparable between runs, turns off per-IP rate limits
+# (every virtual user comes from the one k6 container) and gives the demo gateway a webhook secret.
+x-loadtest-env: &loadtest-env
+  RATE_LIMIT_ENABLED: 'false'
+  RAZORPAY_WEBHOOK_SECRET: ${LOADTEST_WEBHOOK_SECRET:-loadtest-webhook-secret}
+  LOG_LEVEL: warn
+
+services:
+  mongo:
+    cpus: 2
+    mem_limit: 1g
+
+  redis:
+    cpus: 0.5
+    mem_limit: 256m
+
+  meilisearch:
+    cpus: 1
+    mem_limit: 512m
+
+  api:
+    cpus: 2
+    mem_limit: 768m
+    environment:
+      <<: *loadtest-env
+      OTEL_SERVICE_NAME: storefront-api
+
+  worker:
+    cpus: 1
+    mem_limit: 512m
+    environment:
+      <<: *loadtest-env
+      OTEL_SERVICE_NAME: storefront-worker
+
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: ['loadtest']
+    cpus: 1.5
+    mem_limit: 512m
+    working_dir: /loadtest
+    volumes:
+      - ./loadtest:/loadtest
+    environment:
+      BASE_URL: http://api:4001
+      WEBHOOK_SECRET: ${LOADTEST_WEBHOOK_SECRET:-loadtest-webhook-secret}
+    depends_on:
+      api:
+        condition: service_healthy

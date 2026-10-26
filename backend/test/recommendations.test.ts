@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { ProductModel } from '../src/modules/catalog/product.model';
 import { OrderModel } from '../src/modules/orders/order.model';
 import { createProduct, createUser } from './helpers/factories';
 import { API, bearer, useTestApp } from './helpers/app';
@@ -57,6 +58,29 @@ describe('recommendations', () => {
     const res = await t.http().get(`${API}/products/${target._id}/recommendations`).query({ limit: 5 }).expect(200);
     expect(res.body.source).toBe('category-bestsellers');
     expect(res.body.items.map((p: { slug: string }) => p.slug)).toEqual([popular.slug, quiet.slug]);
+  });
+
+  it('ranks a large category once and shares the bounded pool across its products', async () => {
+    const products = await Promise.all(
+      Array.from({ length: 40 }, (_, i) => createProduct({ title: `Pool Rec ${i}`, category: 'Footwear' })),
+    );
+    for (const [i, p] of products.entries()) await ProductModel.updateOne({ _id: p._id }, { $set: { rating: (i * 7) % 50 } });
+    const aggregate = vi.spyOn(OrderModel, 'aggregate');
+    try {
+      const first = await t.http().get(`${API}/products/${products[0]._id}/recommendations`).query({ limit: 12 }).expect(200);
+      const second = await t.http().get(`${API}/products/${products[1]._id}/recommendations`).query({ limit: 12 }).expect(200);
+      expect(aggregate).toHaveBeenCalledTimes(1);
+
+      const ratings = (await ProductModel.find({ category: 'Footwear' }).lean()).map(p => [String(p._id), p.rating] as const);
+      const expected = ratings.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? 1 : -1)).map(([id]) => id);
+      expect(first.body.items.map((p: { _id: string }) => p._id)).toEqual(
+        expected.filter(id => id !== String(products[0]._id)).slice(0, 12),
+      );
+      expect(second.body.items).toHaveLength(12);
+      expect(second.body.items.some((p: { _id: string }) => p._id === String(products[1]._id))).toBe(false);
+    } finally {
+      aggregate.mockRestore();
+    }
   });
 
   it('validates ids, 404s unknown products and gates manual rebuilds', async () => {

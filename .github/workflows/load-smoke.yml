@@ -1,0 +1,49 @@
+name: Load smoke test
+
+# Boots the production compose stack (API and worker as separate containers) and runs short k6
+# scenarios whose thresholds fail the job: browse, pricing quotes, and a checkout race verified
+# for exact stock, ledger reconciliation and an empty dead-letter queue.
+on:
+  workflow_dispatch:
+    inputs:
+      catalog_size:
+        description: Extra products to create before the run
+        default: '500'
+
+concurrency:
+  group: load-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: sfload
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Boot the stack
+        run: loadtest/run.sh up
+      - name: Grow the catalog
+        env:
+          CATALOG_SIZE: ${{ inputs.catalog_size }}
+        run: node loadtest/setup/fixtures.mjs catalog
+      - name: Run smoke scenarios
+        run: loadtest/run.sh smoke
+      - name: Server-side metrics
+        if: always()
+        run: loadtest/run.sh metrics 5m || true
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f loadtest/docker-compose.loadtest.yml logs --tail 200 api worker
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-summaries
+          path: loadtest/results/
+      - name: Tear down
+        if: always()
+        run: loadtest/run.sh down

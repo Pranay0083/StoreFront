@@ -6,7 +6,16 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/.next/**', '**/dist/**', '**/coverage/**', 'frontend/next-env.d.ts', 'frontend/*.config.*'],
+    ignores: [
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/dist/**',
+      '**/coverage/**',
+      'frontend/next-env.d.ts',
+      'frontend/*.config.*',
+      'loadtest/.data/**',
+      'loadtest/results/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -22,6 +31,18 @@ export default tseslint.config(
   {
     files: ['backend/**/*.ts', 'packages/**/*.ts', 'eslint.config.js'],
     languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['loadtest/setup/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['loadtest/setup/**/*.js'],
+    languageOptions: { globals: { db: 'readonly', print: 'readonly' } },
+  },
+  {
+    files: ['loadtest/{lib,scenarios}/**/*.js'],
+    languageOptions: { globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly', open: 'readonly' } },
   },
   {
     files: ['frontend/**/*.{ts,tsx}'],

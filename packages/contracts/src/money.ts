@@ -11,10 +11,14 @@ export const paiseToRupees = (paise: Paise): number => paise / 100;
 
 export const percentOf = (amount: Paise, percent: number): Paise => Math.floor((amount * percent) / 100);
 
+// toLocaleString with options builds a new Intl.NumberFormat on every call; pricing formats dozens
+// of amounts per quote, so the formatters are created once.
+const WHOLE_RUPEES = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const WITH_PAISE = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export function formatINR(paise: Paise | null | undefined): string {
   const value = paiseToRupees(paise ?? 0);
-  const fractionDigits = Number.isInteger(value) ? 0 : 2;
-  return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: fractionDigits, maximumFractionDigits: 2 })}`;
+  return `₹${(Number.isInteger(value) ? WHOLE_RUPEES : WITH_PAISE).format(value)}`;
 }
 
 export const FREE_SHIPPING_THRESHOLD: Paise = 299_900;
