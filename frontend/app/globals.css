@@ -2,74 +2,119 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Newsprint and brass: paper grey, near-black ink, one brass highlighter.
+ * The brass is spent on money saved (the highlighted line on a receipt) and nothing else.
+ * Surfaces are separated by tone steps, not by lines or shadows.
+ */
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
-    --primary: 0 0% 4%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 0 0% 4%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 36%;
-    --accent: 220 13% 91%;
-    --accent-foreground: 0 0% 4%;
+    --background: 60 10% 90%; /* #e8e8e3 newsprint ground */
+    --foreground: 40 7% 9%; /* #181715 ink */
+    --card: 60 10% 96%; /* #f6f6f4 the receipt paper */
+    --card-foreground: 40 7% 9%;
+    --primary: 40 7% 9%;
+    --primary-foreground: 60 10% 96%;
+    --secondary: 60 8% 85%; /* #dcdcd6 one tone step down */
+    --secondary-foreground: 40 7% 9%;
+    --muted: 60 8% 85%;
+    --muted-foreground: 51 4% 37%; /* #63625c */
+    --accent: 60 7% 80%;
+    --accent-foreground: 40 7% 9%;
+    --brass: 55 76% 43%; /* #bfb21a, always with ink on top */
+    --brass-foreground: 40 7% 9%;
+    --positive: 123 46% 34%;
     --destructive: 0 66% 35%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 88%;
-    --input: 220 13% 82%;
-    --ring: 0 0% 4%;
+    --destructive-foreground: 60 10% 96%;
+    --border: 60 6% 78%;
+    --input: 60 5% 66%;
+    --ring: 40 7% 9%;
     --radius: 0rem;
+
+    /* Motion (Emil Kowalski): strong custom curves, UI under 300ms, exits faster than entrances. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* The back office: the achromatic ledger app style, kept on the store's palette and face. */
+  [data-surface='ledger'] {
+    --background: 60 10% 96%;
+    --card: 0 0% 100%;
+    --secondary: 60 8% 92%;
+    --muted: 60 8% 92%;
+    --accent: 60 7% 88%;
+    --border: 60 6% 89%;
+    --input: 60 5% 80%;
+    --chart: 54 80% 30%; /* deep brass: the one data hue, 4:1 on white */
   }
 
   * {
     @apply border-border;
   }
 
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
+    font-feature-settings: 'ss01' on;
   }
 
   ::selection {
-    background: #0a0a0a;
-    color: #fafafa;
+    background: hsl(var(--brass));
+    color: hsl(var(--brass-foreground));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 
 @layer utilities {
-  .grain::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    pointer-events: none;
-    opacity: 0.035;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* A receipt's perforated edges: round bites cut with a mask, never a drawn line. */
+  .edge-perforated {
+    --bite: 5px;
+    -webkit-mask:
+      radial-gradient(circle var(--bite) at 50% 0, #0000 97%, #000) top / calc(var(--bite) * 3.2) 51% repeat-x,
+      radial-gradient(circle var(--bite) at 50% 100%, #0000 97%, #000) bottom / calc(var(--bite) * 3.2) 51% repeat-x;
+    mask:
+      radial-gradient(circle var(--bite) at 50% 0, #0000 97%, #000) top / calc(var(--bite) * 3.2) 51% repeat-x,
+      radial-gradient(circle var(--bite) at 50% 100%, #0000 97%, #000) bottom / calc(var(--bite) * 3.2) 51% repeat-x;
   }
 
-  .label-caps {
-    @apply text-xs uppercase tracking-[0.2em] font-medium;
+  .edge-perforated-b {
+    --bite: 5px;
+    -webkit-mask: radial-gradient(circle var(--bite) at 50% 100%, #0000 97%, #000) bottom / calc(var(--bite) * 3.2) 100% repeat-x;
+    mask: radial-gradient(circle var(--bite) at 50% 100%, #0000 97%, #000) bottom / calc(var(--bite) * 3.2) 100% repeat-x;
   }
-}
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: #f3f4f6;
-}
-::-webkit-scrollbar-thumb {
-  background: #0a0a0a;
+  /* A swing tag's punched corner. */
+  .edge-notched {
+    clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%, 0 14px);
+  }
+
+  /* The brass highlighter stroke across a saved amount. */
+  .highlight {
+    background: linear-gradient(hsl(var(--brass)), hsl(var(--brass))) 0 60% / 100% 70% no-repeat;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Keep fades that explain a change; drop travel and looping motion. */
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }
