@@ -1,52 +1,108 @@
-import { ArrowRight, RefreshCcw, ShieldCheck, Truck } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { connection } from 'next/server';
 import { Suspense } from 'react';
+import { FeaturedRail } from '@/components/home/featured-rail';
+import { LookSection, LookSkeleton } from '@/components/home/look-section';
 import { JsonLd } from '@/components/json-ld';
-import { ProductCard } from '@/components/product-card';
-import { ProductGridSkeleton } from '@/components/skeletons';
+import { Reveal } from '@/components/reveal';
+import { ProductRowSkeleton } from '@/components/skeletons';
 import { Button } from '@/components/ui/button';
+import { fmtINR } from '@/lib/api';
 import { serverApi } from '@/lib/server-api';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
+import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
 
-const HERO = 'https://images.unsplash.com/photo-1603189343302-e603f7add05a?w=1400&q=85&auto=format&fit=crop';
-const EDITORIAL = 'https://images.unsplash.com/photo-1664076458686-3449062080ac?w=1200&q=85&auto=format&fit=crop';
-const FLAT = 'https://images.unsplash.com/photo-1632469188022-b5db09a70fbc?w=800&q=80&auto=format&fit=crop';
+/** Editorial photographs (Unsplash), never a product's own photograph, so no picture stands for two things. */
+const HERO = 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=1600&q=80&auto=format&fit=crop';
+const RAIL = 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1200&q=80&auto=format&fit=crop';
 
-const CATEGORIES = [
-  { name: 'Men', image: 'https://images.unsplash.com/photo-1611312449408-fcece27cdbb7?w=700&q=80&auto=format&fit=crop' },
-  { name: 'Women', image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=700&q=80&auto=format&fit=crop' },
-  { name: 'Footwear', image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=700&q=80&auto=format&fit=crop' },
-  { name: 'Accessories', image: 'https://images.unsplash.com/photo-1591561954557-26941169b49e?w=700&q=80&auto=format&fit=crop' },
+const DEPARTMENTS = [
+  { name: 'Men', note: 'Oxford and linen shirts, selvedge denim, merino and an unstructured blazer.' },
+  { name: 'Women', note: 'A silk slip, wide-leg trousers, cashmere and a double-faced wool coat.' },
+  { name: 'Footwear', note: 'Court sneakers, Chelsea boots, canvas high-tops and suede loafers.' },
+  { name: 'Accessories', note: 'A leather tote, a silk scarf, belts, a beanie, a watch and a backpack.' },
 ];
 
-const MARQUEE = 'FREE SHIPPING OVER ₹2,999 — 30-DAY EASY RETURNS — NEW SEASON DROP — SECURE CHECKOUT — ';
+/** Hooks kept from the earlier home page, now on the department rows that do the same job. */
+const ROW_TEST_IDS: Record<string, string> = { Women: 'editorial-shop-women', Accessories: 'hero-accessories-button' };
 
 export const metadata: Metadata = {
-  title: 'STOREFRONT — Considered Clothing',
-  description: 'Twenty-four pieces across Men, Women, Footwear and Accessories. Free shipping over ₹2,999 and 30-day returns.',
+  title: 'STOREFRONT — Clothes at the lowest total',
+  description:
+    'Twenty-four pieces of menswear, womenswear, footwear and accessories. Whatever you put in your bag, a pricing optimizer finds the cheapest mix of offers.',
   alternates: { canonical: absoluteUrl('/') },
-  openGraph: { type: 'website', url: absoluteUrl('/'), siteName: SITE_NAME, images: [{ url: HERO, width: 1400, alt: 'AW/26 editorial' }] },
+  openGraph: {
+    type: 'website',
+    url: absoluteUrl('/'),
+    siteName: SITE_NAME,
+    images: [{ url: HERO, width: 1600, alt: 'A summer outfit laid out flat: a white shirt, rolled jeans, a striped top and red sandals' }],
+  },
 };
 
-async function FeaturedGrid() {
+function FeaturedHeading() {
+  return (
+    <>
+      <h2 id="featured-heading" className="text-display-md font-extrabold">
+        Where to start
+      </h2>
+      <p className="mt-4 max-w-[60ch] text-lg">
+        Eight pieces the rest of the wardrobe is built around.{' '}
+        <Link href="/products" data-testid="featured-view-all" className="font-semibold underline underline-offset-4">
+          See every piece
+        </Link>
+      </p>
+    </>
+  );
+}
+
+async function Featured() {
   await connection();
   const featured = await serverApi
     .featured()
     .then(d => d.items)
     .catch(() => []);
   if (!featured.length) {
-    return <p className="text-sm text-muted-foreground">The featured edit is being restocked — browse the full collection.</p>;
+    return (
+      <div className="mx-auto max-w-[1760px] px-4 sm:px-8">
+        <FeaturedHeading />
+        <p className="mt-6 text-lg">The featured pieces are being restocked; the full collection is one click away.</p>
+      </div>
+    );
   }
+  return <FeaturedRail products={featured} heading={<FeaturedHeading />} />;
+}
+
+function DepartmentRows({ counts }: { counts?: Map<string, number> }) {
   return (
-    <div data-testid="featured-grid" className="grid grid-cols-2 gap-8 lg:grid-cols-4">
-      {featured.map((p, i) => (
-        <ProductCard key={p._id} product={p} index={i} />
+    <ul className="mt-8">
+      {DEPARTMENTS.map(d => (
+        <li key={d.name} data-testid={ROW_TEST_IDS[d.name]}>
+          <Link
+            href={`/products?category=${d.name}`}
+            data-testid={`category-tile-${d.name.toLowerCase()}`}
+            className="group -mx-4 grid gap-x-8 gap-y-2 px-4 py-5 transition-[background-color] duration-150 hover:bg-secondary sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-baseline sm:py-6"
+          >
+            <span className="text-display-md font-extrabold">{d.name}</span>
+            <span className="text-lg">
+              {d.note}
+              {counts?.has(d.name) && (
+                <span className="block text-base text-muted-foreground">
+                  {counts.get(d.name)} piece{counts.get(d.name) === 1 ? '' : 's'}
+                </span>
+              )}
+            </span>
+          </Link>
+        </li>
       ))}
-    </div>
+    </ul>
   );
+}
+
+async function Departments() {
+  const categories = await serverApi.categories().catch(() => []);
+  return <DepartmentRows counts={new Map(categories.map(c => [c.name, c.count]))} />;
 }
 
 export default function HomePage() {
@@ -65,145 +121,114 @@ export default function HomePage() {
           },
         }}
       />
-      <section className="mx-auto max-w-7xl px-5 pt-8 sm:px-8 sm:pt-12">
-        <div className="grid gap-6 lg:grid-cols-12">
-          <div className="relative order-2 aspect-[4/5] max-h-[80vh] w-full overflow-hidden lg:order-1 lg:col-span-7 lg:aspect-auto lg:min-h-[620px]">
+
+      <section className="mx-auto max-w-[1760px] px-4 sm:px-8">
+        <div className="grid gap-10 pt-8 lg:min-h-[calc(100svh-4rem)] lg:grid-cols-12 lg:gap-8 lg:pb-8 lg:pt-6">
+          <div className="flex min-w-0 flex-col justify-between gap-8 lg:col-span-6 lg:pb-2 lg:pt-4">
+            <p className="hidden max-w-[36ch] animate-rise text-base lg:block">
+              Free delivery on orders over {fmtINR(FREE_SHIPPING_THRESHOLD)}, and you can cancel any order until the moment it ships.
+            </p>
+            <div>
+              <h1 className="max-w-[12ch] animate-rise text-balance text-[clamp(2.75rem,7vw,8.5rem)] font-extrabold leading-[0.88] tracking-[-0.055em]">
+                Clothes at the lowest total
+              </h1>
+              <p className="mt-8 max-w-[42ch] animate-rise text-lg [animation-delay:80ms] sm:mt-10 sm:text-xl">
+                Twenty-four pieces across four departments. Whatever you put in your bag, our optimizer finds the cheapest mix of offers.
+              </p>
+              <div className="mt-8 flex animate-rise flex-wrap items-center gap-x-8 gap-y-4 [animation-delay:160ms]">
+                <Button asChild size="lg" data-testid="hero-shop-button">
+                  <Link href="/products">Shop the collection</Link>
+                </Button>
+                <Link href="#build-a-look" className="text-base font-semibold underline underline-offset-4">
+                  Build a look
+                </Link>
+              </div>
+            </div>
+          </div>
+          <div className="relative aspect-[4/5] overflow-hidden bg-secondary sm:aspect-[4/3] lg:col-span-6 lg:aspect-auto">
             <Image
               src={HERO}
-              alt="AW/26 editorial"
+              alt="A summer outfit laid out flat: a white shirt, rolled jeans, a striped top and red sandals"
               fill
               priority
-              sizes="(max-width:1024px) 100vw, 58vw"
-              className="object-cover object-top"
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="object-cover duration-1000 ease-out animate-in zoom-in-[1.04]"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-            <p className="absolute bottom-6 left-6 label-caps text-white">AW / 26 — The Considered Wardrobe</p>
           </div>
+        </div>
+      </section>
 
-          <div className="order-1 flex flex-col justify-between gap-10 lg:order-2 lg:col-span-5 lg:pl-6">
-            <div className="animate-fade-up">
-              <p className="label-caps text-muted-foreground">New season, no noise</p>
-              <h1 className="mt-5 font-serif text-5xl font-semibold leading-none tracking-tighter sm:text-6xl">
-                Dress like
-                <br />
-                it matters.
-              </h1>
-              <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-                Twenty-four pieces. Four categories. Zero filler. Cut from cloth that earns its keep and shipped through a state machine
-                that never loses an order.
+      <section
+        id="build-a-look"
+        aria-labelledby="look-heading"
+        className="mt-24 scroll-mt-16 bg-primary text-primary-foreground sm:mt-32 [&_:focus-visible]:outline-card"
+      >
+        <div className="mx-auto max-w-[1760px] px-4 py-20 sm:px-8 sm:py-28">
+          <div className="mb-12 grid gap-6 lg:mb-16 lg:grid-cols-12 lg:items-end lg:gap-8">
+            <Reveal className="lg:col-span-7">
+              <h2 id="look-heading" className="text-display-lg font-extrabold">
+                Build a look
+              </h2>
+            </Reveal>
+            <Reveal delay={80} className="lg:col-span-5">
+              <p className="max-w-[44ch] text-lg">
+                Tap the pieces you would wear together. The receipt is priced live by the optimizer that prices every bag, so the bundles it
+                finds are the ones you get.
               </p>
-              <div className="mt-9 flex flex-wrap gap-4">
-                <Button asChild size="lg" data-testid="hero-shop-button">
-                  <Link href="/products">
-                    Shop the collection <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" data-testid="hero-accessories-button">
-                  <Link href="/products?category=Accessories">Accessories</Link>
-                </Button>
-              </div>
-            </div>
-
-            <div className="relative hidden aspect-[16/9] overflow-hidden lg:block animate-fade-up" style={{ animationDelay: '150ms' }}>
-              <Image src={FLAT} alt="Flat lay" fill sizes="40vw" className="object-cover" />
-            </div>
+            </Reveal>
           </div>
+          <Reveal delay={160}>
+            <Suspense fallback={<LookSkeleton />}>
+              <LookSection />
+            </Suspense>
+          </Reveal>
         </div>
       </section>
 
-      <div className="mt-16 overflow-hidden border-y border-black/10 bg-black py-3 text-white">
-        <div className="flex w-max animate-marquee whitespace-nowrap">
-          <span className="label-caps">{MARQUEE.repeat(3)}</span>
-          <span className="label-caps">{MARQUEE.repeat(3)}</span>
-        </div>
-      </div>
-
-      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8">
-        <div className="mb-10 flex items-end justify-between">
-          <div>
-            <p className="label-caps text-muted-foreground">Curated</p>
-            <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Featured pieces</h2>
-          </div>
-          <Link href="/products" data-testid="featured-view-all" className="label-caps hidden items-center gap-2 hover:underline sm:flex">
-            View all <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <Suspense fallback={<ProductGridSkeleton count={8} />}>
-          <FeaturedGrid />
-        </Suspense>
+      <section aria-labelledby="featured-heading" className="mt-28 sm:mt-40">
+        <Reveal>
+          <Suspense
+            fallback={
+              <>
+                <div className="mx-auto max-w-[1760px] px-4 sm:px-8">
+                  <FeaturedHeading />
+                </div>
+                <div className="mt-[68px]">
+                  <ProductRowSkeleton />
+                </div>
+              </>
+            }
+          >
+            <Featured />
+          </Suspense>
+        </Reveal>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
-        <div className="grid items-center gap-10 bg-white p-8 sm:p-14 lg:grid-cols-2 border border-black/5">
-          <div>
-            <p className="label-caps text-muted-foreground">The Women&apos;s edit</p>
-            <h2 className="mt-4 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
-              Silk, wool, and
-              <br />
-              nothing you&apos;ll regret.
-            </h2>
-            <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-              Bias-cut slips, double-faced coats and knitwear graded by hand. Every piece is stocked shallow on purpose — when it&apos;s
-              gone, it&apos;s gone.
-            </p>
-            <Button asChild className="mt-8" data-testid="editorial-shop-women">
-              <Link href="/products?category=Women">Shop Women</Link>
-            </Button>
+      <section aria-labelledby="departments-heading" className="mx-auto mt-28 max-w-[1760px] px-4 sm:mt-40 sm:px-8">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-7">
+            <Reveal>
+              <h2 id="departments-heading" className="text-display-md font-extrabold">
+                Shop by department
+              </h2>
+            </Reveal>
+            <Reveal delay={80}>
+              <Suspense fallback={<DepartmentRows />}>
+                <Departments />
+              </Suspense>
+            </Reveal>
           </div>
-          <div className="relative aspect-[4/5] max-h-[80vh] overflow-hidden">
-            <Image src={EDITORIAL} alt="Women's edit" fill sizes="(max-width:1024px) 100vw, 50vw" className="object-cover" />
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
-        <h2 className="mb-8 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Shop by category</h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {CATEGORIES.map((c, i) => (
-            <Link
-              key={c.name}
-              href={`/products?category=${c.name}`}
-              data-testid={`category-tile-${c.name.toLowerCase()}`}
-              className="group relative aspect-[3/4] overflow-hidden animate-fade-up"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
+          <Reveal delay={160} className="lg:col-span-5">
+            <div className="relative aspect-[4/5] overflow-hidden bg-secondary sm:aspect-[3/2] lg:aspect-[4/5]">
               <Image
-                src={c.image}
-                alt=""
+                src={RAIL}
+                alt="A rail of shirts and blouses in white, cream and brown on wooden hangers"
                 fill
-                sizes="(max-width:1024px) 50vw, 25vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                sizes="(max-width: 1024px) 100vw, 40vw"
+                className="object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <p className="absolute bottom-5 left-5 font-serif text-2xl font-semibold text-white">{c.name}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-t border-black/10 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:grid-cols-3 sm:px-8">
-          {[
-            {
-              icon: Truck,
-              title: 'Tracked fulfilment',
-              text: 'Every order moves through an audited state machine — created to delivered.',
-            },
-            { icon: ShieldCheck, title: 'Secure payments', text: 'Razorpay checkout with idempotent, signature-verified confirmation.' },
-            {
-              icon: RefreshCcw,
-              title: '30-day returns',
-              text: 'Cancel before shipping in one click. Refunds tracked in your order audit trail.',
-            },
-          ].map(f => (
-            <div key={f.title} className="flex gap-4">
-              <f.icon className="h-6 w-6 shrink-0" strokeWidth={1.25} />
-              <div>
-                <p className="font-medium">{f.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{f.text}</p>
-              </div>
             </div>
-          ))}
+          </Reveal>
         </div>
       </section>
     </div>
