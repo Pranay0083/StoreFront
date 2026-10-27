@@ -52,13 +52,13 @@ export function Navbar() {
           STOREFRONT
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           {NAV.map(n => (
             <Link
               key={n.href}
               href={n.href}
               data-testid={n.testId}
-              className="px-2.5 py-2 text-[15px] font-medium underline-offset-[6px] decoration-[1.5px] hover:underline"
+              className="whitespace-nowrap px-2.5 py-2 text-[15px] font-medium underline-offset-[6px] decoration-[1.5px] hover:underline"
             >
               {n.label}
             </Link>
@@ -122,7 +122,7 @@ export function Navbar() {
 
           <button
             type="button"
-            className={cn(barButton, 'md:hidden')}
+            className={cn(barButton, 'lg:hidden')}
             aria-expanded={menuOpen}
             aria-controls="phone-menu"
             onClick={() => setMenuOpen(o => !o)}
@@ -136,7 +136,7 @@ export function Navbar() {
         <nav
           id="phone-menu"
           aria-label="Main"
-          className="absolute inset-x-0 top-16 h-[calc(100svh-4rem)] overflow-y-auto bg-background px-4 pb-10 pt-4 ease-out animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden"
+          className="absolute inset-x-0 top-16 h-[calc(100svh-4rem)] overflow-y-auto bg-background px-4 pb-10 pt-4 ease-out animate-in fade-in-0 slide-in-from-top-2 duration-200 lg:hidden"
         >
           <ul className="space-y-1">
             {NAV.map(n => (

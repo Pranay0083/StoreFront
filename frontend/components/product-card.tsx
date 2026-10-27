@@ -34,7 +34,7 @@ export function ProductCard({
           className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
         />
       </div>
-      <div className="edge-notched flex items-start justify-between gap-3 bg-card px-4 pb-3.5 pt-4">
+      <div className="edge-notched flex min-h-[4.5rem] items-start justify-between gap-3 bg-card px-4 pb-3.5 pt-4">
         <h3 className="text-base font-semibold leading-snug">{product.title}</h3>
         <p className="shrink-0 text-right text-base tabular-nums">
           {product.compareAtPrice ? (
