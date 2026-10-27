@@ -180,8 +180,8 @@ export default async function ProductDetailPage({ params }: Props) {
             {recommendations.source === 'frequently-bought-together' ? 'Frequently bought together' : `More in ${product.category}`}
           </h2>
           <div className="mt-8 grid grid-cols-2 gap-8 lg:grid-cols-4">
-            {related.slice(0, 4).map((p, i) => (
-              <ProductCard key={p._id} product={p} index={i} />
+            {related.slice(0, 4).map(p => (
+              <ProductCard key={p._id} product={p} />
             ))}
           </div>
         </section>

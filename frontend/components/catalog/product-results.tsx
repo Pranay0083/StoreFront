@@ -60,8 +60,8 @@ export function ProductResults({ query, initial }: { query: string; initial: Pro
         {total} piece{total === 1 ? '' : 's'}
       </p>
       <div data-testid="products-grid" className="grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-3">
-        {items.map((p, i) => (
-          <ProductCard key={p._id} product={p} index={i % 24} />
+        {items.map(p => (
+          <ProductCard key={p._id} product={p} />
         ))}
       </div>
       <div ref={sentinel} aria-hidden className="h-px" />
