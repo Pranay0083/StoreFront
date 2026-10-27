@@ -4,7 +4,7 @@ function CardSkeleton({ className }: { className?: string }) {
   return (
     <div className={className}>
       <Skeleton className="aspect-[3/4] w-full" />
-      <Skeleton className="mt-1 h-[68px] w-full" />
+      <Skeleton className="mt-1 h-[5.75rem] w-full" />
     </div>
   );
 }

@@ -23,7 +23,7 @@ export function CatalogToolbar() {
     <div className="flex flex-wrap items-center gap-3" aria-busy={pending}>
       <SearchBox key={params.get('q') || ''} initial={params.get('q') || ''} onSearch={q => setParam({ q })} />
       <Select value={params.get('sort') || 'newest'} onValueChange={v => setParam({ sort: v })}>
-        <SelectTrigger data-testid="products-sort-select" className="w-44" aria-label="Sort by">
+        <SelectTrigger data-testid="products-sort-select" className="w-full sm:w-48" aria-label="Sort by">
           <SelectValue placeholder="Sort" />
         </SelectTrigger>
         <SelectContent>

@@ -34,22 +34,22 @@ export function ProductCard({
           className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
         />
       </div>
-      <div className="edge-notched flex min-h-[4.5rem] items-start justify-between gap-3 bg-card px-4 pb-3.5 pt-4">
+      <div className="edge-notched min-h-[5.75rem] bg-card px-4 pb-3.5 pt-4">
         <h3 className="text-base font-semibold leading-snug">{product.title}</h3>
-        <p className="shrink-0 text-right text-base tabular-nums">
-          {product.compareAtPrice ? (
-            <span className="mr-2 text-muted-foreground line-through">
-              <span className="sr-only">Was </span>
-              {fmtINR(product.compareAtPrice)}
-            </span>
-          ) : null}
+        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-base tabular-nums">
           <span className="font-semibold">
             {product.compareAtPrice ? <span className="sr-only">Now </span> : null}
             {fmtINR(product.price)}
           </span>
+          {product.compareAtPrice ? (
+            <span className="text-muted-foreground line-through">
+              <span className="sr-only">Was </span>
+              {fmtINR(product.compareAtPrice)}
+            </span>
+          ) : null}
+          {fewLeft && <span className="text-sm text-muted-foreground">Only {totalStock} left</span>}
         </p>
       </div>
-      {fewLeft && <p className="mt-2 text-sm text-muted-foreground">Only {totalStock} left</p>}
     </Link>
   );
 }

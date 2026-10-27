@@ -45,7 +45,7 @@ export function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q
   return (
     <form
       role="search"
-      className="relative"
+      className="relative w-full sm:w-auto"
       onSubmit={e => {
         e.preventDefault();
         if (expanded && active >= 0) return choose(suggestions[active]);
@@ -87,14 +87,14 @@ export function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q
           }
         }}
         placeholder="Search pieces…"
-        className="w-64 pl-9"
+        className="w-full pl-9 sm:w-72"
       />
       {expanded && (
         <ul
           id={listId}
           role="listbox"
           data-testid="search-suggestions"
-          className="absolute left-0 right-0 top-full z-30 mt-1 border border-black/10 bg-white py-1 shadow-lg"
+          className="absolute left-0 right-0 top-full z-30 mt-1 bg-card py-1 shadow-xl duration-150 ease-out animate-in fade-in-0 slide-in-from-top-1"
         >
           {suggestions.map((s, i) => (
             <li
@@ -106,12 +106,15 @@ export function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q
                 e.preventDefault();
                 choose(s);
               }}
-              className={cn('flex cursor-pointer items-baseline justify-between gap-3 px-3 py-2 text-sm', i === active && 'bg-black/5')}
+              className={cn(
+                'flex cursor-pointer items-baseline justify-between gap-3 px-3.5 py-2.5 text-[15px]',
+                i === active && 'bg-secondary',
+              )}
             >
               <span>
-                {s.title} <span className="text-xs text-muted-foreground">· {s.category}</span>
+                {s.title} <span className="text-sm text-muted-foreground">in {s.category}</span>
               </span>
-              <span className="text-xs">{fmtINR(s.price)}</span>
+              <span className="shrink-0 tabular-nums">{fmtINR(s.price)}</span>
             </li>
           ))}
         </ul>
