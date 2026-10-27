@@ -1,6 +1,5 @@
 'use client';
 
-import { Tag } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -8,10 +7,12 @@ import { toast } from 'sonner';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { fmtINR } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import type { BundleOffer, Product } from '@storefront/contracts';
 
 const firstInStock = (p?: Product) => p?.sizes.find(s => s.stock > 0)?.size ?? '';
 
+/** One offer, set as a receipt: the pieces it takes, the bundle total over the struck list total, and the saving in brass. */
 function BundleCard({ offer, products }: { offer: BundleOffer; products: Record<string, Product> }) {
   const { addItem } = useCart();
   const components = offer.components ?? [];
@@ -36,99 +37,104 @@ function BundleCard({ offer, products }: { offer: BundleOffer; products: Record<
         stock: variant?.stock,
       });
     }
-    toast.success(`${offer.name} added — the bundle price applies in your bag`);
+    toast.success(`${offer.name} added. The bundle price applies in your bag.`);
   };
 
   return (
-    <article data-testid={`bundle-offer-${offer.promotionId}`} className="border border-black/10 bg-white p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="label-caps flex items-center gap-2 text-muted-foreground">
-            <Tag className="h-3.5 w-3.5" aria-hidden /> {components.length ? 'Bought together' : 'Offer'}
-          </p>
-          <h3 className="mt-2 font-serif text-xl font-semibold">{offer.name}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{offer.summary || offer.description}</p>
-        </div>
+    <article data-testid={`bundle-offer-${offer.promotionId}`} className="edge-perforated bg-card px-6 pb-9 pt-10 sm:px-8">
+      <h3 className="text-2xl font-bold tracking-[-0.03em]">{offer.name}</h3>
+      <p className="mt-2 max-w-[52ch] text-base">{offer.summary || offer.description}</p>
+
+      {components.length > 0 && (
+        <ul className="mt-7 space-y-5">
+          {components.map(c => {
+            const product = products[c.slug];
+            const id = `bundle-${offer.promotionId}-${c.productId}-size`;
+            const image = c.image || product?.images[0];
+            return (
+              <li key={c.productId} className="flex items-center gap-4">
+                <Link
+                  href={`/products/${c.slug}`}
+                  className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden bg-secondary transition-transform duration-150 ease-out active:scale-[0.97]"
+                >
+                  {image && <Image src={image} alt={c.title} fill sizes="72px" className="object-cover" />}
+                </Link>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <div className="min-w-0">
+                    <Link href={`/products/${c.slug}`} className="text-base font-semibold underline-offset-4 hover:underline">
+                      {c.title}
+                    </Link>
+                    <p className="text-base tabular-nums text-muted-foreground">{fmtINR(c.price)}</p>
+                  </div>
+                  {product && product.sizes.length > 1 && (
+                    <div>
+                      <label htmlFor={id} className="sr-only">
+                        Size for {c.title}
+                      </label>
+                      <select
+                        id={id}
+                        value={sizes[c.productId]}
+                        onChange={e => setSizes(s => ({ ...s, [c.productId]: e.target.value }))}
+                        className="h-10 border border-input bg-card px-2.5 text-base"
+                      >
+                        {product.sizes.map(s => (
+                          <option key={s.size} value={s.size} disabled={s.stock < 1}>
+                            {s.size}
+                            {s.stock < 1 ? ', sold out' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <p className="tabular-nums">
+          {offer.listPrice !== undefined && (
+            <span className="block text-base text-muted-foreground line-through">
+              <span className="sr-only">Usually </span>
+              {fmtINR(offer.listPrice)}
+            </span>
+          )}
+          {offer.bundlePrice !== undefined && <span className="text-display-md font-extrabold">{fmtINR(offer.bundlePrice)}</span>}
+        </p>
         {offer.savings ? (
-          <p data-testid="bundle-savings" className="bg-black px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-white">
-            Save {fmtINR(offer.savings)}
+          <p data-testid="bundle-savings" className="text-xl font-bold">
+            <span className="highlight px-1 tabular-nums">Save {fmtINR(offer.savings)}</span>
           </p>
         ) : null}
       </div>
 
       {components.length > 0 && (
-        <>
-          <ul className="mt-5 grid gap-4 sm:grid-cols-2">
-            {components.map(c => {
-              const product = products[c.slug];
-              const id = `bundle-${offer.promotionId}-${c.productId}-size`;
-              return (
-                <li key={c.productId} className="flex gap-3">
-                  <Link href={`/products/${c.slug}`} className="relative h-20 w-16 shrink-0 overflow-hidden bg-muted">
-                    {(c.image || product?.images[0]) && (
-                      <Image src={c.image || product!.images[0]} alt={c.title} fill sizes="64px" className="object-cover" />
-                    )}
-                  </Link>
-                  <div className="min-w-0 text-sm">
-                    <Link href={`/products/${c.slug}`} className="font-medium hover:underline">
-                      {c.title}
-                    </Link>
-                    <p className="text-muted-foreground">{fmtINR(c.price)}</p>
-                    {product && product.sizes.length > 1 && (
-                      <div className="mt-1">
-                        <label htmlFor={id} className="sr-only">
-                          Size for {c.title}
-                        </label>
-                        <select
-                          id={id}
-                          value={sizes[c.productId]}
-                          onChange={e => setSizes(s => ({ ...s, [c.productId]: e.target.value }))}
-                          className="border border-black/20 bg-transparent px-2 py-1 text-xs"
-                        >
-                          {product.sizes.map(s => (
-                            <option key={s.size} value={s.size} disabled={s.stock < 1}>
-                              {s.size}
-                              {s.stock < 1 ? ' — sold out' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-black/5 pt-5">
-            <p className="text-sm">
-              {offer.bundlePrice !== undefined && <span className="text-lg font-semibold">{fmtINR(offer.bundlePrice)}</span>}
-              {offer.listPrice !== undefined && <span className="ml-2 text-muted-foreground line-through">{fmtINR(offer.listPrice)}</span>}
-            </p>
-            <Button data-testid={`bundle-add-${offer.promotionId}`} onClick={addSet} disabled={!purchasable}>
-              Add the set to bag
-            </Button>
-          </div>
-        </>
+        <Button data-testid={`bundle-add-${offer.promotionId}`} size="lg" className="mt-7 w-full" onClick={addSet} disabled={!purchasable}>
+          Add the set to bag
+        </Button>
       )}
     </article>
   );
 }
 
-export function BundleOffers({ offers, products }: { offers: BundleOffer[]; products: Record<string, Product> }) {
+/** The offers that include this piece; the optimizer applies them in the bag on its own. */
+export function BundleOffers({
+  offers,
+  products,
+  className,
+}: {
+  offers: BundleOffer[];
+  products: Record<string, Product>;
+  className?: string;
+}) {
   if (!offers.length) return null;
   return (
-    <section aria-labelledby="bundle-offers-heading" data-testid="bundle-offers" className="mt-20">
-      <h2 id="bundle-offers-heading" className="font-serif text-3xl font-semibold tracking-tight">
-        Better together
-      </h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Offers apply automatically in your bag — we always pick the cheapest combination.
-      </p>
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        {offers.map(o => (
-          <BundleCard key={o.promotionId} offer={o} products={products} />
-        ))}
-      </div>
-    </section>
+    <div data-testid="bundle-offers" className={cn('grid items-start gap-8', offers.length > 1 && 'xl:grid-cols-2', className)}>
+      {offers.map(o => (
+        <BundleCard key={o.promotionId} offer={o} products={products} />
+      ))}
+    </div>
   );
 }
