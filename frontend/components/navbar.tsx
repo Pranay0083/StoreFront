@@ -1,10 +1,10 @@
 'use client';
 
-import { LayoutDashboard, LogOut, Package, ShoppingBag, User as UserIcon } from 'lucide-react';
+import { User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useAuth, useCart } from '@/components/providers';
-import { isStaff } from '@storefront/contracts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,49 +13,64 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { isStaff } from '@storefront/contracts';
 
 const NAV = [
-  { label: 'Shop All', href: '/products' },
-  { label: 'Men', href: '/products?category=Men' },
-  { label: 'Women', href: '/products?category=Women' },
-  { label: 'Footwear', href: '/products?category=Footwear' },
-  { label: 'Accessories', href: '/products?category=Accessories' },
+  { label: 'Shop all', href: '/products', testId: 'nav-link-shop-all' },
+  { label: 'Men', href: '/products?category=Men', testId: 'nav-link-men' },
+  { label: 'Women', href: '/products?category=Women', testId: 'nav-link-women' },
+  { label: 'Footwear', href: '/products?category=Footwear', testId: 'nav-link-footwear' },
+  { label: 'Accessories', href: '/products?category=Accessories', testId: 'nav-link-accessories' },
 ];
 
+const barButton =
+  'flex h-10 items-center gap-2 px-2 text-[15px] font-medium transition-[background-color,transform] duration-150 ease-out hover:bg-foreground/[0.06] active:scale-[0.97]';
+
+/** A plain bar on the page ground: the wordmark, five links, the account and the bag. */
 export function Navbar() {
   const { user, logout } = useAuth();
   const { count, setOpen } = useCart();
   const router = useRouter();
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // A navigation always closes the phone menu.
+  useEffect(() => setMenuOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-black/5 bg-white/70 backdrop-blur-xl backdrop-saturate-150">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-5 sm:px-8">
-        <Link href="/" data-testid="nav-logo" className="font-serif text-2xl font-semibold tracking-tight">
-          STOREFRONT<span className="text-muted-foreground">.</span>
+    <header className="sticky top-0 z-40 bg-background">
+      <div className="mx-auto flex h-16 max-w-[1760px] items-center justify-between gap-6 px-4 sm:px-8">
+        <Link href="/" data-testid="nav-logo" className="-ml-0.5 text-2xl font-extrabold tracking-[-0.05em]">
+          STOREFRONT
         </Link>
 
-        <nav className="hidden items-center gap-7 md:flex">
+        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
           {NAV.map(n => (
             <Link
-              key={n.label}
+              key={n.href}
               href={n.href}
-              data-testid={`nav-link-${n.label.toLowerCase().replace(/\s/g, '-')}`}
-              className="label-caps text-foreground/70 transition-colors hover:text-foreground"
+              data-testid={n.testId}
+              className="px-2.5 py-2 text-[15px] font-medium underline-offset-[6px] decoration-[1.5px] hover:underline"
             >
               {n.label}
             </Link>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="-mr-2 flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                data-testid="nav-account-button"
-                className="flex h-10 w-10 items-center justify-center transition-colors hover:bg-black/5"
-                aria-label="Account"
-              >
-                <UserIcon className="h-5 w-5" strokeWidth={1.5} />
+              <button data-testid="nav-account-button" className={barButton} aria-label="Account">
+                <UserIcon className="h-5 w-5 sm:hidden" strokeWidth={1.75} aria-hidden />
+                <span className="hidden sm:inline">Account</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -63,16 +78,16 @@ export function Navbar() {
                 <>
                   <DropdownMenuLabel data-testid="nav-account-name">{user.name}</DropdownMenuLabel>
                   <DropdownMenuItem data-testid="nav-orders-link" onClick={() => router.push('/orders')}>
-                    <Package className="h-4 w-4" /> My orders
+                    My orders
                   </DropdownMenuItem>
                   {isStaff(user.role) && (
                     <DropdownMenuItem data-testid="nav-admin-link" onClick={() => router.push('/admin')}>
-                      <LayoutDashboard className="h-4 w-4" /> Back office
+                      Back office
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem data-testid="nav-logout-button" onClick={() => logout()}>
-                    <LogOut className="h-4 w-4" /> Sign out
+                    Sign out
                   </DropdownMenuItem>
                 </>
               ) : (
@@ -91,29 +106,58 @@ export function Navbar() {
           <button
             data-testid="nav-cart-button"
             onClick={() => setOpen(true)}
-            className="relative flex h-10 w-10 items-center justify-center transition-colors hover:bg-black/5"
+            className={barButton}
             aria-label={count > 0 ? `Open bag, ${count} item${count === 1 ? '' : 's'}` : 'Open bag'}
           >
-            <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
+            Bag
             {count > 0 && (
               <span
                 data-testid="nav-cart-count"
-                className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center bg-black px-1 text-[10px] font-semibold text-white"
+                className="flex h-6 min-w-6 items-center justify-center bg-primary px-1.5 text-[13px] font-semibold tabular-nums text-primary-foreground"
               >
                 {count}
               </span>
             )}
           </button>
+
+          <button
+            type="button"
+            className={cn(barButton, 'md:hidden')}
+            aria-expanded={menuOpen}
+            aria-controls="phone-menu"
+            onClick={() => setMenuOpen(o => !o)}
+          >
+            {menuOpen ? 'Close' : 'Menu'}
+          </button>
         </div>
       </div>
 
-      <nav className="flex gap-5 overflow-x-auto border-t border-black/5 px-5 py-2.5 md:hidden">
-        {NAV.map(n => (
-          <Link key={n.label} href={n.href} className="label-caps whitespace-nowrap text-foreground/70">
-            {n.label}
-          </Link>
-        ))}
-      </nav>
+      {menuOpen && (
+        <nav
+          id="phone-menu"
+          aria-label="Main"
+          className="absolute inset-x-0 top-16 h-[calc(100svh-4rem)] overflow-y-auto bg-background px-4 pb-10 pt-4 ease-out animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden"
+        >
+          <ul className="space-y-1">
+            {NAV.map(n => (
+              <li key={n.href}>
+                <Link
+                  href={n.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-2 text-display-md font-extrabold transition-transform duration-150 ease-out active:scale-[0.98]"
+                >
+                  {n.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-10 text-base">
+            <Link href="/orders" onClick={() => setMenuOpen(false)} className="underline underline-offset-4">
+              Track an order
+            </Link>
+          </p>
+        </nav>
+      )}
     </header>
   );
 }
