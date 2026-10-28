@@ -1,111 +1,63 @@
 'use client';
 
-import { Minus, Plus, Trash2 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
-import { StockNote } from '@/components/cart-sheet';
-import { AppliedOffers, LinePrice, PriceSummary, lineKey } from '@/components/price-breakdown';
+import { BagLine } from '@/components/checkout/bag-line';
+import { PriceBreakdown, lineKey } from '@/components/price-breakdown';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
-import { fmtINR } from '@/lib/api';
 import { usePriceQuote } from '@/lib/use-price-quote';
 
 const NO_CODES: string[] = [];
 
 export default function CartPage() {
-  const { items, updateQty, removeItem } = useCart();
-  const { quote, loading, error } = usePriceQuote(items, NO_CODES);
+  const { items, count } = useCart();
+  const { quote, loading, error, refresh } = usePriceQuote(items, NO_CODES);
   const breakdown = quote?.breakdown ?? null;
   const pricedLines = new Map((breakdown?.lines ?? []).map(l => [lineKey(l), l]));
 
   return (
-    <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8" data-testid="cart-page">
-      <h1 className="font-serif text-4xl font-semibold tracking-tighter sm:text-5xl">Your bag</h1>
+    <div className="mx-auto max-w-7xl px-5 pb-24 pt-10 sm:px-8 sm:pt-14" data-testid="cart-page">
+      <h1 className="text-display-md font-extrabold">Your bag</h1>
 
       {items.length === 0 ? (
-        <div className="py-24 text-center">
-          <p className="font-serif text-3xl">Empty, for now.</p>
-          <Button asChild className="mt-6" data-testid="cart-page-shop-button">
+        <div className="mt-6 max-w-xl">
+          <p className="text-lg">Nothing in your bag yet. Add a few pieces and the receipt prices them as you go, bundles included.</p>
+          <Button asChild size="lg" className="mt-8" data-testid="cart-page-shop-button">
             <Link href="/products">Browse the collection</Link>
           </Button>
         </div>
       ) : (
-        <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_360px]">
-          <div>
-            {items.map(item => (
-              <div key={`${item.productId}-${item.size}`} className="flex gap-6 border-b border-black/10 py-6 first:border-t">
-                <Link href={`/products/${item.slug}`} className="relative h-36 w-28 shrink-0 overflow-hidden bg-muted">
-                  <Image src={item.image} alt={item.title} fill sizes="112px" className="object-cover" />
-                </Link>
-                <div className="flex flex-1 flex-col justify-between py-1">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <Link href={`/products/${item.slug}`} className="font-serif text-xl font-medium hover:underline">
-                        {item.title}
-                      </Link>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Size {item.size} · {fmtINR(item.price)}
-                      </p>
-                      <StockNote item={item} />
-                    </div>
-                    <button
-                      data-testid={`cart-page-remove-${item.slug}`}
-                      aria-label={`Remove ${item.title} (${item.size})`}
-                      onClick={() => removeItem(item.productId, item.size)}
-                      className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center border border-black/15">
-                      <button
-                        aria-label={`Decrease quantity of ${item.title}`}
-                        onClick={() => updateQty(item.productId, item.size, item.qty - 1)}
-                        className="flex h-9 w-9 items-center justify-center hover:bg-black/5"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="w-10 text-center text-sm" aria-live="polite">
-                        {item.qty}
-                      </span>
-                      <button
-                        aria-label={`Increase quantity of ${item.title}`}
-                        onClick={() => updateQty(item.productId, item.size, item.qty + 1)}
-                        disabled={item.stock !== undefined && item.qty >= item.stock}
-                        className="flex h-9 w-9 items-center justify-center hover:bg-black/5 disabled:opacity-30"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <LinePrice
-                      listTotal={item.price * item.qty}
-                      line={pricedLines.get(lineKey(item))}
-                      breakdown={breakdown}
-                      testId={`cart-line-price-${item.slug}`}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        <>
+          <p className="mt-3 text-[15px] text-muted-foreground">
+            {count} {count === 1 ? 'piece' : 'pieces'}
+          </p>
+          <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-16">
+            <ul className="space-y-8" aria-label="Pieces in your bag">
+              {items.map(item => (
+                <BagLine
+                  key={lineKey(item)}
+                  item={item}
+                  priced={pricedLines.get(lineKey(item))}
+                  breakdown={breakdown}
+                  testIds={{ remove: `cart-page-remove-${item.slug}`, price: `cart-line-price-${item.slug}` }}
+                />
+              ))}
+            </ul>
 
-          <aside className="h-fit border border-black/10 bg-white p-8">
-            <p className="label-caps text-muted-foreground">Summary</p>
-            <div className="mt-6">
-              <PriceSummary breakdown={breakdown} loading={loading} />
-              {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-            </div>
-            {breakdown && (
-              <div className="mt-6 border-t border-black/10 pt-5">
-                <AppliedOffers breakdown={breakdown} />
-              </div>
-            )}
-            <Button asChild size="lg" className="mt-8 w-full" data-testid="cart-page-checkout-button">
-              <Link href="/checkout">Proceed to checkout</Link>
-            </Button>
-          </aside>
-        </div>
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <PriceBreakdown breakdown={breakdown} loading={loading} error={error} onRetry={refresh} />
+              <Button asChild size="lg" className="mt-4 w-full" data-testid="cart-page-checkout-button">
+                <Link href="/checkout">Checkout</Link>
+              </Button>
+              <Link
+                href="/products"
+                className="mt-3 block py-1 text-center text-sm font-medium underline underline-offset-4 hover:text-muted-foreground"
+              >
+                Keep shopping
+              </Link>
+            </aside>
+          </div>
+        </>
       )}
     </div>
   );
