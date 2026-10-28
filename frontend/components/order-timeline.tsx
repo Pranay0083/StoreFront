@@ -1,100 +1,152 @@
-import { Ban, Check, RotateCcw } from 'lucide-react';
-import { fmtDateTime } from '@/lib/api';
-import type { Order } from '@storefront/contracts';
-import { fmtINR } from '@/lib/api';
+import type { Order, OrderStatus, StatusEvent } from '@storefront/contracts';
+import { fmtDateTime, fmtINR } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const FLOW = ['created', 'paid', 'packed', 'shipped', 'delivered'] as const;
+const FLOW: Array<{ status: OrderStatus; label: string }> = [
+  { status: 'created', label: 'Order placed' },
+  { status: 'paid', label: 'Paid' },
+  { status: 'packed', label: 'Packed' },
+  { status: 'shipped', label: 'Shipped' },
+  { status: 'delivered', label: 'Delivered' },
+];
 
+const BRANCH: Partial<Record<OrderStatus, string>> = {
+  cancelled: 'Cancelled',
+  refund_requested: 'Refund requested',
+  partially_refunded: 'Partly refunded',
+  refunded: 'Refunded',
+};
+
+const labelOf = (status: OrderStatus) => BRANCH[status] ?? FLOW.find(s => s.status === status)?.label ?? status;
+
+/** Who moved the order, in words a customer would use. */
+function actor(by: string) {
+  if (by.startsWith('user:')) return 'You';
+  if (by.startsWith('system:')) return 'Automatic';
+  if (by.startsWith('webhook') || by.includes('razorpay')) return 'Payment provider';
+  return 'STOREFRONT team';
+}
+
+interface Step {
+  key: string;
+  label: string;
+  at?: string;
+  state: 'done' | 'current' | 'pending' | 'stopped';
+}
+
+/**
+ * The order's state machine as rows: one mark per state, its date on the right. States the order has
+ * not reached yet show a dash; a cancellation or refund continues the list from where it branched.
+ */
 export function OrderTimeline({ order }: { order: Order }) {
+  const lastAt = (status: OrderStatus, events: StatusEvent[]) => [...events].reverse().find(e => e.to === status)?.at;
   const reached = new Set<string>(order.statusHistory.map(e => e.to));
   reached.add(order.status);
-  const isTerminalBranch = order.status === 'cancelled' || order.status === 'refunded';
+  const lastFlowIdx = Math.max(...FLOW.map((s, i) => (reached.has(s.status) ? i : -1)));
+  const inFlow = FLOW.some(s => s.status === order.status);
+
+  const steps: Step[] = FLOW.filter((_, i) => inFlow || i <= lastFlowIdx).map((s, i) => ({
+    key: s.status,
+    label: s.label,
+    at: lastAt(s.status, order.statusHistory) ?? (s.status === 'created' ? order.createdAt : undefined),
+    state: i > lastFlowIdx ? 'pending' : order.status === s.status ? 'current' : 'done',
+  }));
+  order.statusHistory.forEach((e, i) => {
+    const label = BRANCH[e.to];
+    if (!label) return;
+    const isLast = i === order.statusHistory.length - 1;
+    steps.push({
+      key: `${e.to}-${i}`,
+      label,
+      at: e.at,
+      state: e.to === 'cancelled' || e.to === 'refunded' ? 'stopped' : isLast ? 'current' : 'done',
+    });
+  });
+
   const openRefund = order.refunds?.find(r => r.status === 'requested' || r.status === 'processing' || r.status === 'pending');
-  const lastFlowIdx = Math.max(...FLOW.map((s, i) => (reached.has(s) ? i : -1)));
+  const history = [...order.statusHistory].reverse();
 
   return (
     <div data-testid="order-timeline">
-      <div className="flex items-start">
-        {FLOW.map((step, i) => {
-          const done = i <= lastFlowIdx;
-          const isCurrent = order.status === step;
+      <ol className="text-[15px]">
+        {steps.map((step, i) => {
+          const next = steps[i + 1];
+          const trackDone = next && next.state !== 'pending';
           return (
-            <div key={step} className="flex flex-1 flex-col items-center">
-              <div className="flex w-full items-center">
-                <div className={cn('h-px flex-1', i === 0 ? 'bg-transparent' : done ? 'bg-black' : 'bg-black/15')} />
-                <div
-                  className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center border transition-colors',
-                    done ? 'border-black bg-black text-white' : 'border-black/20 bg-white text-black/30',
-                  )}
-                >
-                  {done ? <Check className="h-4 w-4" /> : <span className="text-xs">{i + 1}</span>}
-                </div>
-                <div
-                  className={cn('h-px flex-1', i === FLOW.length - 1 ? 'bg-transparent' : i < lastFlowIdx ? 'bg-black' : 'bg-black/15')}
+            <li key={step.key} className="relative grid h-12 grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-4">
+              {next && (
+                <span
+                  aria-hidden
+                  className={cn('absolute left-[6px] top-[31px] h-[34px] w-0.5', trackDone ? 'bg-foreground' : 'bg-border')}
                 />
-              </div>
-              <p
+              )}
+              <span
+                aria-hidden
                 className={cn(
-                  'mt-2 text-[10px] uppercase tracking-[0.15em] sm:text-xs',
-                  isCurrent ? 'font-semibold' : done ? 'text-foreground/70' : 'text-black/30',
+                  'h-3.5 w-3.5',
+                  step.state === 'pending' && 'border-2 border-input bg-transparent',
+                  step.state === 'done' && 'bg-foreground',
+                  step.state === 'current' && 'bg-foreground outline outline-[3px] outline-offset-2 outline-foreground/15',
+                  step.state === 'stopped' && 'bg-destructive',
+                )}
+              />
+              <span
+                className={cn(
+                  step.state === 'pending' && 'text-muted-foreground',
+                  step.state === 'current' && 'font-semibold',
+                  step.state === 'stopped' && 'font-semibold',
                 )}
               >
-                {step}
-              </p>
-            </div>
+                {step.label}
+                {step.state === 'current' && <span className="sr-only"> (current)</span>}
+              </span>
+              <span className={cn('text-right', step.at ? 'text-foreground' : 'text-muted-foreground')}>
+                {step.at ? fmtDateTime(step.at) : '—'}
+              </span>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
       {order.status === 'refund_requested' && (
-        <div
-          data-testid="order-refund-banner"
-          className="mt-6 flex items-center gap-3 border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-        >
-          <RotateCcw className="h-4 w-4" />
+        <p data-testid="order-refund-banner" className="mt-6 bg-secondary px-5 py-4 text-[15px] leading-relaxed">
           {openRefund?.kind === 'partial'
-            ? `A refund of ${fmtINR(openRefund.amount)} for the returned items is being processed to your original payment method.`
-            : 'A refund of the full amount is being processed to your original payment method.'}
-        </div>
+            ? `A refund of ${fmtINR(openRefund.amount)} for the returned pieces is on its way to your original payment method.`
+            : 'A refund of the full amount is on its way to your original payment method.'}
+        </p>
       )}
 
       {order.status === 'partially_refunded' && (
-        <div
-          data-testid="order-partial-refund-banner"
-          className="mt-6 flex items-center gap-3 border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-        >
-          <RotateCcw className="h-4 w-4" />
-          {fmtINR(order.refundedAmount)} has been refunded for returned items.
-        </div>
+        <p data-testid="order-partial-refund-banner" className="mt-6 bg-secondary px-5 py-4 text-[15px] leading-relaxed">
+          {fmtINR(order.refundedAmount)} has been refunded for the pieces you returned.
+        </p>
       )}
 
-      {isTerminalBranch && (
-        <div
-          data-testid="order-terminal-banner"
-          className="mt-6 flex items-center gap-3 border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-        >
-          {order.status === 'cancelled' ? <Ban className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
-          This order was {order.status}.
-        </div>
+      {(order.status === 'cancelled' || order.status === 'refunded') && (
+        <p data-testid="order-terminal-banner" className="mt-6 flex items-center gap-3 bg-secondary px-5 py-4 text-[15px]">
+          <span aria-hidden className="h-2 w-2 shrink-0 bg-destructive" />
+          {order.status === 'cancelled' ? 'This order was cancelled.' : 'This order was refunded in full.'}
+        </p>
       )}
 
-      <div className="mt-8">
-        <p className="label-caps mb-4 text-muted-foreground">Audit trail</p>
-        <ul className="space-y-3 border-l border-black/10 pl-5">
-          {[...order.statusHistory].reverse().map((e, i) => (
-            <li key={i} className="relative text-sm">
-              <span className="absolute -left-[23px] top-1.5 h-1.5 w-1.5 bg-black" />
-              <span className="font-medium">{e.from ? `${e.from} → ${e.to}` : `Order ${e.to}`}</span>
-              <span className="ml-2 text-xs text-muted-foreground">
-                {fmtDateTime(e.at)} · {e.by}
+      <details className="group mt-6">
+        <summary className="cursor-pointer select-none text-[15px] font-medium underline underline-offset-4 marker:content-none [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">Show the full history</span>
+          <span className="hidden group-open:inline">Hide the full history</span>
+        </summary>
+        <ol className="mt-4 space-y-3 text-[15px]">
+          {history.map((e, i) => (
+            <li key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4">
+              <span>{labelOf(e.to)}</span>
+              <span className="text-right text-muted-foreground">{fmtDateTime(e.at)}</span>
+              <span className="col-span-2 text-sm text-muted-foreground">
+                {actor(e.by)}
+                {e.note ? `. ${e.note}` : ''}
               </span>
-              {e.note && <p className="text-xs text-muted-foreground">{e.note}</p>}
             </li>
           ))}
-        </ul>
-      </div>
+        </ol>
+      </details>
     </div>
   );
 }
