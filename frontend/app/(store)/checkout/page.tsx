@@ -264,7 +264,7 @@ export default function CheckoutPage() {
                       value={address[f.key]}
                       onChange={set(f.key)}
                       enterKeyHint={f.key === 'phone' ? 'done' : 'next'}
-                      className={INVALID}
+                      className={`scroll-mt-32 ${INVALID}`}
                     />
                   )}
                 </Field>

@@ -224,7 +224,9 @@ function OrderDetailContent() {
                 {order.payment.provider}, {order.payment.status}
               </p>
               {order.payment.razorpayPaymentId && (
-                <p className="mt-1 break-all text-sm text-muted-foreground">Reference {order.payment.razorpayPaymentId}</p>
+                <p className="mt-1 truncate text-sm text-muted-foreground" title={order.payment.razorpayPaymentId}>
+                  Reference {order.payment.razorpayPaymentId}
+                </p>
               )}
             </section>
           </div>

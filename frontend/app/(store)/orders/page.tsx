@@ -111,6 +111,7 @@ export default function OrdersPage() {
                   <span className="mt-1 block text-sm text-muted-foreground">
                     Placed {fmtDate(order.createdAt)}, {pieces(order)} {pieces(order) === 1 ? 'piece' : 'pieces'}
                   </span>
+                  <span className="mt-0.5 hidden truncate text-sm sm:block">{order.items.map(i => i.title).join(', ')}</span>
                 </span>
                 <span className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-10">
                   <StatusBadge status={order.status} testId={`order-status-${order.orderNumber}`} className="sm:w-40" />
