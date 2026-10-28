@@ -1,18 +1,43 @@
 'use client';
 
+/*
+ * Promotions.
+ * Data: every promotion (name, status, how it applies, priority, stack group, exclusivity, the
+ * condition tree, the discount strategy, its window, times used against its limit) and each one's
+ * immutable version history. Opened by the catalogue manager a few times a week. Jobs: create or edit
+ * an offer (most frequent), check it in the simulator, pause or archive it.
+ *
+ * Question: which offers are live, and are they being used?
+ * Finding: how many offers are live and which has been used most.
+ * Face: uses against the limit as a short track in the data hue, the one figure that says an offer works.
+ */
+
 import { Archive, FlaskConical, History, Pause, Pencil, Play, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { ActionEditor, ACTION_LABELS, ConditionEditor, defaultAction, defaultCondition, Field } from '@/components/promotion-rule-builder';
-import { Badge } from '@/components/ui/badge';
+import {
+  BlockError,
+  Dash,
+  Empty,
+  FieldLabel,
+  fmtCount,
+  fmtWhen,
+  LoadingRows,
+  PageHeader,
+  Pill,
+  plural,
+  selectClass,
+  Tabs,
+  type PillTone,
+} from '@/components/admin/ledger';
+import { ActionEditor, ACTION_LABELS, ConditionEditor, defaultAction, defaultCondition } from '@/components/promotion-rule-builder';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { api, ApiError, fmtDateTime } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import {
   PROMOTION_STATUSES,
   PromotionInputSchema,
@@ -41,17 +66,12 @@ const EMPTY: Draft = {
   action: defaultAction('mixAndMatch'),
 };
 
-const statusVariant = (s: PromotionStatus) =>
-  s === 'active'
-    ? ('success' as const)
-    : s === 'paused'
-      ? ('warning' as const)
-      : s === 'archived'
-        ? ('secondary' as const)
-        : ('outline' as const);
+const STATUS_LABEL: Record<PromotionStatus, string> = { draft: 'Draft', active: 'Live', paused: 'Paused', archived: 'Archived' };
+const STATUS_TONE: Record<PromotionStatus, PillTone> = { draft: 'neutral', active: 'positive', paused: 'warning', archived: 'neutral' };
 
 const toLocalInput = (iso?: string) => (iso ? new Date(iso).toISOString().slice(0, 16) : '');
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : undefined);
+const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
 function toDraft(p: Promotion): Draft {
   return {
@@ -96,42 +116,57 @@ function diff(before: Record<string, unknown> | undefined, after: Record<string,
 
 function VersionsDialog({ promotion, onClose }: { promotion: Promotion; onClose: () => void }) {
   const [versions, setVersions] = useState<PromotionVersion[] | null>(null);
-  useEffect(() => {
+  const [failed, setFailed] = useState(false);
+  const fetchVersions = useCallback(() => {
+    setFailed(false);
     api<PromotionVersion[]>(`/admin/promotions/${promotion._id}/versions`)
       .then(v => setVersions([...v].sort((x, y) => y.version - x.version)))
-      .catch(e => toast.error((e as Error).message));
+      .catch(() => setFailed(true));
   }, [promotion._id]);
+  useEffect(fetchVersions, [fetchVersions]);
 
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-        <DialogTitle className="font-serif text-xl">{promotion.name}: version history</DialogTitle>
-        {!versions ? (
-          <Skeleton className="h-32" />
+      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto" data-surface="ledger">
+        <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">{promotion.name}</DialogTitle>
+        <DialogDescription className="-mt-2 text-sm text-muted-foreground">
+          Every save is a new version; orders keep the version they were priced with.
+        </DialogDescription>
+        {failed ? (
+          <BlockError what="the version history" onRetry={fetchVersions} />
+        ) : !versions ? (
+          <LoadingRows rows={3} />
         ) : (
-          <ol className="mt-4 space-y-4" data-testid="promotion-versions">
+          <ol className="divide-y divide-border" data-testid="promotion-versions">
             {versions.map((v, i) => {
               const changes = diff(versions[i + 1]?.snapshot, v.snapshot);
               return (
-                <li key={v.version} className="border border-black/10 p-3">
-                  <p className="text-sm font-medium">
-                    v{v.version}{' '}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      · {fmtDateTime(v.createdAt)} · {v.changedBy ?? 'system'}
+                <li key={v.version} className="py-3">
+                  <p className="text-sm">
+                    <span className="font-semibold tabular-nums">Version {v.version}</span>{' '}
+                    <span className="text-muted-foreground">
+                      · {fmtWhen(v.createdAt)} · {v.changedBy ?? 'system'}
                     </span>
                   </p>
                   {i === versions.length - 1 ? (
-                    <p className="mt-1 text-xs text-muted-foreground">Created.</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">Created.</p>
                   ) : changes.length === 0 ? (
-                    <p className="mt-1 text-xs text-muted-foreground">No field changes.</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">Saved with no field changes.</p>
                   ) : (
-                    <table className="mt-2 w-full text-xs">
+                    <table className="mt-2 w-full text-[13px]">
+                      <thead>
+                        <tr className="text-left text-xs text-muted-foreground">
+                          <th className="w-1/3 pb-1 font-normal">Field</th>
+                          <th className="pb-1 font-normal">Before</th>
+                          <th className="pb-1 font-normal">After</th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {changes.map(c => (
                           <tr key={c.path} className="align-top">
-                            <td className="py-0.5 pr-3 font-mono">{c.path}</td>
-                            <td className="py-0.5 pr-3 text-red-800 line-through">{c.before ?? '—'}</td>
-                            <td className="py-0.5 text-emerald-800">{c.after ?? '—'}</td>
+                            <td className="break-all py-0.5 pr-3">{c.path}</td>
+                            <td className="break-all py-0.5 pr-3 text-muted-foreground line-through">{c.before ?? '—'}</td>
+                            <td className="break-all py-0.5 font-medium">{c.after ?? '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -170,7 +205,7 @@ function PromotionEditor({ initial, onDone }: { initial: Promotion | null; onDon
           headers: { 'If-Match': `"${initial.version}"` },
           body: JSON.stringify(parsed.data),
         });
-        toast.success(`Saved ${parsed.data.name} as v${initial.version + 1}`);
+        toast.success(`Saved ${parsed.data.name} as version ${initial.version + 1}`);
       } else {
         await api('/admin/promotions', { method: 'POST', body: JSON.stringify(parsed.data) });
         toast.success(`Created ${parsed.data.name}`);
@@ -188,151 +223,213 @@ function PromotionEditor({ initial, onDone }: { initial: Promotion | null; onDon
   };
 
   return (
-    <form onSubmit={save} className="mt-6 space-y-6 border border-black/10 bg-white p-5" data-testid="promotion-editor">
-      <div className="flex items-center justify-between">
-        <h2 className="font-serif text-xl font-semibold">{initial ? `Edit ${initial.name} (v${initial.version})` : 'New promotion'}</h2>
+    <form onSubmit={save} className="mt-6 border border-border bg-card" data-testid="promotion-editor">
+      <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+        <h2 className="text-base font-semibold">{initial ? `Edit ${initial.name}, version ${initial.version}` : 'New promotion'}</h2>
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
           Cancel
         </Button>
-      </div>
+      </header>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Field label="Name" className="md:col-span-2">
-          <Input value={draft.name} onChange={e => set('name', e.target.value)} className="mt-1 h-9" data-testid="promotion-name" />
-        </Field>
-        <Field label="Status">
-          <select
-            value={draft.status}
-            onChange={e => set('status', e.target.value as PromotionStatus)}
-            className="mt-1 h-9 w-full border border-black/15 bg-white px-2 text-sm"
-          >
-            {PROMOTION_STATUSES.map(s => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Description (shown to customers)" className="md:col-span-3">
-          <Textarea value={draft.description} onChange={e => set('description', e.target.value)} rows={2} className="mt-1" />
-        </Field>
-        <Field label="Applies">
-          <select
-            value={draft.activation}
-            onChange={e => set('activation', e.target.value as Draft['activation'])}
-            className="mt-1 h-9 w-full border border-black/15 bg-white px-2 text-sm"
-          >
-            <option value="auto">Automatically</option>
-            <option value="code">With a promo code</option>
-          </select>
-        </Field>
-        {draft.activation === 'code' && (
-          <Field label="Code">
-            <Input value={draft.code ?? ''} onChange={e => set('code', e.target.value.toUpperCase())} className="mt-1 h-9 font-mono" />
-          </Field>
-        )}
-        <Field label="Priority (higher wins ties)">
-          <Input type="number" value={draft.priority} onChange={e => set('priority', Number(e.target.value))} className="mt-1 h-9" />
-        </Field>
-        <Field label="Stack group (one winner per group)">
-          <Input
-            value={draft.stackGroup ?? ''}
-            onChange={e => set('stackGroup', e.target.value)}
-            placeholder="order-discount"
-            className="mt-1 h-9"
-          />
-        </Field>
-        <Field label="Usage limit (optional)">
-          <Input
-            type="number"
-            min={1}
-            value={draft.usageLimit ?? ''}
-            onChange={e => set('usageLimit', e.target.value ? Number(e.target.value) : undefined)}
-            className="mt-1 h-9"
-          />
-        </Field>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm">
-          <input type="checkbox" checked={draft.exclusive} onChange={e => set('exclusive', e.target.checked)} />
-          Exclusive (never combines with other promotions)
-        </label>
-        <Field label="Starts">
-          <Input
-            type="datetime-local"
-            value={toLocalInput(draft.startsAt)}
-            onChange={e => set('startsAt', fromLocalInput(e.target.value))}
-            className="mt-1 h-9"
-          />
-        </Field>
-        <Field label="Ends">
-          <Input
-            type="datetime-local"
-            value={toLocalInput(draft.endsAt)}
-            onChange={e => set('endsAt', fromLocalInput(e.target.value))}
-            className="mt-1 h-9"
-          />
-        </Field>
-      </div>
-
-      <div>
-        <h3 className="label-caps text-muted-foreground">Discount</h3>
-        <div className="mt-2">
-          <ActionEditor value={draft.action} onChange={action => set('action', action)} />
+      <div className="grid gap-8 px-5 py-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <div>
+          <h3 className="text-sm font-semibold">The offer</h3>
+          <p className="mt-1 text-[13px] text-muted-foreground">Its name, what customers read at checkout, and when it runs.</p>
         </div>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between">
-          <h3 className="label-caps text-muted-foreground">Conditions</h3>
-          {draft.conditions ? (
-            <Button type="button" size="sm" variant="ghost" onClick={() => set('conditions', undefined)}>
-              Remove all conditions
-            </Button>
-          ) : (
-            <Button type="button" size="sm" variant="outline" onClick={() => set('conditions', defaultCondition('all'))}>
-              <Plus className="mr-1 h-4 w-4" /> Add conditions
-            </Button>
-          )}
+        <div className="grid gap-4 md:grid-cols-3">
+          <FieldLabel label="Name" className="md:col-span-2">
+            <Input value={draft.name} onChange={e => set('name', e.target.value)} className="h-9" data-testid="promotion-name" />
+          </FieldLabel>
+          <FieldLabel label="Status">
+            <select value={draft.status} onChange={e => set('status', e.target.value as PromotionStatus)} className={selectClass}>
+              {PROMOTION_STATUSES.map(s => (
+                <option key={s} value={s}>
+                  {STATUS_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </FieldLabel>
+          <FieldLabel label="Description" hint="Shown to customers" className="md:col-span-3">
+            <Textarea value={draft.description} onChange={e => set('description', e.target.value)} rows={2} />
+          </FieldLabel>
+          <FieldLabel label="Starts">
+            <Input
+              type="datetime-local"
+              value={toLocalInput(draft.startsAt)}
+              onChange={e => set('startsAt', fromLocalInput(e.target.value))}
+              className="h-9"
+            />
+          </FieldLabel>
+          <FieldLabel label="Ends">
+            <Input
+              type="datetime-local"
+              value={toLocalInput(draft.endsAt)}
+              onChange={e => set('endsAt', fromLocalInput(e.target.value))}
+              className="h-9"
+            />
+          </FieldLabel>
+          <FieldLabel label="Usage limit" hint="Optional">
+            <Input
+              type="number"
+              min={1}
+              value={draft.usageLimit ?? ''}
+              onChange={e => set('usageLimit', e.target.value ? Number(e.target.value) : undefined)}
+              className="h-9 tabular-nums"
+            />
+          </FieldLabel>
         </div>
-        <div className="mt-2">
-          {draft.conditions ? (
-            <ConditionEditor value={draft.conditions} onChange={c => set('conditions', c)} />
-          ) : (
-            <p className="text-sm text-muted-foreground">Applies to every cart that the discount itself can apply to.</p>
-          )}
+
+        <div className="border-t border-border pt-6 lg:col-span-2 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
+          <div>
+            <h3 className="text-sm font-semibold">How it combines</h3>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              The optimizer picks the cheapest valid combination; one winner per stack group, higher priority wins ties.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-3 lg:mt-0">
+            <FieldLabel label="Applies">
+              <select
+                value={draft.activation}
+                onChange={e => set('activation', e.target.value as Draft['activation'])}
+                className={selectClass}
+              >
+                <option value="auto">Automatically</option>
+                <option value="code">With a promo code</option>
+              </select>
+            </FieldLabel>
+            {draft.activation === 'code' ? (
+              <FieldLabel label="Code">
+                <Input value={draft.code ?? ''} onChange={e => set('code', e.target.value.toUpperCase())} className="h-9 uppercase" />
+              </FieldLabel>
+            ) : (
+              <div className="hidden md:block" />
+            )}
+            <FieldLabel label="Priority">
+              <Input
+                type="number"
+                value={draft.priority}
+                onChange={e => set('priority', Number(e.target.value))}
+                className="h-9 tabular-nums"
+              />
+            </FieldLabel>
+            <FieldLabel label="Stack group" hint="Optional">
+              <Input
+                value={draft.stackGroup ?? ''}
+                onChange={e => set('stackGroup', e.target.value)}
+                placeholder="order-discount"
+                className="h-9"
+              />
+            </FieldLabel>
+            <label className="flex items-center gap-2.5 self-end pb-2 text-sm md:col-span-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-foreground"
+                checked={draft.exclusive}
+                onChange={e => set('exclusive', e.target.checked)}
+              />
+              Exclusive: never combines with other promotions
+            </label>
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-6 lg:col-span-2 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
+          <div>
+            <h3 className="text-sm font-semibold">Discount</h3>
+            <p className="mt-1 text-[13px] text-muted-foreground">What the customer gets.</p>
+          </div>
+          <div className="mt-4 lg:mt-0">
+            <ActionEditor value={draft.action} onChange={action => set('action', action)} />
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-6 lg:col-span-2 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
+          <div>
+            <h3 className="text-sm font-semibold">Conditions</h3>
+            <p className="mt-1 text-[13px] text-muted-foreground">Which carts qualify. Combine with all of, any of and not.</p>
+          </div>
+          <div className="mt-4 space-y-3 lg:mt-0">
+            {draft.conditions ? (
+              <>
+                <ConditionEditor value={draft.conditions} onChange={c => set('conditions', c)} />
+                <Button type="button" size="sm" variant="ghost" onClick={() => set('conditions', undefined)}>
+                  Remove all conditions
+                </Button>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 border border-dashed border-input px-4 py-3">
+                <p className="text-sm text-muted-foreground">Every cart the discount can apply to qualifies.</p>
+                <Button type="button" size="sm" variant="outline" onClick={() => set('conditions', defaultCondition('all'))}>
+                  <Plus /> Add conditions
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {problems.length > 0 && (
-        <ul className="space-y-1 bg-red-50 p-3 text-xs text-red-900" data-testid="promotion-problems">
+        <ul className="mx-5 mb-4 space-y-1 bg-[#fbe7e3] px-4 py-3 text-[13px] text-[#7d1d1a]" data-testid="promotion-problems">
           {problems.map(p => (
             <li key={p}>{p}</li>
           ))}
         </ul>
       )}
 
-      <div className="flex gap-3">
-        <Button type="submit" disabled={saving} data-testid="promotion-save">
-          {saving ? 'Saving…' : initial ? 'Save new version' : 'Create promotion'}
-        </Button>
-        <details className="text-xs text-muted-foreground">
-          <summary className="cursor-pointer select-none py-3">Rule JSON</summary>
-          <pre className="mt-2 max-h-64 overflow-auto bg-black/5 p-3">{JSON.stringify(draft, null, 2)}</pre>
+      <footer className="flex flex-wrap items-start justify-between gap-3 border-t border-border px-5 py-4">
+        <details className="text-[13px] text-muted-foreground">
+          <summary className="cursor-pointer select-none py-2">The rule as JSON</summary>
+          <pre className="mt-2 max-h-64 max-w-[min(640px,80vw)] overflow-auto bg-secondary p-3 font-mono text-xs text-foreground">
+            {JSON.stringify(draft, null, 2)}
+          </pre>
         </details>
-      </div>
+        <Button type="submit" size="sm" disabled={saving} data-testid="promotion-save">
+          {saving ? 'Saving…' : initial ? 'Save as a new version' : 'Create promotion'}
+        </Button>
+      </footer>
     </form>
+  );
+}
+
+function Usage({ used, limit }: { used: number; limit?: number }) {
+  if (!limit) return <span className="tabular-nums">{fmtCount(used)}</span>;
+  const ratio = Math.min(1, used / limit);
+  return (
+    <span className="inline-flex flex-col items-end gap-1">
+      <span className="tabular-nums">
+        {fmtCount(used)} <span className="text-muted-foreground">/ {fmtCount(limit)}</span>
+      </span>
+      <span className="block h-1 w-20 bg-secondary" aria-hidden>
+        {used > 0 && <span className="block h-full bg-chart" style={{ width: `${ratio * 100}%` }} />}
+      </span>
+    </span>
   );
 }
 
 export default function AdminPromotionsPage() {
   const [promotions, setPromotions] = useState<Promotion[] | null>(null);
+  const [failed, setFailed] = useState(false);
   const [filter, setFilter] = useState<PromotionStatus | 'all'>('all');
   const [editing, setEditing] = useState<Promotion | null | 'new'>(null);
   const [history, setHistory] = useState<Promotion | null>(null);
+  const [all, setAll] = useState<Promotion[] | null>(null);
 
   const load = useCallback(() => {
+    setFailed(false);
     api<Promotion[]>(`/admin/promotions${filter === 'all' ? '' : `?status=${filter}`}`)
-      .then(setPromotions)
-      .catch(e => toast.error((e as Error).message));
+      .then(list => {
+        setPromotions(list);
+        if (filter === 'all') setAll(list);
+      })
+      .catch(e => {
+        setFailed(true);
+        toast.error((e as Error).message);
+      });
   }, [filter]);
   useEffect(load, [load]);
+  // The finding and the tab counts read every promotion, whatever the filter shows.
+  useEffect(() => {
+    if (filter !== 'all' && all === null) api<Promotion[]>('/admin/promotions').then(setAll, () => {});
+  }, [filter, all]);
 
   const setStatus = async (p: Promotion, status: PromotionStatus) => {
     try {
@@ -343,6 +440,7 @@ export default function AdminPromotionsPage() {
           headers: { 'If-Match': `"${p.version}"` },
           body: JSON.stringify({ status }),
         });
+      setAll(null);
       load();
     } catch (e) {
       toast.error((e as Error).message);
@@ -354,27 +452,34 @@ export default function AdminPromotionsPage() {
     [promotions],
   );
 
+  const live = all?.filter(p => p.status === 'active') ?? [];
+  // A column empty in every row is dropped rather than drawn as a band of dashes.
+  const windowed = sorted.some(p => p.startsAt || p.endsAt);
+  const mostUsed = [...live].sort((a, b) => b.usedCount - a.usedCount)[0];
+  const finding = all
+    ? live.length === 0
+      ? 'No offer is live; customers pay list prices.'
+      : `${plural(live.length, 'offer')} live${mostUsed && mostUsed.usedCount > 0 ? `; ${mostUsed.name} has been used most, ${plural(mostUsed.usedCount, 'time')}` : ', none used yet'}.`
+    : null;
+
   return (
     <div data-testid="admin-promotions-page">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Promotions</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Rules are data: conditions combine with AND/OR/NOT, each discount is a strategy, and the optimizer picks the cheapest valid
-            combination for every cart. Every save is a new immutable version.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/admin/promotions/simulator">
-            <Button variant="outline" size="sm">
-              <FlaskConical className="mr-2 h-4 w-4" /> Simulator
+      <PageHeader
+        title="Promotions"
+        finding={finding}
+        actions={
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/promotions/simulator">
+                <FlaskConical /> Simulator
+              </Link>
             </Button>
-          </Link>
-          <Button size="sm" onClick={() => setEditing('new')} data-testid="promotion-new">
-            <Plus className="mr-2 h-4 w-4" /> New promotion
-          </Button>
-        </div>
-      </div>
+            <Button size="sm" onClick={() => setEditing('new')} data-testid="promotion-new">
+              <Plus /> New promotion
+            </Button>
+          </>
+        }
+      />
 
       {editing && (
         <PromotionEditor
@@ -382,93 +487,144 @@ export default function AdminPromotionsPage() {
           initial={editing === 'new' ? null : editing}
           onDone={() => {
             setEditing(null);
+            setAll(null);
             load();
           }}
         />
       )}
 
-      <div className="mt-6 flex gap-1">
-        {(['all', ...PROMOTION_STATUSES] as const).map(s => (
-          <Button key={s} size="sm" variant={filter === s ? 'default' : 'ghost'} onClick={() => setFilter(s)}>
-            {s}
-          </Button>
-        ))}
-      </div>
+      <Tabs
+        className="mt-6"
+        ariaLabel="Status"
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: 'all' as const, label: 'All', count: all?.length ?? null },
+          ...PROMOTION_STATUSES.map(s => ({
+            value: s,
+            label: STATUS_LABEL[s],
+            count: all ? all.filter(p => p.status === s).length : null,
+          })),
+        ]}
+      />
 
-      <div className="mt-3 border border-black/10 bg-white">
-        {promotions === null ? (
-          <Skeleton className="m-4 h-32" />
+      <section className="mt-4 border border-border bg-card">
+        {failed && promotions === null ? (
+          <div className="p-4">
+            <BlockError what="promotions" onRetry={load} />
+          </div>
+        ) : promotions === null ? (
+          <LoadingRows rows={5} className="px-4" />
+        ) : sorted.length === 0 ? (
+          <div className="p-4">
+            <Empty>
+              {filter === 'all'
+                ? 'No promotions yet. Create the first with New promotion.'
+                : `No ${STATUS_LABEL[filter].toLowerCase()} promotions.`}
+            </Empty>
+          </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Promotion</TableHead>
-                <TableHead>Discount</TableHead>
-                <TableHead>Applies</TableHead>
+                <TableHead className="pl-4">Promotion</TableHead>
+                <TableHead className="hidden md:table-cell">Discount</TableHead>
+                <TableHead className="hidden lg:table-cell">Applies</TableHead>
+                {windowed && <TableHead className="hidden xl:table-cell">Runs</TableHead>}
                 <TableHead className="text-right">Used</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead />
+                <TableHead className="pr-4">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sorted.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-sm text-muted-foreground">
-                    No promotions match.
-                  </TableCell>
-                </TableRow>
-              )}
               {sorted.map(p => (
                 <TableRow key={p._id} data-testid={`promotion-${p._id}`}>
-                  <TableCell>
-                    <p className="font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      v{p.version} · priority {p.priority}
+                  <TableCell className="max-w-0 pl-4 md:max-w-none">
+                    <p className="truncate font-medium">{p.name}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      Version {p.version} · priority {p.priority}
                       {p.stackGroup && ` · group ${p.stackGroup}`}
                       {p.exclusive && ' · exclusive'}
                     </p>
                   </TableCell>
-                  <TableCell className="text-sm">{ACTION_LABELS[p.action.type]}</TableCell>
-                  <TableCell className="text-sm">
-                    {p.activation === 'code' ? <span className="font-mono">{p.code}</span> : 'Automatic'}
+                  <TableCell className="hidden md:table-cell">{ACTION_LABELS[p.action.type]}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {p.activation === 'code' ? (
+                      <Pill tone="neutral">{p.code}</Pill>
+                    ) : (
+                      <span className="text-muted-foreground">Automatically</span>
+                    )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {p.usedCount}
-                    {p.usageLimit ? ` / ${p.usageLimit}` : ''}
+                  {windowed && (
+                    <TableCell className="hidden whitespace-nowrap tabular-nums xl:table-cell">
+                      {p.startsAt || p.endsAt ? (
+                        `${p.startsAt ? day(p.startsAt) : 'Now'} – ${p.endsAt ? day(p.endsAt) : 'open'}`
+                      ) : (
+                        <Dash label="No end date" />
+                      )}
+                    </TableCell>
+                  )}
+                  <TableCell className="text-right">
+                    <Usage used={p.usedCount} limit={p.usageLimit} />
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant(p.status)}>{p.status}</Badge>
+                    {p.status === 'active' ? (
+                      // Live is the norm: a dot and the word, so a screen of live offers is not a stripe of green.
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-positive" aria-hidden /> Live
+                      </span>
+                    ) : (
+                      <Pill tone={STATUS_TONE[p.status]}>{STATUS_LABEL[p.status]}</Pill>
+                    )}
                   </TableCell>
-                  <TableCell className="space-x-1 whitespace-nowrap text-right">
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(p)} aria-label={`Edit ${p.name}`}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setHistory(p)} aria-label={`History of ${p.name}`}>
-                      <History className="h-4 w-4" />
-                    </Button>
-                    {p.status !== 'active' && p.status !== 'archived' && (
-                      <Button size="sm" variant="ghost" onClick={() => setStatus(p, 'active')} aria-label={`Activate ${p.name}`}>
-                        <Play className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {p.status === 'active' && (
-                      <Button size="sm" variant="ghost" onClick={() => setStatus(p, 'paused')} aria-label={`Pause ${p.name}`}>
-                        <Pause className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {p.status !== 'archived' && (
-                      <Button size="sm" variant="ghost" onClick={() => setStatus(p, 'archived')} aria-label={`Archive ${p.name}`}>
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                    )}
+                  <TableCell className="whitespace-nowrap pr-4 text-right">
+                    <span className="inline-flex gap-0.5">
+                      <IconButton label={`Edit ${p.name}`} onClick={() => setEditing(p)}>
+                        <Pencil />
+                      </IconButton>
+                      <IconButton label={`History of ${p.name}`} onClick={() => setHistory(p)}>
+                        <History />
+                      </IconButton>
+                      {p.status !== 'active' && p.status !== 'archived' && (
+                        <IconButton label={`Activate ${p.name}`} onClick={() => setStatus(p, 'active')}>
+                          <Play />
+                        </IconButton>
+                      )}
+                      {p.status === 'active' && (
+                        <IconButton label={`Pause ${p.name}`} onClick={() => setStatus(p, 'paused')}>
+                          <Pause />
+                        </IconButton>
+                      )}
+                      {p.status !== 'archived' && (
+                        <IconButton label={`Archive ${p.name}`} onClick={() => setStatus(p, 'archived')}>
+                          <Archive />
+                        </IconButton>
+                      )}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
-      </div>
+      </section>
       {history && <VersionsDialog promotion={history} onClose={() => setHistory(null)} />}
     </div>
+  );
+}
+
+function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label.split(' ')[0]}
+      className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-transform duration-150 ease-out hover:bg-secondary hover:text-foreground active:scale-[0.97] [&_svg]:h-4 [&_svg]:w-4 [&_svg]:stroke-[1.5]"
+    >
+      {children}
+    </button>
   );
 }

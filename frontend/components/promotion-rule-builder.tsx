@@ -22,7 +22,7 @@ const list = (v: string) =>
 
 export function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <label className={`block text-xs text-muted-foreground ${className}`}>
+    <label className={`block min-w-0 text-[13px] font-medium text-foreground [&_input]:mt-1.5 ${className}`}>
       {label}
       {children}
     </label>
@@ -56,32 +56,28 @@ export function SelectorEditor({ value, onChange }: { value: ProductSelector | u
     onChange(next as ProductSelector);
   };
   return (
-    <div className="grid gap-2 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-3">
       <Field label="Categories (comma-separated)">
         <Input defaultValue={value?.categories?.join(', ')} onBlur={e => set('categories', e.target.value)} className="mt-1 h-9" />
       </Field>
       <Field label="Product slugs">
-        <Input defaultValue={value?.slugs?.join(', ')} onBlur={e => set('slugs', e.target.value)} className="mt-1 h-9 font-mono" />
+        <Input defaultValue={value?.slugs?.join(', ')} onBlur={e => set('slugs', e.target.value)} className="mt-1 h-9" />
       </Field>
       <Field label="Product ids">
-        <Input
-          defaultValue={value?.productIds?.join(', ')}
-          onBlur={e => set('productIds', e.target.value)}
-          className="mt-1 h-9 font-mono"
-        />
+        <Input defaultValue={value?.productIds?.join(', ')} onBlur={e => set('productIds', e.target.value)} className="mt-1 h-9" />
       </Field>
     </div>
   );
 }
 
 const CONDITION_LABELS: Record<ConditionSpec['type'], string> = {
-  all: 'All of (AND)',
-  any: 'Any of (OR)',
-  not: 'Not',
+  all: 'All of these',
+  any: 'Any of these',
+  not: 'Not this',
   cartContains: 'Cart contains',
   minSubtotal: 'Minimum subtotal',
   customerSegment: 'Customer segment',
-  dateWindow: 'Date / time window',
+  dateWindow: 'Days and hours',
   paymentMethod: 'Payment method',
 };
 
@@ -120,12 +116,12 @@ export function ConditionEditor({
   depth?: number;
 }) {
   return (
-    <div className={`space-y-2 border-l-2 pl-3 ${depth % 2 ? 'border-black/10' : 'border-black/30'}`} data-testid="condition-node">
+    <div className={`space-y-3 border-l-2 pl-4 ${depth % 2 ? 'border-border' : 'border-foreground/25'}`} data-testid="condition-node">
       <div className="flex items-center gap-2">
         <select
           value={value.type}
           onChange={e => onChange(defaultCondition(e.target.value as ConditionSpec['type']))}
-          className="h-9 border border-black/15 bg-white px-2 text-sm"
+          className="h-9 border border-input bg-card px-2.5 text-sm transition-[border-color] duration-150 focus-visible:border-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground"
           aria-label="Condition type"
         >
           {Object.entries(CONDITION_LABELS).map(([k, label]) => (
@@ -187,7 +183,7 @@ export function ConditionEditor({
           <select
             value={value.segment}
             onChange={e => onChange({ ...value, segment: e.target.value as CustomerSegment })}
-            className="h-9 border border-black/15 bg-white px-2 text-sm"
+            className="h-9 border border-input bg-card px-2.5 text-sm transition-[border-color] duration-150 focus-visible:border-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground"
             aria-label="Segment"
           >
             {CUSTOMER_SEGMENTS.map(s => (
@@ -197,11 +193,12 @@ export function ConditionEditor({
         )}
         {value.type === 'dateWindow' && (
           <div className="space-y-2">
-            <div className="flex flex-wrap gap-3 text-xs">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
               {DAYS.map((d, i) => (
-                <label key={d} className="flex items-center gap-1">
+                <label key={d} className="flex items-center gap-1.5">
                   <input
                     type="checkbox"
+                    className="h-4 w-4 accent-foreground"
                     checked={value.daysOfWeek?.includes(i) ?? false}
                     onChange={e => {
                       const days = new Set(value.daysOfWeek ?? []);
@@ -214,7 +211,7 @@ export function ConditionEditor({
                 </label>
               ))}
             </div>
-            <div className="grid gap-2 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-4">
               <Field label="From hour">
                 <NumberInput
                   value={value.hours?.start ?? 0}
@@ -234,11 +231,12 @@ export function ConditionEditor({
           </div>
         )}
         {value.type === 'paymentMethod' && (
-          <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
             {PAYMENT_METHODS.map(m => (
-              <label key={m} className="flex items-center gap-1">
+              <label key={m} className="flex items-center gap-1.5">
                 <input
                   type="checkbox"
+                  className="h-4 w-4 accent-foreground"
                   checked={value.methods.includes(m)}
                   onChange={e =>
                     onChange({
@@ -259,7 +257,7 @@ export function ConditionEditor({
 
 export const ACTION_LABELS: Record<ActionType, string> = {
   fixedBundle: 'Fixed-price bundle',
-  mixAndMatch: 'Mix & match (any N for ₹X)',
+  mixAndMatch: 'Mix and match (any N for ₹X)',
   buyXGetY: 'Buy X get Y',
   tiered: 'Tiered spend discount',
   percentOff: 'Percent off',
@@ -299,7 +297,7 @@ export function ActionEditor({ value, onChange }: { value: ActionSpec; onChange:
       <select
         value={value.type}
         onChange={e => onChange(defaultAction(e.target.value as ActionType))}
-        className="h-9 border border-black/15 bg-white px-2 text-sm"
+        className="h-9 border border-input bg-card px-2.5 text-sm transition-[border-color] duration-150 focus-visible:border-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground"
         aria-label="Action type"
       >
         {Object.entries(ACTION_LABELS).map(([k, label]) => (
@@ -313,8 +311,8 @@ export function ActionEditor({ value, onChange }: { value: ActionSpec; onChange:
         {value.type === 'fixedBundle' && (
           <div className="space-y-3">
             {value.components.map((c, i) => (
-              <div key={i} className="border border-black/10 p-3">
-                <div className="flex items-center justify-between text-xs font-medium">
+              <div key={i} className="border border-border p-3">
+                <div className="flex items-center justify-between text-[13px] font-medium">
                   Component {i + 1}
                   {value.components.length > 1 && (
                     <Button
@@ -363,7 +361,7 @@ export function ActionEditor({ value, onChange }: { value: ActionSpec; onChange:
         {value.type === 'mixAndMatch' && (
           <div className="space-y-2">
             <SelectorEditor value={value.selector} onChange={selector => onChange({ ...value, selector })} />
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Any N items">
                 <NumberInput value={value.quantity} min={2} max={6} onChange={quantity => onChange({ ...value, quantity })} />
               </Field>
@@ -376,7 +374,7 @@ export function ActionEditor({ value, onChange }: { value: ActionSpec; onChange:
         {value.type === 'buyXGetY' && (
           <div className="space-y-2">
             <SelectorEditor value={value.selector} onChange={selector => onChange({ ...value, selector })} />
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Buy">
                 <NumberInput value={value.buyQty} min={1} max={4} onChange={buyQty => onChange({ ...value, buyQty })} />
               </Field>
@@ -447,7 +445,7 @@ export function ActionEditor({ value, onChange }: { value: ActionSpec; onChange:
           </div>
         )}
         {value.type === 'percentOff' && (
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Percent off">
               <NumberInput value={value.percent} min={1} max={100} onChange={percent => onChange({ ...value, percent })} />
             </Field>
@@ -464,7 +462,7 @@ export function ActionEditor({ value, onChange }: { value: ActionSpec; onChange:
         {(value.type === 'markdown' || value.type === 'clearance') && (
           <div className="space-y-2">
             <SelectorEditor value={value.selector} onChange={selector => onChange({ ...value, selector })} />
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Percent off">
                 <NumberInput value={value.percentOff} min={1} max={100} onChange={percentOff => onChange({ ...value, percentOff })} />
               </Field>
