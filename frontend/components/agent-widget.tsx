@@ -1,11 +1,15 @@
 'use client';
 
 import type { CartItem } from '@storefront/contracts';
-import { ArrowUp, Check, Loader2, MessageSquare, Sparkles, Square, Wrench, X } from 'lucide-react';
+import { ArrowUp, Check, Loader2, MessageSquare, Square, X } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth, useCart } from '@/components/providers';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { api, apiStream } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 type ActionStatus = 'pending' | 'executing' | 'completed' | 'declined' | 'failed' | 'expired';
 
@@ -124,30 +128,21 @@ async function* readSse(res: Response): AsyncGenerator<StreamEvent> {
 function ActionCard({ action, onResolve }: { action: AgentAction; onResolve: (a: AgentAction, decision: 'confirm' | 'decline') => void }) {
   const busy = action.status === 'executing';
   return (
-    <div data-testid="agent-action-card" className="mt-2 border border-black bg-white p-3 text-sm">
-      <p className="label-caps text-[10px] text-muted-foreground">{ACTION_LABELS[action.type]} · needs your OK</p>
+    <div data-testid="agent-action-card" className="mt-2 bg-background p-4 text-[15px]">
+      <p className="text-sm font-semibold">{ACTION_LABELS[action.type]}? Aria needs your go-ahead.</p>
       <p className="mt-1 leading-snug">{action.summary}</p>
       {action.status === 'pending' || busy ? (
         <div className="mt-3 flex gap-2">
-          <button
-            data-testid="agent-action-confirm"
-            disabled={busy}
-            onClick={() => onResolve(action, 'confirm')}
-            className="flex h-8 items-center gap-1.5 bg-black px-3 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-40"
-          >
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" strokeWidth={1.5} />} Confirm
-          </button>
-          <button
-            data-testid="agent-action-decline"
-            disabled={busy}
-            onClick={() => onResolve(action, 'decline')}
-            className="h-8 border border-black/20 px-3 text-xs transition-colors hover:border-black disabled:opacity-40"
-          >
+          <Button data-testid="agent-action-confirm" size="sm" disabled={busy} onClick={() => onResolve(action, 'confirm')}>
+            {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />}
+            Confirm
+          </Button>
+          <Button data-testid="agent-action-decline" size="sm" variant="ghost" disabled={busy} onClick={() => onResolve(action, 'decline')}>
             Not now
-          </button>
+          </Button>
         </div>
       ) : (
-        <p data-testid="agent-action-status" className="mt-2 text-xs text-muted-foreground">
+        <p data-testid="agent-action-status" className="mt-2 text-sm text-muted-foreground">
           {action.status === 'completed' && 'Done.'}
           {action.status === 'declined' && 'Declined, nothing was changed.'}
           {action.status === 'expired' && 'This request expired. Ask again if you still want it.'}
@@ -159,7 +154,20 @@ function ActionCard({ action, onResolve }: { action: AgentAction; onResolve: (a:
 }
 
 export function AgentWidget() {
+  const pathname = usePathname();
+  // Checkout keeps one task on screen, and the phone's pay bar owns the bottom edge there.
+  if (pathname?.startsWith('/checkout')) return null;
+  return <AgentWidgetInner />;
+}
+
+function AgentWidgetInner() {
   const [open, setOpen] = useState(false);
+  /** Mounted once first opened, so the panel can play its exit and keep the conversation. */
+  const [mounted, setMounted] = useState(false);
+  /** Set a frame after mounting, so the panel enters from its starting style. */
+  const [shown, setShown] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -183,6 +191,24 @@ export function AgentWidget() {
   }, [messages, loading, open]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (!open) {
+      setShown(false);
+      return;
+    }
+    setMounted(true);
+    const frame = requestAnimationFrame(() => {
+      setShown(true);
+      inputRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  const close = () => {
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
 
   const updateLast = (fn: (m: Msg) => Msg) => setMessages(prev => (prev.length ? [...prev.slice(0, -1), fn(prev[prev.length - 1])] : prev));
 
@@ -251,42 +277,57 @@ export function AgentWidget() {
 
   return (
     <>
-      {open && (
+      {mounted && (
         <div
+          ref={panelRef}
+          id="agent-panel"
+          role="dialog"
+          aria-label="Chat with Aria"
           data-testid="agent-widget-panel"
-          className="fixed bottom-24 right-5 z-50 flex h-[min(600px,calc(100vh-8rem))] w-[min(400px,calc(100vw-2.5rem))] flex-col border border-black/15 bg-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.35)]"
+          data-open={shown}
+          inert={!open}
+          onKeyDown={e => {
+            if (e.key === 'Escape') close();
+          }}
+          className={cn(
+            // Grows out of the button's corner: 200ms in, 150ms out, transform and opacity only.
+            'fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] right-4 z-50 flex h-[min(600px,calc(100dvh-8rem))] w-[min(400px,calc(100vw-2rem))] origin-bottom-right flex-col bg-card shadow-[0_24px_60px_-16px_rgba(24,23,21,0.4)] transition-[transform,opacity,visibility] ease-out sm:right-5',
+            shown
+              ? 'visible scale-100 opacity-100 duration-200'
+              : 'pointer-events-none invisible scale-95 opacity-0 duration-150 motion-reduce:scale-100',
+          )}
         >
-          <div className="flex items-center justify-between border-b border-black/10 bg-black px-5 py-4 text-white">
+          <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-5">
             <div>
-              <p className="flex items-center gap-2 font-serif text-lg font-semibold leading-none">
-                <Sparkles className="h-4 w-4" strokeWidth={1.5} /> Aria
-              </p>
-              <p className="label-caps mt-1.5 text-white/60">AI shopping concierge</p>
+              <h2 className="text-lg font-bold leading-tight tracking-[-0.02em]">Aria</h2>
+              <p className="text-sm text-muted-foreground">Shopping assistant</p>
             </div>
             <button
+              type="button"
               data-testid="agent-close-button"
-              onClick={() => setOpen(false)}
+              onClick={close}
               aria-label="Close chat"
-              className="flex h-9 w-9 items-center justify-center transition-colors hover:bg-white/10"
+              className="-mr-2 -mt-1 flex h-10 w-10 touch-manipulation items-center justify-center transition-[background-color,transform] duration-150 ease-out hover:bg-secondary active:scale-[0.97]"
             >
-              <X className="h-4 w-4" strokeWidth={1.5} />
+              <X className="h-4 w-4" aria-hidden />
             </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-3" aria-live="polite">
             {messages.length === 0 && (
               <div data-testid="agent-empty-state">
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Hi{user && typeof user === 'object' ? ` ${user.name.split(' ')[0]}` : ''}, I can help you find products, check sizes, get
-                  the best price on your bag, track orders, and answer questions about shipping, returns, and payments.
+                <p className="text-[15px] leading-relaxed">
+                  Hi{user && typeof user === 'object' ? ` ${user.name.split(' ')[0]}` : ''}. I can find pieces, check sizes, get the best
+                  price on your bag, track an order, and answer questions about shipping, returns and payment.
                 </p>
                 <div className="mt-5 space-y-2">
                   {SUGGESTIONS.map(s => (
                     <button
                       key={s}
+                      type="button"
                       data-testid="agent-suggestion-chip"
                       onClick={() => send(s)}
-                      className="block w-full border border-black/15 px-3 py-2 text-left text-sm transition-colors hover:bg-black hover:text-white"
+                      className="block w-full touch-manipulation bg-secondary px-4 py-3 text-left text-[15px] transition-[background-color,transform] duration-150 ease-out hover:bg-accent active:scale-[0.98]"
                     >
                       {s}
                     </button>
@@ -297,40 +338,48 @@ export function AgentWidget() {
             {messages.map((m, i) =>
               m.role === 'user' ? (
                 <div key={i} className="flex justify-end">
-                  <p data-testid="agent-message-user" className="max-w-[85%] bg-black px-3.5 py-2.5 text-sm leading-relaxed text-white">
+                  <p
+                    data-testid="agent-message-user"
+                    className="max-w-[85%] bg-primary px-4 py-2.5 text-[15px] leading-relaxed text-primary-foreground"
+                  >
                     {m.content}
                   </p>
                 </div>
               ) : (
                 <div key={i} className="flex">
-                  <div className="max-w-[90%]">
+                  <div className="max-w-[92%]">
                     {!!m.tools?.length && (
-                      <div className="mb-1.5 flex flex-wrap gap-1.5">
+                      <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1">
                         {m.tools.map((t, j) => (
                           <span
                             key={`${t.name}-${j}`}
                             data-testid="agent-tool-chip"
-                            className="label-caps flex items-center gap-1 border border-black/10 px-2 py-1 text-[10px] text-muted-foreground"
+                            className="flex items-center gap-1.5 text-sm text-muted-foreground"
                           >
-                            {t.done ? <Wrench className="h-3 w-3" strokeWidth={1.5} /> : <Loader2 className="h-3 w-3 animate-spin" />}
+                            {t.done ? (
+                              <Check className="h-3.5 w-3.5" aria-hidden />
+                            ) : (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                            )}
                             {t.title}
                           </span>
                         ))}
                       </div>
                     )}
                     {m.content ? (
-                      <div
-                        data-testid="agent-message-assistant"
-                        className="border border-black/10 bg-secondary/60 px-3.5 py-2.5 text-sm leading-relaxed"
-                      >
+                      <div data-testid="agent-message-assistant" className="bg-secondary px-4 py-3 text-[15px] leading-relaxed">
                         <AssistantText content={m.content} />
                       </div>
                     ) : (
                       m.streaming && (
-                        <div className="flex items-center gap-1.5 border border-black/10 px-3.5 py-3" data-testid="agent-typing-indicator">
-                          <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:0ms]" />
-                          <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:150ms]" />
-                          <span className="h-1.5 w-1.5 animate-bounce bg-black [animation-delay:300ms]" />
+                        <div
+                          className="flex h-11 items-center gap-1.5 bg-secondary px-4"
+                          data-testid="agent-typing-indicator"
+                          aria-label="Aria is typing"
+                        >
+                          <span className="h-1.5 w-1.5 animate-bounce bg-foreground/60 [animation-delay:0ms]" />
+                          <span className="h-1.5 w-1.5 animate-bounce bg-foreground/60 [animation-delay:150ms]" />
+                          <span className="h-1.5 w-1.5 animate-bounce bg-foreground/60 [animation-delay:300ms]" />
                         </div>
                       )
                     )}
@@ -346,49 +395,61 @@ export function AgentWidget() {
               e.preventDefault();
               send(input);
             }}
-            className="flex items-center gap-2 border-t border-black/10 p-3"
+            className="flex items-center gap-2 bg-background px-3 py-3"
           >
-            <input
+            <label htmlFor="agent-input" className="sr-only">
+              Message Aria
+            </label>
+            <Input
               ref={inputRef}
+              id="agent-input"
               data-testid="agent-input"
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder="Ask about products, prices, orders…"
-              className="h-10 flex-1 border border-input bg-white px-3 text-sm outline-none transition-colors focus:border-black"
+              placeholder="Ask about pieces, prices or orders…"
+              autoComplete="off"
+              enterKeyHint="send"
+              className="flex-1"
             />
             {loading ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="icon"
                 data-testid="agent-stop-button"
                 onClick={() => abortRef.current?.abort()}
                 aria-label="Stop generating"
-                className="flex h-10 w-10 shrink-0 items-center justify-center border border-black text-black transition-colors hover:bg-black hover:text-white"
+                className="h-11 w-11 shrink-0"
               >
-                <Square className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </button>
+                <Square aria-hidden />
+              </Button>
             ) : (
-              <button
+              <Button
                 type="submit"
+                size="icon"
                 data-testid="agent-send-button"
                 disabled={!input.trim()}
                 aria-label="Send message"
-                className="flex h-10 w-10 shrink-0 items-center justify-center bg-black text-white transition-opacity hover:opacity-80 disabled:opacity-30"
+                className="h-11 w-11 shrink-0"
               >
-                <ArrowUp className="h-4 w-4" strokeWidth={1.5} />
-              </button>
+                <ArrowUp aria-hidden />
+              </Button>
             )}
           </form>
         </div>
       )}
 
       <button
+        ref={buttonRef}
+        type="button"
         data-testid="agent-widget-button"
         onClick={() => setOpen(v => !v)}
-        aria-label="Chat with Aria, the AI assistant"
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center bg-black text-white shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] transition-transform hover:scale-105"
+        aria-label={open ? 'Close chat' : 'Chat with Aria, the AI assistant'}
+        aria-expanded={open}
+        aria-controls={mounted ? 'agent-panel' : undefined}
+        className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-4 z-50 flex h-14 w-14 touch-manipulation select-none items-center justify-center bg-primary text-primary-foreground shadow-[0_10px_28px_-10px_rgba(24,23,21,0.55)] transition-[transform,background-color] duration-150 ease-out hover:bg-primary/85 active:scale-[0.97] sm:right-5"
       >
-        {open ? <X className="h-5 w-5" strokeWidth={1.5} /> : <MessageSquare className="h-5 w-5" strokeWidth={1.5} />}
-        {!open && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 animate-pulse bg-emerald-500" />}
+        {open ? <X className="h-5 w-5" aria-hidden /> : <MessageSquare className="h-5 w-5" aria-hidden />}
       </button>
     </>
   );
