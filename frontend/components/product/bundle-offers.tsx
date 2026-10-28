@@ -110,10 +110,17 @@ function BundleCard({ offer, products }: { offer: BundleOffer; products: Record<
         ) : null}
       </div>
 
-      {components.length > 0 && (
+      {components.length > 0 ? (
         <Button data-testid={`bundle-add-${offer.promotionId}`} size="lg" className="mt-7 w-full" onClick={addSet} disabled={!purchasable}>
           Add the set to bag
         </Button>
+      ) : (
+        <p className="mt-6 text-base">
+          Add any qualifying pieces to your bag and it applies on its own.{' '}
+          <Link href="/products" className="font-semibold underline underline-offset-4">
+            Browse the catalogue
+          </Link>
+        </p>
       )}
     </article>
   );
