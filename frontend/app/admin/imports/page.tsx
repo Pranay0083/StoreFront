@@ -230,7 +230,7 @@ export default function AdminImportsPage() {
                     return (
                       <Fragment key={imp.id}>
                         <TableRow data-testid={`import-${imp.id}`}>
-                          <TableCell className="max-w-0 pl-5 sm:max-w-none">
+                          <TableCell className="w-full max-w-0 pl-5 sm:max-w-none">
                             <p className="truncate font-medium">{imp.filename}</p>
                             <p className="mt-0.5 truncate text-xs text-muted-foreground">
                               {fmtWhen(imp.createdAt)} · {kb(imp.size)}
@@ -274,7 +274,7 @@ export default function AdminImportsPage() {
                               <ul className="space-y-1 text-[13px]">
                                 {errors[imp.id].map(err => (
                                   <li key={err.row}>
-                                    <span className="font-medium tabular-nums">Row {err.row}</span>
+                                    <span className="font-medium">Row {err.row}</span>
                                     {err.slug && <span className="text-muted-foreground"> ({err.slug})</span>}: {err.messages.join('; ')}
                                   </li>
                                 ))}

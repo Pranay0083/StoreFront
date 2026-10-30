@@ -286,7 +286,7 @@ export default function PromotionSimulatorPage() {
                     <Thumb src={p.images[0]} />
                     <div className="min-w-0 flex-1 leading-tight">
                       <p className="truncate text-sm font-medium">{p.title}</p>
-                      <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{fmtMoney(p.price)}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{fmtMoney(p.price)}</p>
                     </div>
                     <Button size="sm" variant="ghost" className="h-8 px-3" onClick={() => add(p)} aria-label={`Add ${p.title}`}>
                       <Plus /> Add
@@ -300,7 +300,7 @@ export default function PromotionSimulatorPage() {
           <section className="border border-border bg-card">
             <header className="flex items-center justify-between px-5 pt-4">
               <h2 className="text-base font-semibold">Cart</h2>
-              <span className="text-[13px] tabular-nums text-muted-foreground">{plural(pieces, 'piece')}</span>
+              <span className="text-[13px] text-muted-foreground">{plural(pieces, 'piece')}</span>
             </header>
             {lines.length === 0 ? (
               <div className="p-5 pt-3">
@@ -321,7 +321,7 @@ export default function PromotionSimulatorPage() {
                 <TableBody>
                   {lines.map((l, i) => (
                     <TableRow key={`${l.productId}:${i}`}>
-                      <TableCell className="max-w-0 pl-5 sm:max-w-none">
+                      <TableCell className="w-full max-w-0 pl-5 sm:max-w-none">
                         <span className="flex items-center gap-3">
                           <Thumb src={l.image} className="h-8 w-6" />
                           <span className="truncate">{l.title}</span>
@@ -492,7 +492,7 @@ export default function PromotionSimulatorPage() {
                     {breakdown.suggestions.map(s => (
                       <li key={s.message} className="py-2">
                         <p>{s.message}</p>
-                        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           Adds {fmtMoney(s.addedCost)}, saves {fmtMoney(s.extraSavings)} more
                         </p>
                       </li>

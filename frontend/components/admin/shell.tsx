@@ -159,10 +159,7 @@ function NavList({ user, pathname, onNavigate }: { user: User; pathname: string;
                       <l.icon className="h-4 w-4 flex-none text-foreground/60" strokeWidth={1.5} />
                       <span className="truncate">{l.label}</span>
                       {l.href === '/admin/orders' && !!toPack && (
-                        <span
-                          className="ml-auto text-xs tabular-nums text-muted-foreground"
-                          title={`${toPack} paid orders waiting to be packed`}
-                        >
+                        <span className="ml-auto text-xs text-muted-foreground" title={`${toPack} paid orders waiting to be packed`}>
                           {fmtCount(toPack)} to pack
                         </span>
                       )}

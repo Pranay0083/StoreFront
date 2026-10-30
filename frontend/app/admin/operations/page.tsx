@@ -176,7 +176,7 @@ function DeadLetters({ onChange }: { onChange: () => void }) {
             {(showAll ? items : items.slice(0, CAP)).map(d => (
               <Fragment key={`${d.source}:${d.id}`}>
                 <TableRow>
-                  <TableCell className="max-w-0 pl-5 md:max-w-none">
+                  <TableCell className="w-full max-w-0 pl-5 md:max-w-none">
                     <p className="truncate">
                       <span className="font-medium">{d.name}</span>
                       <span className="text-xs text-muted-foreground">
@@ -294,7 +294,7 @@ function Queues({ overview, failed, onRetry }: { overview: JobsOverview | null; 
           </Table>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border px-5 py-3 text-sm">
             <span>Outbox</span>
-            <span className="text-[13px] tabular-nums text-muted-foreground">
+            <span className="text-[13px] text-muted-foreground">
               {outbox.length ? outbox.map(([k, v]) => `${fmtCount(v)} ${k}`).join(' · ') : 'Empty'}
             </span>
           </div>

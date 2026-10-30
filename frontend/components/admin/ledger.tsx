@@ -123,9 +123,9 @@ export function KpiStrip({ items, loading, className }: { items: Kpi[]; loading?
     <div
       className={cn(
         'grid grid-cols-2 border border-border bg-card',
-        cols === 3 && 'sm:grid-cols-3',
-        cols === 4 && 'sm:grid-cols-4',
-        cols === 5 && 'sm:grid-cols-5',
+        cols === 3 && 'lg:grid-cols-3',
+        cols === 4 && 'lg:grid-cols-4',
+        cols === 5 && 'lg:grid-cols-5',
         className,
       )}
     >
@@ -137,17 +137,17 @@ export function KpiStrip({ items, loading, className }: { items: Kpi[]; loading?
             'min-w-0 border-border px-5 py-4',
             // Dividers: a left rule between cells on one row; a top rule on the phone's second row.
             i % 2 === 1 && 'border-l',
-            i >= 2 && 'border-t sm:border-t-0',
-            i > 0 && 'sm:border-l',
+            i >= 2 && 'border-t lg:border-t-0',
+            i > 0 && 'lg:border-l',
             // An odd count on the phone: the last cell takes the full row.
-            cols % 2 === 1 && i === cols - 1 && 'col-span-2 border-l-0 sm:col-span-1 sm:border-l',
+            cols % 2 === 1 && i === cols - 1 && 'col-span-2 border-l-0 lg:col-span-1 lg:border-l',
           )}
         >
           <p className="text-[13px] text-muted-foreground">{k.label}</p>
           {loading ? (
             <LoadingBar className="mt-2 h-6 w-24" />
           ) : (
-            <p className="mt-1 truncate text-xl font-medium tabular-nums tracking-[-0.01em] sm:text-2xl">{k.value}</p>
+            <p className="mt-1 truncate text-xl font-medium tracking-[-0.01em] md:text-2xl">{k.value}</p>
           )}
           {k.sub && !loading && <p className="mt-0.5 truncate text-xs text-muted-foreground">{k.sub}</p>}
         </div>
@@ -277,9 +277,7 @@ export function Tabs<T extends string>({
               )}
             >
               {o.label}
-              {o.count != null && (
-                <span className={cn('tabular-nums', active ? 'text-foreground' : 'text-muted-foreground')}>{fmtCount(o.count)}</span>
-              )}
+              {o.count != null && <span className={cn(active ? 'text-foreground' : 'text-muted-foreground')}>{fmtCount(o.count)}</span>}
             </button>
           );
         })}
@@ -321,7 +319,7 @@ export function ShortId({ id, className }: { id: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   const short = id.length > 10 ? `${id.slice(0, 8)}…` : id;
   return (
-    <span className={cn('inline-flex items-center gap-1.5 tabular-nums', className)} title={id}>
+    <span className={cn('inline-flex items-center gap-1.5', className)} title={id}>
       {short}
       <button
         type="button"

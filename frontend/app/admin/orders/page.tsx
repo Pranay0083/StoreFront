@@ -245,7 +245,7 @@ function AdminOrdersScreen() {
         <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-3 px-4 py-2">
           {selected.size > 0 && canManage ? (
             <div data-testid="bulk-action-bar" className="flex flex-wrap items-center gap-3">
-              <p className="text-sm font-medium tabular-nums">{fmtCount(selected.size)} selected</p>
+              <p className="text-sm font-medium">{fmtCount(selected.size)} selected</p>
               <Select value={bulkTo} onValueChange={setBulkTo}>
                 <SelectTrigger data-testid="bulk-status-select" className="h-9 w-44">
                   <SelectValue placeholder="Move to…" />
@@ -271,7 +271,7 @@ function AdminOrdersScreen() {
               </button>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground tabular-nums">
+            <p className="text-sm text-muted-foreground">
               {data
                 ? data.total === 0
                   ? 'No orders'
@@ -297,7 +297,7 @@ function AdminOrdersScreen() {
             <TableHeader className="bg-card">
               <TableRow>
                 {canManage && (
-                  <TableHead className="w-10 pl-4">
+                  <TableHead className="hidden w-10 pl-4 sm:table-cell">
                     <Checkbox
                       data-testid="orders-select-all"
                       aria-label="Select every order on this page"
@@ -306,7 +306,7 @@ function AdminOrdersScreen() {
                     />
                   </TableHead>
                 )}
-                <TableHead className={cn(!canManage && 'pl-4')}>Order</TableHead>
+                <TableHead className={cn('pl-4', canManage && 'sm:pl-3')}>Order</TableHead>
                 <TableHead className="hidden md:table-cell">Customer</TableHead>
                 <TableHead className="hidden text-right sm:table-cell">Pieces</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -327,7 +327,7 @@ function AdminOrdersScreen() {
                     data-state={selected.has(order._id) ? 'selected' : undefined}
                   >
                     {canManage && (
-                      <TableCell className="pl-4">
+                      <TableCell className="hidden pl-4 sm:table-cell">
                         <Checkbox
                           data-testid={`order-select-${order.orderNumber}`}
                           aria-label={`Select ${order.orderNumber}`}
@@ -336,8 +336,8 @@ function AdminOrdersScreen() {
                         />
                       </TableCell>
                     )}
-                    <TableCell className={cn('max-w-0 sm:max-w-none', !canManage && 'pl-4')}>
-                      <p className="truncate font-medium tabular-nums">{order.orderNumber}</p>
+                    <TableCell className={cn('w-full max-w-0 pl-4 sm:max-w-none', canManage && 'sm:pl-3')}>
+                      <p className="truncate font-medium">{order.orderNumber}</p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         <span className="md:hidden">{order.address?.name ?? 'No name'} · </span>
                         <span className="sm:hidden">{plural(pieces, 'piece')} · </span>
@@ -417,7 +417,7 @@ function AdminOrdersScreen() {
 
         {data && data.pages > 1 && (
           <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
-            <p className="text-[13px] tabular-nums text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground">
               Page {fmtCount(page)} of {fmtCount(data.pages)}
             </p>
             <div className="flex gap-2">

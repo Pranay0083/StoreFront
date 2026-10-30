@@ -173,9 +173,9 @@ export default function AdminAuditPage() {
           <Table data-testid="audit-table">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-40 pl-5">When</TableHead>
-                <TableHead>Who</TableHead>
-                <TableHead>What</TableHead>
+                <TableHead className="hidden w-40 pl-5 sm:table-cell">When</TableHead>
+                <TableHead className="hidden md:table-cell">Who</TableHead>
+                <TableHead className="pl-5 sm:pl-3">What</TableHead>
                 <TableHead className="hidden xl:table-cell">Permission</TableHead>
                 <TableHead className="hidden lg:table-cell">Targets</TableHead>
                 <TableHead className="pr-5 text-right">Result</TableHead>
@@ -191,8 +191,8 @@ export default function AdminAuditPage() {
                     className={cn('align-top', e.changes && 'cursor-pointer hover:bg-foreground/[0.02]')}
                     onClick={() => e.changes && setExpanded(open ? null : e.id)}
                   >
-                    <TableCell className="whitespace-nowrap pl-5 text-muted-foreground">{fmtWhen(e.at)}</TableCell>
-                    <TableCell className="max-w-[220px]">
+                    <TableCell className="hidden whitespace-nowrap pl-5 text-muted-foreground sm:table-cell">{fmtWhen(e.at)}</TableCell>
+                    <TableCell className="hidden max-w-[220px] md:table-cell">
                       <span className="flex items-center gap-2.5">
                         <Initial name={e.actor.email} className="h-7 w-7 text-xs" />
                         <span className="min-w-0">
@@ -201,7 +201,7 @@ export default function AdminAuditPage() {
                         </span>
                       </span>
                     </TableCell>
-                    <TableCell className="max-w-md">
+                    <TableCell className="max-w-md pl-5 sm:pl-3">
                       <p className="flex items-start gap-1.5">
                         <span className="min-w-0">{describe(e)}</span>
                         {e.changes && (
@@ -212,6 +212,10 @@ export default function AdminAuditPage() {
                         )}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                        <span className="block md:hidden">
+                          {e.actor.email}
+                          <span className="sm:hidden"> · {fmtWhen(e.at)}</span>
+                        </span>
                         {e.method} {route(e)}
                         {!open && e.changes ? ` · changed ${Object.keys(e.changes).join(', ')}` : ''}
                       </p>
@@ -225,7 +229,7 @@ export default function AdminAuditPage() {
                       {e.permissions.join(', ') || '—'}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      <span className="flex flex-col items-start gap-0.5 text-[13px] tabular-nums">
+                      <span className="flex flex-col items-start gap-0.5 text-[13px]">
                         {e.targets.slice(0, 3).map(id => (
                           <button
                             key={id}
@@ -247,7 +251,7 @@ export default function AdminAuditPage() {
                       {e.status >= 400 ? (
                         <Pill tone="negative">Refused {e.status}</Pill>
                       ) : (
-                        <span className="text-[13px] tabular-nums text-muted-foreground">Done {e.status}</span>
+                        <span className="text-[13px] text-muted-foreground">Done {e.status}</span>
                       )}
                     </TableCell>
                   </TableRow>

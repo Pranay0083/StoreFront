@@ -274,11 +274,20 @@ export default function AdminProductsPage() {
                     <TableCell className="py-2 pl-4">
                       <Thumb src={p.images[0]} className="h-12 w-9" />
                     </TableCell>
-                    <TableCell className="max-w-0 md:max-w-none">
+                    <TableCell className="w-full max-w-0 md:max-w-none">
                       <p className="truncate font-medium">{p.title}</p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {p.category}
                         {p.featured && ' · on the home page'}
+                        {/* On a phone the stock column folds into this line. */}
+                        <span className="md:hidden">
+                          {' · '}
+                          {state.out.length
+                            ? `sold out in ${state.out.join(', ')}`
+                            : state.low.length
+                              ? `low in ${state.low.join(', ')}`
+                              : `${fmtCount(stock)} in stock`}
+                        </span>
                       </p>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -391,7 +400,6 @@ export default function AdminProductsPage() {
                 data-testid="product-form-price"
                 type="number"
                 inputMode="decimal"
-                className="tabular-nums"
                 value={form.price}
                 onChange={e => setForm({ ...form, price: e.target.value })}
               />
@@ -401,7 +409,6 @@ export default function AdminProductsPage() {
                 data-testid="product-form-compare-price"
                 type="number"
                 inputMode="decimal"
-                className="tabular-nums"
                 value={form.compareAtPrice}
                 onChange={e => setForm({ ...form, compareAtPrice: e.target.value })}
               />
@@ -409,7 +416,6 @@ export default function AdminProductsPage() {
             <FieldLabel label="Stock by size" hint="Size and count, separated by commas: S:10, M:15, L:8" className="sm:col-span-2">
               <Input
                 data-testid="product-form-sizes"
-                className="tabular-nums"
                 value={form.sizes}
                 onChange={e => setForm({ ...form, sizes: e.target.value })}
                 placeholder="S:10, M:15, L:8"

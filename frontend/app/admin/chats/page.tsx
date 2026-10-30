@@ -216,7 +216,7 @@ export default function AdminChatsPage() {
                         <span className="mt-0.5 block truncate text-[13px]">
                           {c.preview || <span className="text-muted-foreground">No message from the customer</span>}
                         </span>
-                        <span className="mt-0.5 block text-xs tabular-nums text-muted-foreground">
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
                           {plural(c.messageCount, 'message')}
                           {c.toolCallCount ? ` · ${plural(c.toolCallCount, 'tool call')}` : ''}
                           {cost ? ` · ${usd(cost.costUsd)}` : ''}
@@ -246,7 +246,7 @@ export default function AdminChatsPage() {
                       {active.userEmail && active.userName && <span className="text-muted-foreground"> · {active.userEmail}</span>}
                     </p>
                   </div>
-                  <p className="text-xs tabular-nums text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {plural(active.toolCallCount, 'tool call')}
                     {activeCost && ` · ${compact(activeCost.inputTokens + activeCost.outputTokens)} tokens · ${usd(activeCost.costUsd)}`}
                   </p>
@@ -283,7 +283,7 @@ export default function AdminChatsPage() {
                           </p>
                         )}
                         {m.usage && (
-                          <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                          <p className="mt-1 text-xs text-muted-foreground">
                             {m.usage.model} · {fmtCount(m.usage.inputTokens)} → {fmtCount(m.usage.outputTokens)} tokens ·{' '}
                             {(m.usage.latencyMs / 1000).toFixed(1)} s · {usd(m.usage.costUsd)}
                           </p>

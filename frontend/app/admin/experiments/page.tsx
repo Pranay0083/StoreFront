@@ -78,7 +78,7 @@ function SampleTrack({ results, min }: { results: ExperimentResults; min: number
   const ratio = Math.min(1, smallest / min);
   return (
     <div className="max-w-sm">
-      <div className="flex justify-between text-xs tabular-nums text-muted-foreground">
+      <div className="flex justify-between text-xs text-muted-foreground">
         <span>
           <span className="font-medium text-foreground">{fmtCount(smallest)}</span> visitors in the smallest variant
         </span>
@@ -137,8 +137,8 @@ function ResultsTable({ experiment, results }: { experiment: Experiment; results
         <p key={c.variant} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <span>
             {c.variant} against {c.control}: lift{' '}
-            <span className="font-medium tabular-nums">{c.relativeLift === null ? '—' : signedPct(c.relativeLift)}</span>
-            <span className="text-muted-foreground tabular-nums">
+            <span className="font-medium">{c.relativeLift === null ? '—' : signedPct(c.relativeLift)}</span>
+            <span className="text-muted-foreground">
               {' '}
               · z {c.zScore === null ? '—' : c.zScore.toFixed(2)} · p {c.pValue === null ? '—' : c.pValue.toFixed(4)}
             </span>
@@ -204,7 +204,7 @@ function FlagsSection() {
   return (
     <Panel
       title="Feature flags"
-      meta={flags ? `${fmtCount(on)} of ${plural(flags.length, 'flag')} on` : null}
+      meta={flags ? (flags.length ? `${fmtCount(on)} of ${plural(flags.length, 'flag')} on` : 'No flags') : null}
       data-testid="flags-section"
       bodyClassName="px-0 pb-0"
     >
@@ -234,7 +234,7 @@ function FlagsSection() {
           <TableBody>
             {flags.map(f => (
               <TableRow key={f.key} data-testid={`flag-${f.key}`}>
-                <TableCell className="max-w-0 pl-5 md:max-w-none">
+                <TableCell className="w-full max-w-0 pl-5 md:max-w-none">
                   <p className="truncate font-medium">{f.key}</p>
                   {f.description ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{f.description}</p> : null}
                 </TableCell>
@@ -281,7 +281,7 @@ function FlagsSection() {
             max={100}
             value={draft.rolloutPercent}
             onChange={e => setDraft({ ...draft, rolloutPercent: e.target.value })}
-            className="h-9 tabular-nums"
+            className="h-9"
           />
         </FieldLabel>
         <fieldset className="min-w-0">
@@ -419,7 +419,7 @@ function ExperimentsSection({ onFinding }: { onFinding: (f: string | null) => vo
                       <span className="font-semibold">{e.name}</span>
                       <Pill tone={STATUS_TONE[e.status]}>{STATUS_LABEL[e.status]}</Pill>
                     </p>
-                    <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {e.key} · {e.variants.map(v => `${v.key} ${v.weight}%`).join(' / ')}
                       {e.startedAt && ` · started ${fmtWhen(e.startedAt)}`}
                     </p>
@@ -501,12 +501,7 @@ function ExperimentsSection({ onFinding }: { onFinding: (f: string | null) => vo
           <Input value={draft.variants} onChange={e => setDraft({ ...draft, variants: e.target.value })} className="h-9" />
         </FieldLabel>
         <FieldLabel label="Minimum visitors per variant" hint="Results are not called before this">
-          <Input
-            type="number"
-            value={draft.minSample}
-            onChange={e => setDraft({ ...draft, minSample: e.target.value })}
-            className="h-9 tabular-nums"
-          />
+          <Input type="number" value={draft.minSample} onChange={e => setDraft({ ...draft, minSample: e.target.value })} className="h-9" />
         </FieldLabel>
         <div className="md:col-span-2">
           <Button type="submit" size="sm" variant="outline">

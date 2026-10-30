@@ -178,7 +178,7 @@ export default function AdminOverview() {
               </>
             ) : (
               <>
-                <p className="text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums">{fmtRupees(monthRevenue)}</p>
+                <p className="text-[30px] font-bold leading-none tracking-[-0.02em]">{fmtRupees(monthRevenue)}</p>
                 <p className="mt-1.5 text-[13px] text-muted-foreground">
                   {plural(monthOrders, 'paid order')}
                   {best && best.revenue > 0 && (
@@ -200,7 +200,7 @@ export default function AdminOverview() {
         {canOrders && (
           <Panel
             title="Waiting to be packed"
-            meta={packQuery.data ? <span className="tabular-nums">{fmtCount(toPack)}</span> : null}
+            meta={packQuery.data ? <span>{fmtCount(toPack)}</span> : null}
             className="flex flex-col"
             bodyClassName="flex flex-1 flex-col pt-1"
             data-testid="pack-queue"
@@ -223,14 +223,14 @@ export default function AdminOverview() {
                         ))}
                       </span>
                       <div className="min-w-0 flex-1 leading-tight">
-                        <p className="truncate text-sm font-medium tabular-nums">{o.orderNumber}</p>
+                        <p className="truncate text-sm font-medium">{o.orderNumber}</p>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
                           {o.address?.name ?? 'No name'} · {plural(pieces, 'piece')}
                         </p>
                       </div>
                       <div className="flex-none text-right leading-tight">
                         <p className="text-sm font-semibold tabular-nums">{fmtINR(o.total)}</p>
-                        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{fmtAge(o.paidAt ?? o.createdAt)}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{fmtAge(o.paidAt ?? o.createdAt)}</p>
                       </div>
                     </li>
                   );
@@ -263,7 +263,7 @@ export default function AdminOverview() {
                 const share = p.revenue / Math.max(1, top.data[0].revenue);
                 return (
                   <li key={p._id} className="flex items-center gap-3">
-                    <span className="w-4 flex-none text-right text-xs tabular-nums text-muted-foreground">{i + 1}</span>
+                    <span className="w-4 flex-none text-right text-xs text-muted-foreground">{i + 1}</span>
                     <Thumb src={p.image} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3">

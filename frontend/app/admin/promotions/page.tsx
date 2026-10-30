@@ -143,7 +143,7 @@ function VersionsDialog({ promotion, onClose }: { promotion: Promotion; onClose:
               return (
                 <li key={v.version} className="py-3">
                   <p className="text-sm">
-                    <span className="font-semibold tabular-nums">Version {v.version}</span>{' '}
+                    <span className="font-semibold">Version {v.version}</span>{' '}
                     <span className="text-muted-foreground">
                       · {fmtWhen(v.createdAt)} · {v.changedBy ?? 'system'}
                     </span>
@@ -274,7 +274,7 @@ function PromotionEditor({ initial, onDone }: { initial: Promotion | null; onDon
               min={1}
               value={draft.usageLimit ?? ''}
               onChange={e => set('usageLimit', e.target.value ? Number(e.target.value) : undefined)}
-              className="h-9 tabular-nums"
+              className="h-9"
             />
           </FieldLabel>
         </div>
@@ -305,12 +305,7 @@ function PromotionEditor({ initial, onDone }: { initial: Promotion | null; onDon
               <div className="hidden md:block" />
             )}
             <FieldLabel label="Priority">
-              <Input
-                type="number"
-                value={draft.priority}
-                onChange={e => set('priority', Number(e.target.value))}
-                className="h-9 tabular-nums"
-              />
+              <Input type="number" value={draft.priority} onChange={e => set('priority', Number(e.target.value))} className="h-9" />
             </FieldLabel>
             <FieldLabel label="Stack group" hint="Optional">
               <Input
@@ -541,7 +536,7 @@ export default function AdminPromotionsPage() {
             <TableBody>
               {sorted.map(p => (
                 <TableRow key={p._id} data-testid={`promotion-${p._id}`}>
-                  <TableCell className="max-w-0 pl-4 md:max-w-none">
+                  <TableCell className="w-full max-w-0 pl-4 md:max-w-none">
                     <p className="truncate font-medium">{p.name}</p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       Version {p.version} · priority {p.priority}

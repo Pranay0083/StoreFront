@@ -164,7 +164,7 @@ export default function AdminUsersPage() {
 
       <section className="mt-6 border border-border bg-card">
         <div className="flex min-h-[44px] items-center justify-between px-5 pt-1 text-[13px] text-muted-foreground">
-          <span className="tabular-nums">{data ? plural(data.total, 'account') : 'Loading accounts…'}</span>
+          <span>{data ? plural(data.total, 'account') : 'Loading accounts…'}</span>
           <span className="hidden sm:inline">Role changes apply at once and are written to the audit log.</span>
         </div>
         {failed && !data ? (
@@ -195,7 +195,7 @@ export default function AdminUsersPage() {
                 const self = me && typeof me === 'object' && me.id === u.id;
                 return (
                   <TableRow key={u.id} data-testid={`user-row-${u.email}`}>
-                    <TableCell className="max-w-0 pl-5 sm:max-w-none">
+                    <TableCell className="w-full max-w-0 pl-5 sm:max-w-none">
                       <span className="flex items-center gap-3">
                         <Initial name={u.name || u.email} />
                         <span className="min-w-0 leading-tight">
@@ -237,7 +237,7 @@ export default function AdminUsersPage() {
 
         {data && data.pages > 1 && (
           <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 text-[13px]">
-            <span className="tabular-nums text-muted-foreground">
+            <span className="text-muted-foreground">
               Page {data.page} of {data.pages}
             </span>
             <span className="flex gap-2">

@@ -58,7 +58,7 @@ function DayTooltip({ active, payload }: { active?: boolean; payload?: Array<{ p
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="border border-border bg-card px-2.5 py-1.5 text-xs tabular-nums shadow-sm">
+    <div className="border border-border bg-card px-2.5 py-1.5 text-xs shadow-sm">
       <span className="text-muted-foreground">{dayLabel(d.date)}</span> <span className="font-medium">{fmtRupees(d.revenue)}</span>{' '}
       <span className="text-muted-foreground">· {d.orders === 1 ? '1 order' : `${fmtCount(d.orders)} orders`}</span>
     </div>
