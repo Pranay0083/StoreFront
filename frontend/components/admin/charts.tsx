@@ -25,14 +25,18 @@ export function niceTicks(max: number, count = 4): number[] {
   return out;
 }
 
-/** ₹40k, ₹1.2L: axis money in the store's own grouping, short enough for a tick. */
-const tickMoney = (paise: number) => {
-  const r = paiseToRupees(paise);
-  if (r === 0) return '₹0';
-  if (r >= 100_000) return `₹${+(r / 100_000).toFixed(1)}L`;
-  if (r >= 1000) return `₹${+(r / 1000).toFixed(r % 1000 ? 1 : 0)}k`;
-  return `₹${r}`;
-};
+/**
+ * Axis money in the store's own grouping, in one unit per axis chosen from the top tick:
+ * lakh (₹0, ₹0.5L, ₹1L) once the scale reaches a lakh, thousands (₹0, ₹20k, ₹40k) below that.
+ */
+function tickMoney(topPaise: number) {
+  const top = paiseToRupees(topPaise);
+  const [div, unit] = top >= 100_000 ? [100_000, 'L'] : top >= 1000 ? [1000, 'k'] : [1, ''];
+  return (paise: number) => {
+    const v = paiseToRupees(paise) / div;
+    return v === 0 ? '₹0' : `₹${+v.toFixed(2)}${unit}`;
+  };
+}
 
 const dayLabel = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
@@ -81,7 +85,7 @@ export function RevenueBars({ data, height = 220 }: { data: DayRevenue[]; height
             tickLine={false}
             ticks={ticks}
             domain={[0, ticks[ticks.length - 1]]}
-            tickFormatter={tickMoney}
+            tickFormatter={tickMoney(ticks[ticks.length - 1])}
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
           />
           <XAxis

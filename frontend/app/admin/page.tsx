@@ -72,6 +72,14 @@ interface LowStockRow {
 
 const DAYS = 30;
 
+/** The funnel's stages in words that keep them apart from the KPI strip's figures. */
+const STAGE_LABEL: Record<string, string> = {
+  'Active carts': 'Carts started',
+  'Orders placed': 'Orders placed',
+  'Orders paid': 'Ever paid, incl. later refunds',
+  Delivered: 'Delivered',
+};
+
 /** A dashboard block's rows, with its own loading and error state so one failure never blanks the screen. */
 function useAdminList<T>(path: string, enabled = true) {
   return useQuery({ queryKey: [...queryKeys.adminStats, path], queryFn: () => api<T[]>(path), enabled });
@@ -129,9 +137,11 @@ export default function AdminOverview() {
   })();
 
   const kpis = [
-    { label: 'Revenue, all time', value: stats ? fmtRupees(stats.revenue) : '', testId: 'kpi-revenue' },
+    { label: 'Revenue, all time', value: stats ? fmtRupees(stats.revenue) : '', sub: 'after refunds', testId: 'kpi-revenue' },
     {
-      label: 'Paid orders',
+      // Orders still counted in revenue: refunded and refund-requested orders are excluded, so this is
+      // smaller than the funnel's "ever paid" stage, and each is labelled so they can't read as one fact.
+      label: 'Paid, not refunded',
       value: stats ? fmtCount(stats.paidOrders) : '',
       sub: stats ? `of ${fmtCount(stats.totalOrders)} placed` : '',
       testId: 'kpi-paid-orders',
@@ -180,7 +190,7 @@ export default function AdminOverview() {
               <>
                 <p className="text-[30px] font-bold leading-none tracking-[-0.02em]">{fmtRupees(monthRevenue)}</p>
                 <p className="mt-1.5 text-[13px] text-muted-foreground">
-                  {plural(monthOrders, 'paid order')}
+                  {plural(monthOrders, 'paid order')} in these {DAYS} days
                   {best && best.revenue > 0 && (
                     <>
                       {' '}
@@ -302,7 +312,7 @@ export default function AdminOverview() {
                 return (
                   <li key={f.stage}>
                     <div className="flex items-baseline gap-3 text-sm">
-                      <span className="flex-1">{f.stage}</span>
+                      <span className="flex-1">{STAGE_LABEL[f.stage] ?? f.stage}</span>
                       <span className="font-medium tabular-nums">{fmtCount(f.count)}</span>
                       <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
                         {prev === null ? '' : prev > 0 ? `${Math.round((f.count / prev) * 100)}%` : '—'}
