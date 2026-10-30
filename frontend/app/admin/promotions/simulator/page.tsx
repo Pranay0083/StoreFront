@@ -323,8 +323,8 @@ export default function PromotionSimulatorPage() {
                     <TableRow key={`${l.productId}:${i}`}>
                       <TableCell className="w-full max-w-0 pl-5 sm:max-w-none">
                         <span className="flex items-center gap-3">
-                          <Thumb src={l.image} className="h-8 w-6" />
-                          <span className="truncate">{l.title}</span>
+                          <Thumb src={l.image} className="hidden h-8 w-6 sm:block" />
+                          <span className="line-clamp-2 sm:line-clamp-none sm:truncate">{l.title}</span>
                         </span>
                       </TableCell>
                       <TableCell>
