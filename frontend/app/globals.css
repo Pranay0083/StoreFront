@@ -71,6 +71,12 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
+
+  /* On ink fields the ring turns to paper so focus never disappears. */
+  .bg-primary :focus-visible,
+  .bg-foreground :focus-visible {
+    outline-color: hsl(var(--card));
+  }
 }
 
 @layer utilities {

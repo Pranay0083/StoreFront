@@ -2,15 +2,16 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-const badgeVariants = cva('inline-flex items-center gap-1 border px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em] font-medium', {
+const badgeVariants = cva('inline-flex flex-none items-center gap-1 whitespace-nowrap px-2 py-0.5 text-xs font-medium', {
   variants: {
     variant: {
-      default: 'border-transparent bg-primary text-primary-foreground',
-      secondary: 'border-transparent bg-secondary text-secondary-foreground',
-      outline: 'border-foreground/30 text-foreground',
-      destructive: 'border-transparent bg-destructive text-destructive-foreground',
-      success: 'border-transparent bg-emerald-800 text-white',
-      warning: 'border-transparent bg-amber-700 text-white',
+      default: 'bg-primary text-primary-foreground',
+      secondary: 'bg-secondary text-secondary-foreground',
+      outline: 'bg-card text-foreground',
+      // Status pills: a pale tint with dark text of the same hue.
+      destructive: 'bg-[#ffedea] text-[#831c1e]',
+      success: 'bg-[#dcfae5] text-[#04250e]',
+      warning: 'bg-[#fff4d6] text-[#7a3b06]',
     },
   },
   defaultVariants: { variant: 'default' },
