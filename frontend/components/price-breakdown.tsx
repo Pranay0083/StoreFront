@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 
 /*
  * The receipt: the shop's paper. Every price the optimizer computes is set here as till lines in the
- * one sans face, with tabular figures on a single right edge, the offers it chose grouped and named,
+ * one sans face, in proportional figures on a single right edge, the offers it chose grouped and named,
  * the total as the largest figure, and the money saved struck once with the brass highlighter.
  */
 
@@ -80,7 +80,7 @@ function Row({
     <div className={cn('animate-print', className)} style={printDelay(index)}>
       <div className="flex items-baseline justify-between gap-6">
         <span>{label}</span>
-        <span className="shrink-0 tabular-nums" data-testid={testId}>
+        <span className="shrink-0" data-testid={testId}>
           {value}
         </span>
       </div>
@@ -243,7 +243,7 @@ function OfferLines({ promos, compact }: { promos: AppliedPromotion[]; compact?:
               {a.code && a.code !== a.name && <span className="font-normal text-muted-foreground"> with {a.code}</span>}
               {a.times > 1 && <span className="font-normal text-muted-foreground"> × {a.times}</span>}
             </span>
-            {promos.length > 1 && <span className="shrink-0 tabular-nums text-muted-foreground">−{fmtINR(a.amount)}</span>}
+            {promos.length > 1 && <span className="shrink-0 text-muted-foreground">−{fmtINR(a.amount)}</span>}
           </div>
           {!compact && a.description && <p className="mt-0.5 text-sm text-muted-foreground">{a.description}</p>}
         </li>
@@ -264,7 +264,7 @@ function ItemLines({ lines }: { lines: PricedLine[] }) {
               Size {l.size}, qty {l.qty}
             </span>
           </span>
-          <span className="shrink-0 tabular-nums">{fmtINR(l.unitPrice * l.qty)}</span>
+          <span className="shrink-0">{fmtINR(l.unitPrice * l.qty)}</span>
         </li>
       ))}
     </ul>

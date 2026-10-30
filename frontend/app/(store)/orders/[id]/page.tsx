@@ -276,7 +276,7 @@ function OrderDetailContent() {
             {order.refundedAmount > 0 && (
               <div className="mt-5 flex items-baseline justify-between gap-6 text-[15px]">
                 <span>Refunded</span>
-                <span data-testid="order-detail-refunded" className="font-semibold tabular-nums">
+                <span data-testid="order-detail-refunded" className="font-semibold">
                   −{fmtINR(order.refundedAmount)}
                 </span>
               </div>
