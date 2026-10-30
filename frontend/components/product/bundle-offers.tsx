@@ -64,7 +64,7 @@ function BundleCard({ offer, products }: { offer: BundleOffer; products: Record<
                     <Link href={`/products/${c.slug}`} className="text-base font-semibold underline-offset-4 hover:underline">
                       {c.title}
                     </Link>
-                    <p className="text-base tabular-nums text-muted-foreground">{fmtINR(c.price)}</p>
+                    <p className="text-base text-muted-foreground">{fmtINR(c.price)}</p>
                   </div>
                   {product && product.sizes.length > 1 && (
                     <div>
@@ -94,7 +94,7 @@ function BundleCard({ offer, products }: { offer: BundleOffer; products: Record<
       )}
 
       <div className="mt-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <p className="tabular-nums">
+        <p>
           {offer.listPrice !== undefined && (
             <span className="block text-base text-muted-foreground line-through">
               <span className="sr-only">Usually </span>
@@ -105,7 +105,7 @@ function BundleCard({ offer, products }: { offer: BundleOffer; products: Record<
         </p>
         {offer.savings ? (
           <p data-testid="bundle-savings" className="text-xl font-bold">
-            <span className="highlight px-1 tabular-nums">Save {fmtINR(offer.savings)}</span>
+            <span className="highlight px-1">Save {fmtINR(offer.savings)}</span>
           </p>
         ) : null}
       </div>

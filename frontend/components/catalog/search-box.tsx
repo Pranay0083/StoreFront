@@ -114,7 +114,7 @@ export function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q
               <span>
                 {s.title} <span className="text-sm text-muted-foreground">in {s.category}</span>
               </span>
-              <span className="shrink-0 tabular-nums">{fmtINR(s.price)}</span>
+              <span className="shrink-0">{fmtINR(s.price)}</span>
             </li>
           ))}
         </ul>

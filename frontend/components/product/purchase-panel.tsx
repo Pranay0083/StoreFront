@@ -82,7 +82,7 @@ export function PurchasePanel({ product }: { product: Product }) {
           >
             <Minus className="h-4 w-4" />
           </button>
-          <span data-testid="product-qty" className="w-8 text-center text-base tabular-nums" aria-live="polite">
+          <span data-testid="product-qty" className="w-8 text-center text-base" aria-live="polite">
             {qty}
           </span>
           <button
@@ -102,7 +102,7 @@ export function PurchasePanel({ product }: { product: Product }) {
           onClick={handleAdd}
         >
           <span>Add to bag</span>
-          <span className="hidden tabular-nums min-[440px]:inline">{fmtINR(product.price * qty)}</span>
+          <span className="hidden min-[440px]:inline">{fmtINR(product.price * qty)}</span>
         </Button>
       </div>
     </>

@@ -74,7 +74,7 @@ export function ReviewsSection({
         </h2>
         {numReviews > 0 && rating !== undefined && (
           <div className="mt-6 flex items-center gap-4">
-            <span className="text-display-md font-extrabold tabular-nums">{rating.toFixed(1)}</span>
+            <span className="text-display-md font-extrabold">{rating.toFixed(1)}</span>
             <span>
               <Stars rating={rating} />
               <span className="mt-1 block text-base text-muted-foreground">

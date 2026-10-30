@@ -94,7 +94,7 @@ export function LookBuilder({
                     </span>
                   </span>
                   <span className="mt-2.5 block text-[15px] font-semibold leading-snug">{p.title}</span>
-                  <span className="block text-[15px] tabular-nums text-primary-foreground/75">{fmtINR(p.price)}</span>
+                  <span className="block text-[15px] text-primary-foreground/75">{fmtINR(p.price)}</span>
                 </button>
               </li>
             );
@@ -130,7 +130,7 @@ function Line({ label, note, value, className }: { label: React.ReactNode; note?
         {label}
         {note && <span className="block text-sm text-muted-foreground">{note}</span>}
       </span>
-      <span className="shrink-0 tabular-nums">{value}</span>
+      <span className="shrink-0">{value}</span>
     </div>
   );
 }
@@ -202,13 +202,13 @@ function Receipt({
 
           <div className="mt-6 flex items-end justify-between gap-6">
             <span className="text-lg font-semibold">Total</span>
-            <span data-testid="look-total" className="text-display-md font-extrabold tabular-nums">
+            <span data-testid="look-total" className="text-display-md font-extrabold">
               {fmtINR(breakdown.total)}
             </span>
           </div>
           {breakdown.totalSavings > 0 && (
             <p className="mt-3 text-right text-xl font-bold">
-              You save <span className="highlight px-1 tabular-nums">{fmtINR(breakdown.totalSavings)}</span>
+              You save <span className="highlight px-1">{fmtINR(breakdown.totalSavings)}</span>
             </p>
           )}
         </div>

@@ -108,7 +108,7 @@ async function Results({ f }: { f: Filters }) {
           <ul className="space-y-2 text-base">
             <li>
               <FilterLink href={hrefWith(f, { category: '' })} active={!f.category} testId="filter-category-all">
-                All <span className="tabular-nums">({allCount})</span>
+                All <span>({allCount})</span>
               </FilterLink>
             </li>
             {categoryFacets.map(c => (
@@ -118,7 +118,7 @@ async function Results({ f }: { f: Filters }) {
                   active={f.category === c.value}
                   testId={`filter-category-${c.value.toLowerCase()}`}
                 >
-                  {c.value} <span className="tabular-nums">({c.count})</span>
+                  {c.value} <span>({c.count})</span>
                 </FilterLink>
               </li>
             ))}
@@ -140,7 +140,7 @@ async function Results({ f }: { f: Filters }) {
                 className={cn(chip, f.size === s ? 'bg-primary text-primary-foreground' : 'bg-secondary hover:bg-accent')}
               >
                 {s}
-                {sizeCounts.has(s) && <span className="tabular-nums opacity-70">({sizeCounts.get(s)})</span>}
+                {sizeCounts.has(s) && <span className="opacity-70">({sizeCounts.get(s)})</span>}
               </Link>
             ))}
           </div>

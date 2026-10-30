@@ -156,7 +156,7 @@ export default async function ProductDetailPage({ params }: Props) {
             <h1 data-testid="product-title" className="text-balance text-display-md font-extrabold">
               {product.title}
             </h1>
-            <div className="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2 tabular-nums">
+            <div className="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2">
               <p data-testid="product-price" className="text-3xl font-bold tracking-[-0.02em]">
                 {fmtINR(product.price)}
               </p>
@@ -175,7 +175,7 @@ export default async function ProductDetailPage({ params }: Props) {
             {product.numReviews > 0 && (
               <a href="#reviews" className="mt-3 flex w-fit items-center gap-2 text-base underline-offset-4 hover:underline">
                 <Star className="h-4 w-4 fill-foreground text-foreground" aria-hidden />
-                <span className="tabular-nums">{product.rating.toFixed(1)}</span>
+                <span>{product.rating.toFixed(1)}</span>
                 <span className="sr-only"> out of 5,</span>
                 <span className="text-muted-foreground">
                   from {product.numReviews} review{product.numReviews === 1 ? '' : 's'}
@@ -265,7 +265,7 @@ function Recommendations({ heading, items, wide = false }: { heading: string; it
               </span>
               <span>
                 <span className="block text-base font-semibold underline-offset-4 group-hover:underline">{p.title}</span>
-                <span className="block text-base tabular-nums text-muted-foreground">{fmtINR(p.price)}</span>
+                <span className="block text-base text-muted-foreground">{fmtINR(p.price)}</span>
               </span>
             </Link>
           </li>

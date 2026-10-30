@@ -36,7 +36,7 @@ export function ProductCard({
       </div>
       <div className="edge-notched min-h-[5.75rem] bg-card px-4 pb-3.5 pt-4">
         <h3 className="text-base font-semibold leading-snug">{product.title}</h3>
-        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-base tabular-nums">
+        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-base">
           <span className="font-semibold">
             {product.compareAtPrice ? <span className="sr-only">Now </span> : null}
             {fmtINR(product.price)}

@@ -113,7 +113,7 @@ export function Navbar() {
             {count > 0 && (
               <span
                 data-testid="nav-cart-count"
-                className="flex h-6 min-w-6 items-center justify-center bg-primary px-1.5 text-[13px] font-semibold tabular-nums text-primary-foreground"
+                className="flex h-6 min-w-6 items-center justify-center bg-primary px-1.5 text-[13px] font-semibold text-primary-foreground"
               >
                 {count}
               </span>
