@@ -483,7 +483,7 @@ export function LinePrice({
         <ul className="mt-0.5 text-sm text-muted-foreground">
           {line.discounts.map(d => (
             <li key={d.promotionId}>
-              {names.get(d.promotionId) ?? 'Offer'} <span className="">−{fmtINR(d.amount)}</span>
+              {names.get(d.promotionId) ?? 'Offer'} <span className="whitespace-nowrap">−{fmtINR(d.amount)}</span>
             </li>
           ))}
         </ul>
