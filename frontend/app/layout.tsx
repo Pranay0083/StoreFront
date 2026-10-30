@@ -14,6 +14,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#e8e8e3',
+  // Lets fixed bars pad themselves with env(safe-area-inset-*) on notched phones.
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +25,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>{children}</Providers>
         <Toaster
           position="bottom-right"
+          // On phones, clear the fixed checkout pay bar.
+          mobileOffset={{ bottom: 'calc(88px + env(safe-area-inset-bottom))' }}
           toastOptions={{
             style: {
               borderRadius: 0,

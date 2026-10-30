@@ -91,6 +91,12 @@
       radial-gradient(circle var(--bite) at 50% 100%, #0000 97%, #000) bottom / calc(var(--bite) * 3.2) 51% repeat-x;
   }
 
+  .edge-perforated-t {
+    --bite: 5px;
+    -webkit-mask: radial-gradient(circle var(--bite) at 50% 0, #0000 97%, #000) top / calc(var(--bite) * 3.2) 100% repeat-x;
+    mask: radial-gradient(circle var(--bite) at 50% 0, #0000 97%, #000) top / calc(var(--bite) * 3.2) 100% repeat-x;
+  }
+
   .edge-perforated-b {
     --bite: 5px;
     -webkit-mask: radial-gradient(circle var(--bite) at 50% 100%, #0000 97%, #000) bottom / calc(var(--bite) * 3.2) 100% repeat-x;
