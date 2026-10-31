@@ -7,7 +7,9 @@ import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { fmtINR } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { FREE_SHIPPING_THRESHOLD, MAX_LINE_QTY, type Product } from '@storefront/contracts';
+import { MAX_LINE_QTY, type Product } from '@storefront/contracts';
+
+const press = 'transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97]';
 
 export function PurchasePanel({ product }: { product: Product }) {
   const { addItem } = useCart();
@@ -34,8 +36,8 @@ export function PurchasePanel({ product }: { product: Product }) {
 
   return (
     <>
-      <fieldset className="mt-9">
-        <legend className="label-caps mb-3 text-muted-foreground">Size</legend>
+      <fieldset className="mt-8">
+        <legend className="mb-3 text-base font-semibold">Size</legend>
         <div className="flex flex-wrap gap-2">
           {product.sizes.map(s => (
             <button
@@ -50,34 +52,37 @@ export function PurchasePanel({ product }: { product: Product }) {
                 setQty(q => Math.min(q, Math.max(1, s.stock)));
               }}
               className={cn(
-                'min-w-12 border px-4 py-2.5 text-sm transition-colors',
-                size === s.size ? 'border-black bg-black text-white' : 'border-black/20 hover:border-black',
-                s.stock < 1 && 'cursor-not-allowed opacity-40 line-through',
+                'h-12 min-w-14 px-4 text-base font-medium',
+                press,
+                size === s.size ? 'bg-primary text-primary-foreground' : 'bg-secondary hover:bg-accent',
+                s.stock < 1 && 'cursor-not-allowed line-through opacity-40',
               )}
             >
               {s.size}
             </button>
           ))}
         </div>
-        {selected && selected.stock <= 5 && (
-          <p data-testid="product-low-stock-note" className="mt-2 text-xs text-destructive" role="status">
-            Only {selected.stock} left in {selected.size}
-          </p>
-        )}
+        <p
+          data-testid={selected && selected.stock <= 5 ? 'product-low-stock-note' : undefined}
+          className="mt-3 min-h-6 text-base"
+          role="status"
+        >
+          {selected && selected.stock <= 5 ? `Only ${selected.stock} left in ${selected.size}` : ''}
+        </p>
       </fieldset>
 
-      <div className="mt-8 flex items-center gap-4">
-        <div className="flex items-center border border-black/20" role="group" aria-label="Quantity">
+      <div className="mt-4 flex items-stretch gap-3">
+        <div className="flex items-center bg-secondary" role="group" aria-label="Quantity">
           <button
             type="button"
             data-testid="product-qty-decrease"
             aria-label="Decrease quantity"
             onClick={() => setQty(Math.max(1, qty - 1))}
-            className="flex h-11 w-11 items-center justify-center hover:bg-black/5"
+            className={cn('flex h-14 w-12 items-center justify-center hover:bg-accent', press)}
           >
             <Minus className="h-4 w-4" />
           </button>
-          <span data-testid="product-qty" className="w-10 text-center" aria-live="polite">
+          <span data-testid="product-qty" className="w-8 text-center text-base" aria-live="polite">
             {qty}
           </span>
           <button
@@ -85,19 +90,21 @@ export function PurchasePanel({ product }: { product: Product }) {
             data-testid="product-qty-increase"
             aria-label="Increase quantity"
             onClick={() => setQty(Math.min(maxQty, qty + 1))}
-            className="flex h-11 w-11 items-center justify-center hover:bg-black/5"
+            className={cn('flex h-14 w-12 items-center justify-center hover:bg-accent', press)}
           >
             <Plus className="h-4 w-4" />
           </button>
         </div>
-        <Button data-testid="product-add-to-cart" size="lg" className="flex-1" onClick={handleAdd}>
-          Add to bag — {fmtINR(product.price * qty)}
+        <Button
+          data-testid="product-add-to-cart"
+          size="lg"
+          className="min-w-0 flex-1 justify-center gap-4 px-5 min-[440px]:justify-between sm:px-8"
+          onClick={handleAdd}
+        >
+          <span>Add to bag</span>
+          <span className="hidden min-[440px]:inline">{fmtINR(product.price * qty)}</span>
         </Button>
       </div>
-
-      <p className="mt-6 text-xs text-muted-foreground">
-        Free shipping over {fmtINR(FREE_SHIPPING_THRESHOLD)} · Cancel any time before shipping · Audited order tracking
-      </p>
     </>
   );
 }

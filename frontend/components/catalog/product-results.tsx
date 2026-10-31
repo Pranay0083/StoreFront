@@ -47,21 +47,21 @@ export function ProductResults({ query, initial }: { query: string; initial: Pro
 
   if (!items.length) {
     return (
-      <div data-testid="products-empty" className="py-24 text-center">
-        <p className="font-serif text-3xl">Nothing matches.</p>
-        <p className="mt-2 text-sm text-muted-foreground">Try loosening a filter or two.</p>
+      <div data-testid="products-empty" className="bg-card px-6 py-16 sm:px-10">
+        <p className="text-display-md font-extrabold">Nothing matches</p>
+        <p className="mt-4 max-w-[44ch] text-lg">Loosen a filter or two, or clear them all to see every piece.</p>
       </div>
     );
   }
 
   return (
     <>
-      <p data-testid="products-count" className="mb-6 text-xs text-muted-foreground" aria-live="polite">
+      <p data-testid="products-count" className="mb-6 text-base text-muted-foreground" aria-live="polite">
         {total} piece{total === 1 ? '' : 's'}
       </p>
-      <div data-testid="products-grid" className="grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-3">
-        {items.map((p, i) => (
-          <ProductCard key={p._id} product={p} index={i % 24} />
+      <div data-testid="products-grid" className="grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-3">
+        {items.map(p => (
+          <ProductCard key={p._id} product={p} sizes="(max-width: 1024px) 50vw, 28vw" />
         ))}
       </div>
       <div ref={sentinel} aria-hidden className="h-px" />
@@ -71,8 +71,8 @@ export function ProductResults({ query, initial }: { query: string; initial: Pro
         </div>
       )}
       {hasNextPage && !isFetchingNextPage && (
-        <div className="mt-12 text-center">
-          <Button variant="outline" data-testid="products-load-more" onClick={() => fetchNextPage()}>
+        <div className="mt-14 flex justify-center">
+          <Button variant="outline" size="lg" data-testid="products-load-more" onClick={() => fetchNextPage()}>
             {isError ? 'Retry loading more' : 'Load more'}
           </Button>
         </div>

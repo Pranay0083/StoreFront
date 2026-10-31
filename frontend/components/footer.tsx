@@ -1,90 +1,80 @@
 import Link from 'next/link';
 
+const COLUMNS = [
+  {
+    title: 'Shop',
+    links: [
+      { label: 'Men', href: '/products?category=Men' },
+      { label: 'Women', href: '/products?category=Women' },
+      { label: 'Footwear', href: '/products?category=Footwear' },
+      { label: 'Accessories', href: '/products?category=Accessories' },
+    ],
+  },
+  {
+    title: 'Account',
+    links: [
+      { label: 'Order tracking', href: '/orders' },
+      { label: 'Sign in', href: '/login' },
+      { label: 'Create account', href: '/register' },
+    ],
+  },
+  {
+    title: 'Platform',
+    links: [
+      { label: 'Documentation', href: '/docs', testId: 'footer-docs-link' },
+      { label: 'REST API', href: '/docs#api' },
+      { label: 'MCP server', href: '/docs#mcp' },
+      { label: 'AI agent', href: '/docs#agent' },
+    ],
+  },
+];
+
+/** The close: the promise in one sentence, the links, and the name across the full width. */
 export function Footer() {
   return (
-    <footer className="mt-24 border-t border-black/10 bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
-        <div className="grid gap-12 md:grid-cols-12">
-          <div className="md:col-span-5">
-            <p className="font-serif text-4xl font-semibold tracking-tight">STOREFRONT.</p>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Considered clothing, shipped with an explicit order state machine.
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <p className="label-caps mb-5 text-muted-foreground">Shop</p>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link href="/products?category=Men" className="hover:underline">
-                  Men
-                </Link>
-              </li>
-              <li>
-                <Link href="/products?category=Women" className="hover:underline">
-                  Women
-                </Link>
-              </li>
-              <li>
-                <Link href="/products?category=Footwear" className="hover:underline">
-                  Footwear
-                </Link>
-              </li>
-              <li>
-                <Link href="/products?category=Accessories" className="hover:underline">
-                  Accessories
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div className="md:col-span-2">
-            <p className="label-caps mb-5 text-muted-foreground">Account</p>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link href="/orders" className="hover:underline">
-                  Order tracking
-                </Link>
-              </li>
-              <li>
-                <Link href="/login" className="hover:underline">
-                  Sign in
-                </Link>
-              </li>
-              <li>
-                <Link href="/register" className="hover:underline">
-                  Create account
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div className="md:col-span-3">
-            <p className="label-caps mb-5 text-muted-foreground">Platform</p>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link href="/docs" data-testid="footer-docs-link" className="hover:underline">
-                  Documentation
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs#api" className="hover:underline">
-                  REST API
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs#mcp" className="hover:underline">
-                  MCP server
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs#agent" className="hover:underline">
-                  AI agent
-                </Link>
-              </li>
-            </ul>
-          </div>
+    <footer className="mt-32 bg-primary text-primary-foreground sm:mt-40 [&_:focus-visible]:outline-card">
+      <div className="mx-auto max-w-[1760px] px-4 pt-16 sm:px-8 sm:pt-24">
+        <div className="grid gap-12 md:grid-cols-12 md:gap-8">
+          <p className="max-w-[34ch] text-xl leading-snug md:col-span-5">
+            Every order is tracked from the moment it is placed to the day it arrives, and you can cancel any time before it ships.
+          </p>
+          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 md:col-span-7">
+            {COLUMNS.map(col => (
+              <div key={col.title}>
+                <h2 className="text-base font-semibold">{col.title}</h2>
+                <ul className="mt-4 space-y-2.5 text-base text-primary-foreground/75">
+                  {col.links.map(l => (
+                    <li key={l.href}>
+                      <Link
+                        href={l.href}
+                        data-testid={'testId' in l ? l.testId : undefined}
+                        className="transition-colors duration-150 hover:text-primary-foreground hover:underline hover:underline-offset-4"
+                      >
+                        {l.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
         </div>
-        <p className="mt-16 border-t border-black/5 pt-6 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Storefront — created → paid → packed → shipped → delivered.
-        </p>
+
+        <svg viewBox="0 0 1000 124" className="mt-20 block w-full fill-current sm:mt-28" role="img" aria-label="STOREFRONT">
+          <text
+            x="0"
+            y="120"
+            textLength="1000"
+            lengthAdjust="spacingAndGlyphs"
+            fontSize="166"
+            fontWeight="800"
+            letterSpacing="-6"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            STOREFRONT
+          </text>
+        </svg>
+        <p className="py-6 text-sm text-primary-foreground/70">© {new Date().getFullYear()} Storefront</p>
       </div>
     </footer>
   );
