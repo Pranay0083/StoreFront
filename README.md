@@ -87,7 +87,7 @@ docker compose up --build       # web :3000 · api :4001 · worker · mongo (rep
 docker compose --profile observability up --build   # adds Jaeger :16686, Prometheus :9090, Grafana :3001
 ```
 
-Open http://localhost:3000. The API applies migrations and seeds the demo catalog (24 products, about
+Open http://localhost:3000. The API applies migrations and seeds the demo catalog (60 products, about
 110 historical orders and 9 overlapping promotions) on first start.
 
 ### Local development without Redis

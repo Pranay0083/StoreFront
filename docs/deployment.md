@@ -6,7 +6,7 @@
   and `STOREFRONT_REVALIDATE_SECRET` (the same value as on the API, which also needs `STOREFRONT_REVALIDATE_URL`
   or a `FRONTEND_URL` it can reach).
 - **API → Render/Railway**: `render.yaml` included — `npm start -w backend` applies pending
-  migrations, seeds demo data when the catalog is empty (`SEED_DEMO_DATA=false` to skip), then serves.
+  migrations, seeds demo data (on an empty catalog the full demo store; on an existing one only the demo products it is missing; `SEED_DEMO_DATA=false` to skip), then serves.
   Set Mongo, `JWT_ACCESS_SECRET` + `JWT_REFRESH_SECRET` (a legacy `JWT_SECRET` still works and is
   HKDF-split), Razorpay env vars, `TRUST_PROXY=1` behind a proxy, and `ADMIN_PASSWORD` to provision the admin account.
 - **Worker + Redis on Render**: `render.yaml` adds a Key Value instance (`noeviction`) and a
