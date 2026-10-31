@@ -5,6 +5,7 @@ import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { FeaturedRail } from '@/components/home/featured-rail';
 import { LookSection, LookSkeleton } from '@/components/home/look-section';
+import { OffersSection } from '@/components/home/offers-section';
 import { JsonLd } from '@/components/json-ld';
 import { Reveal } from '@/components/reveal';
 import { ProductRowSkeleton } from '@/components/skeletons';
@@ -12,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { fmtINR } from '@/lib/api';
 import { serverApi } from '@/lib/server-api';
 import { SITE_NAME, SITE_URL, absoluteUrl } from '@/lib/site';
-import { FREE_SHIPPING_THRESHOLD } from '@storefront/contracts';
+import { capitalise, inWords } from '@/lib/words';
+import { FREE_SHIPPING_THRESHOLD, offerBadges, type Category } from '@storefront/contracts';
 
 /** Editorial photographs (Unsplash), never a product's own photograph, so no picture stands for two things. */
 const HERO = 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=1600&q=80&auto=format&fit=crop';
@@ -28,18 +30,29 @@ const DEPARTMENTS = [
 /** Hooks kept from the earlier home page, now on the department rows that do the same job. */
 const ROW_TEST_IDS: Record<string, string> = { Women: 'editorial-shop-women', Accessories: 'hero-accessories-button' };
 
-export const metadata: Metadata = {
-  title: 'STOREFRONT — Clothes at the lowest total',
-  description:
-    'Twenty-four pieces of menswear, womenswear, footwear and accessories. Whatever you put in your bag, a pricing optimizer finds the cheapest mix of offers.',
-  alternates: { canonical: absoluteUrl('/') },
-  openGraph: {
-    type: 'website',
-    url: absoluteUrl('/'),
-    siteName: SITE_NAME,
-    images: [{ url: HERO, width: 1600, alt: 'A summer outfit laid out flat: a white shirt, rolled jeans, a striped top and red sandals' }],
-  },
-};
+/** "Sixty pieces across four departments", from the live catalogue; the catalogue keeps growing. */
+function catalogueLine(categories: Category[]): string | null {
+  const pieces = categories.reduce((s, c) => s + c.count, 0);
+  if (!pieces) return null;
+  return `${capitalise(inWords(pieces))} piece${pieces === 1 ? '' : 's'} across ${inWords(categories.length)} department${categories.length === 1 ? '' : 's'}`;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const line = catalogueLine(await serverApi.categories().catch(() => []));
+  return {
+    title: 'STOREFRONT — Clothes at the lowest total',
+    description: `${line ? `${line} of` : 'Pieces of'} menswear, womenswear, footwear and accessories. Whatever you put in your bag, a pricing optimizer finds the cheapest mix of offers.`,
+    alternates: { canonical: absoluteUrl('/') },
+    openGraph: {
+      type: 'website',
+      url: absoluteUrl('/'),
+      siteName: SITE_NAME,
+      images: [
+        { url: HERO, width: 1600, alt: 'A summer outfit laid out flat: a white shirt, rolled jeans, a striped top and red sandals' },
+      ],
+    },
+  };
+}
 
 function FeaturedHeading() {
   return (
@@ -59,10 +72,13 @@ function FeaturedHeading() {
 
 async function Featured() {
   await connection();
-  const featured = await serverApi
-    .featured()
-    .then(d => d.items)
-    .catch(() => []);
+  const [featured, { offers }] = await Promise.all([
+    serverApi
+      .featured()
+      .then(d => d.items)
+      .catch(() => []),
+    serverApi.offersOrNone(),
+  ]);
   if (!featured.length) {
     return (
       <div className="mx-auto max-w-[1760px] px-4 sm:px-8">
@@ -71,7 +87,7 @@ async function Featured() {
       </div>
     );
   }
-  return <FeaturedRail products={featured} heading={<FeaturedHeading />} />;
+  return <FeaturedRail products={featured} heading={<FeaturedHeading />} badges={offerBadges(offers)} />;
 }
 
 function DepartmentRows({ counts }: { counts?: Map<string, number> }) {
@@ -105,7 +121,13 @@ async function Departments() {
   return <DepartmentRows counts={new Map(categories.map(c => [c.name, c.count]))} />;
 }
 
-export default function HomePage() {
+async function Offers() {
+  const { offers } = await serverApi.offersOrNone();
+  return <OffersSection offers={offers} />;
+}
+
+export default async function HomePage() {
+  const line = catalogueLine(await serverApi.categories().catch(() => []));
   return (
     <div data-testid="home-page">
       <JsonLd
@@ -133,7 +155,8 @@ export default function HomePage() {
                 Clothes at the lowest total
               </h1>
               <p className="mt-8 max-w-[42ch] animate-rise text-lg [animation-delay:80ms] sm:mt-10 sm:text-xl">
-                Twenty-four pieces across four departments. Whatever you put in your bag, our optimizer finds the cheapest mix of offers.
+                {line ? `${line}.` : 'Menswear, womenswear, footwear and accessories.'} Whatever you put in your bag, our optimizer finds
+                the cheapest mix of offers.
               </p>
               <div className="mt-8 flex animate-rise flex-wrap items-center gap-x-8 gap-y-4 [animation-delay:160ms]">
                 <Button asChild size="lg" data-testid="hero-shop-button">
@@ -157,6 +180,10 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <Suspense>
+        <Offers />
+      </Suspense>
 
       <section
         id="build-a-look"
