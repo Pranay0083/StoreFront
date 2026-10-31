@@ -9,6 +9,8 @@ const SMALL_ACCESSORIES = [
   'hand-rolled-silk-scarf',
   'aviator-sunglasses',
 ];
+const KNITS = ['merino-crewneck-sweater', 'brushed-mohair-sweater', 'fair-isle-yoke-cardigan'];
+const TEES = ['heavyweight-cotton-tee', 'garment-dyed-cotton-tee', 'breton-stripe-tee'];
 
 /** Demo promotions that overlap on purpose, so the optimizer and stack-group rules have real choices to make. */
 export const DEMO_PROMOTIONS: Array<Partial<PromotionInput> & Pick<PromotionInput, 'name' | 'action'>> = [
@@ -83,6 +85,74 @@ export const DEMO_PROMOTIONS: Array<Partial<PromotionInput> & Pick<PromotionInpu
     name: 'Clearance',
     description: '20% off sizes we have had in deep stock for over 60 days.',
     action: { type: 'clearance', percentOff: 20, minStock: 15, minAgeDays: 60 },
+  },
+
+  // Combos to advertise. Ranked below the launch offers above, and none of them touches the Oxford shirt, the
+  // selvedge jeans or the shirts-and-tops set, so those offers keep winning exactly as before.
+  {
+    name: 'Desk to dinner',
+    description: 'The unstructured linen blazer with tapered wool trousers for ₹10,999 — save ₹1,999.',
+    priority: 120,
+    action: {
+      type: 'fixedBundle',
+      components: [
+        { selector: { slugs: ['unstructured-linen-blazer'] }, qty: 1 },
+        { selector: { slugs: ['tapered-wool-trousers'] }, qty: 1 },
+      ],
+      price: inr(10_999),
+    },
+  },
+  {
+    name: 'The suiting set',
+    description: 'Our oversized wool blazer with the wide-leg trousers for ₹10,499 — save ₹1,899.',
+    priority: 120,
+    action: {
+      type: 'fixedBundle',
+      components: [
+        { selector: { slugs: ['oversized-wool-blazer'] }, qty: 1 },
+        { selector: { slugs: ['wide-leg-trousers'] }, qty: 1 },
+      ],
+      price: inr(10_499),
+    },
+  },
+  {
+    name: 'Weekend away',
+    description: 'Waxed canvas backpack, canvas low-tops and a washed cotton cap for ₹7,999 — save ₹1,698.',
+    priority: 120,
+    action: {
+      type: 'fixedBundle',
+      components: [
+        { selector: { slugs: ['waxed-canvas-backpack'] }, qty: 1 },
+        { selector: { slugs: ['canvas-low-top-sneakers'] }, qty: 1 },
+        { selector: { slugs: ['washed-cotton-cap'] }, qty: 1 },
+      ],
+      price: inr(7999),
+    },
+  },
+  {
+    name: 'Derby & belt',
+    description: 'Leather derby shoes with the full-grain leather belt for ₹7,499 — save ₹1,299.',
+    priority: 120,
+    action: {
+      type: 'fixedBundle',
+      components: [
+        { selector: { slugs: ['leather-derby-shoes'] }, qty: 1 },
+        { selector: { slugs: ['full-grain-leather-belt'] }, qty: 1 },
+      ],
+      price: inr(7499),
+    },
+  },
+  {
+    name: 'Any 2 knits',
+    description: 'Any two of the merino crewneck, mohair sweater and Fair Isle cardigan for ₹6,999 — save up to ₹2,499.',
+    priority: 120,
+    action: { type: 'mixAndMatch', selector: { slugs: KNITS }, quantity: 2, price: inr(6999) },
+  },
+  {
+    name: 'Buy 2 tees, get 1 free',
+    description: 'Mix any three of our tees and the cheapest one is free — save up to ₹1,799.',
+    priority: 120,
+    action: { type: 'buyXGetY', selector: { slugs: TEES }, buyQty: 2, getQty: 1, percentOff: 100 },
   },
 ];
 

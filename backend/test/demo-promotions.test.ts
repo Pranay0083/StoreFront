@@ -1,6 +1,6 @@
 import type { PriceBreakdown } from '@storefront/contracts';
 import mongoose from 'mongoose';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pricingIndexes } from '../src/db/migrations/020-pricing-indexes';
 import { DEMO_PROMOTIONS, seedDemoPromotions } from '../src/db/seed/demo-promotions';
 import { seedDemoData } from '../src/db/seed/demo-seeder';
@@ -15,6 +15,10 @@ beforeEach(async () => {
   await pricingIndexes.up(db);
   await seedDemoData({ ADMIN_EMAIL: 'admin@test.dev', ADMIN_PASSWORD: undefined });
   t.container.services.promotionCache.invalidate();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 async function quote(slugs: string[], codes: string[] = []): Promise<PriceBreakdown> {
@@ -56,6 +60,24 @@ describe('demo promotions seed', () => {
     expect(b.explanations).toContain(
       'Applied "Spend more, save more" instead of "WELCOME10": only one order-discount offer can be used per order, and this one saves ₹29.90 more.',
     );
+  });
+
+  it.each([
+    ['Desk to dinner', ['unstructured-linen-blazer', 'tapered-wool-trousers'], 199_900],
+    ['The suiting set', ['oversized-wool-blazer', 'wide-leg-trousers'], 189_900],
+    ['Weekend away', ['waxed-canvas-backpack', 'canvas-low-top-sneakers', 'washed-cotton-cap'], 169_800],
+    ['Derby & belt', ['leather-derby-shoes', 'full-grain-leather-belt'], 129_900],
+    ['Any 2 knits', ['brushed-mohair-sweater', 'fair-isle-yoke-cardigan'], 249_900],
+    // The cheapest tee is free; the description advertises the best case (three Breton tees, ₹1,799).
+    ['Buy 2 tees, get 1 free', ['heavyweight-cotton-tee', 'garment-dyed-cotton-tee', 'breton-stripe-tee'], 129_900, 179_900],
+  ])('applies the "%s" combo for the saving its description advertises', async (name, slugs, saving, advertisedSaving = saving) => {
+    // A Saturday, so "Footwear Friday" markdowns cannot change the bundle saving on the footwear combos.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-31T06:30:00Z') });
+    const b = await quote(slugs);
+    expect(b.applied.filter(a => a.stage === 'bundle').map(a => a.name)).toEqual([name]);
+    expect(b.bundleDiscount).toBe(saving);
+    const advertised = DEMO_PROMOTIONS.find(p => p.name === name)!.description!;
+    expect(advertised).toContain(`₹${(advertisedSaving / 100).toLocaleString('en-IN')}`);
   });
 
   it('nudges toward a free accessory', async () => {
