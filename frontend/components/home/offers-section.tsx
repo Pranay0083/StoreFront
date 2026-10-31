@@ -6,7 +6,7 @@ import type { Offer } from '@storefront/contracts';
 
 /** The offer worth leading with: the set that saves the most, else any offer with a priced example. */
 export function leadOffer(offers: readonly Offer[]): Offer | undefined {
-  const bySaving = (a: Offer, b: Offer) => (b.example?.saving ?? 0) - (a.example?.saving ?? 0);
+  const bySaving = (a: Offer, b: Offer) => (b.example?.offerSaving ?? 0) - (a.example?.offerSaving ?? 0);
   const priced = offers.filter(o => o.example).sort(bySaving);
   return priced.find(o => o.kind === 'set') ?? priced[0];
 }
@@ -30,7 +30,7 @@ function OfferLines({ offers, title }: { offers: Offer[]; title: string }) {
               </span>
               {o.example ? (
                 <span className="shrink-0">
-                  save <span className="highlight px-1">{fmtINR(o.example.saving)}</span>
+                  save <span className="highlight px-1">{fmtINR(o.example.offerSaving)}</span>
                 </span>
               ) : null}
             </Link>

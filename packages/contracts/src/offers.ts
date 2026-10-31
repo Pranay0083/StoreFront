@@ -140,7 +140,8 @@ export function offerBadges(offers: readonly Offer[]): Record<string, OfferBadge
         name: offer.name,
         kind: offer.kind,
         headline: offer.headline,
-        ...(offer.kind === 'set' && offer.example && { saving: offer.example.saving }),
+        // The set's own saving: the example bag may also reach a spend tier, which is not this offer's doing.
+        ...(offer.kind === 'set' && offer.example && { saving: offer.example.offerSaving }),
       };
       const current = out[productId];
       if (!current || rank(badge) > rank(current)) out[productId] = badge;

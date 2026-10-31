@@ -83,4 +83,24 @@ describe('offer contracts', () => {
     expect(badges.tee).toMatchObject({ offerId: 'multi', kind: 'multiBuy' });
     expect(badges.tee.saving).toBeUndefined();
   });
+
+  it('badges a set with its own saving, not a spend tier its example bag also reached', () => {
+    const set = offer({
+      id: 'desk',
+      name: 'Desk to dinner',
+      example: {
+        lines: [
+          { ...piece('blazer'), qty: 1 },
+          { ...piece('trousers'), qty: 1 },
+        ],
+        listTotal: 1_299_800,
+        total: 1_044_905,
+        saving: 254_895,
+        offerSaving: 199_900,
+        shipping: 0,
+        alsoApplied: ['Spend more, save more'],
+      },
+    });
+    expect(offerBadges([set]).blazer).toMatchObject({ offerId: 'desk', saving: 199_900 });
+  });
 });
