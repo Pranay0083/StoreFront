@@ -10,6 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const pages: MetadataRoute.Sitemap = [
     { url: absoluteUrl('/'), changeFrequency: 'daily', priority: 1 },
     { url: absoluteUrl('/products'), changeFrequency: 'daily', priority: 0.9 },
+    { url: absoluteUrl('/offers'), changeFrequency: 'daily', priority: 0.8 },
     { url: absoluteUrl('/policies'), changeFrequency: 'monthly', priority: 0.4 },
     ...POLICIES.map(doc => ({
       url: absoluteUrl(policyPath(doc.slug)),

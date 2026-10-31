@@ -9,7 +9,7 @@ const sans = Schibsted_Grotesk({ subsets: ['latin'], weight: 'variable', variabl
 
 export const metadata: Metadata = {
   title: 'STOREFRONT — Considered Clothing',
-  description: 'Twenty-four pieces, priced by an optimizer that always finds you the lowest total.',
+  description: 'Considered clothing, priced by an optimizer that always finds you the lowest total.',
 };
 
 export const viewport: Viewport = {
