@@ -12,7 +12,8 @@ import { Reveal } from '@/components/reveal';
 import { fmtINR } from '@/lib/api';
 import { serverApi, type Recommendation } from '@/lib/server-api';
 import { SITE_NAME, absoluteUrl } from '@/lib/site';
-import { FREE_SHIPPING_THRESHOLD, type BundleOffer, type Product, type Review } from '@storefront/contracts';
+import type { BundleOffer, Product, Review } from '@storefront/contracts';
+import { PolicyHighlights } from '../../policies/_components/policy-highlights';
 
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -187,18 +188,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
             <PurchasePanel product={product} />
 
-            <dl className="mt-9 space-y-3 text-base">
-              {[
-                ['Delivery', `Free over ${fmtINR(FREE_SHIPPING_THRESHOLD)}, tracked from packing to your door`],
-                ['Cancelling', 'Any time before the order ships'],
-                ['Returns', 'Within 7 days of delivery, refunded at the price you paid'],
-              ].map(([term, detail]) => (
-                <div key={term} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
-                  <dt className="font-semibold">{term}</dt>
-                  <dd>{detail}</dd>
-                </div>
-              ))}
-            </dl>
+            <PolicyHighlights keys={['delivery', 'cancelling', 'returns']} className="mt-9" />
           </div>
         </div>
       </div>
