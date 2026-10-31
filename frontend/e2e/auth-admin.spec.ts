@@ -19,6 +19,8 @@ test('login and logout, with cookie-authenticated writes requiring the CSRF toke
   expect(withoutToken.body.code).toBe('CSRF_INVALID');
 
   await page.getByTestId('nav-logout-button').click();
+  // The menu animates out and Radix blocks pointer events until it has gone; a person would wait too.
+  await expect(page.getByRole('menu')).toBeHidden();
   await page.getByTestId('nav-account-button').click();
   await expect(page.getByTestId('nav-login-link')).toBeVisible();
   const me = await page.evaluate(async api => (await fetch(`${api}/api/v1/auth/me`, { credentials: 'include' })).status, API);
