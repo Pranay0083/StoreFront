@@ -147,7 +147,7 @@ export const POLICY_HIGHLIGHTS = {
     section: 'demo-mode',
   },
   hold: {
-    label: 'Your pieces are held',
+    label: 'Checkout',
     text: `When you press Pay, your pieces are held for ${hold} while you pay.`,
     slug: 'payments',
     section: 'stock-hold',
