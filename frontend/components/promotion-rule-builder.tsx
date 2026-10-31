@@ -12,6 +12,7 @@ import {
   type CustomerSegment,
   type PaymentMethod,
   type ProductSelector,
+  type PromotionActivation,
 } from '@storefront/contracts';
 
 const list = (v: string) =>
@@ -19,6 +20,40 @@ const list = (v: string) =>
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
+
+/**
+ * Whether the storefront advertises the offer while it is live (home page, /offers, product cards).
+ * Automatic offers default to shown; a code defaults to private, so it is only published on purpose.
+ */
+export function StorefrontToggle({
+  checked,
+  activation,
+  onChange,
+}: {
+  checked: boolean;
+  activation: PromotionActivation;
+  onChange: (show: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2.5 text-sm">
+      <input
+        type="checkbox"
+        data-testid="promotion-show-on-storefront"
+        className="mt-0.5 h-4 w-4 accent-foreground"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+      />
+      <span>
+        Show on the storefront
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          {activation === 'code'
+            ? 'Off by default for codes. When on, the code itself is printed on the home page and /offers while the offer is live.'
+            : 'Advertised on the home page, /offers and the cards of its pieces while it is live.'}
+        </span>
+      </span>
+    </label>
+  );
+}
 
 export function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (
