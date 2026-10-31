@@ -1,12 +1,19 @@
-import type { BundleOffer, Category, Product, ProductListResponse, Review } from '@storefront/contracts';
+import type { BundleOffer, Category, OffersResponse, Product, ProductListResponse, Review } from '@storefront/contracts';
 
 const BASE = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || '';
 
 /** Cached for this long unless the API revalidates the tag sooner (see app/api/revalidate). */
 export const CATALOG_REVALIDATE_SECONDS = 300;
 
+/**
+ * Offers start and stop on a schedule; the API revalidates the tag at each start and end, and this
+ * shorter backstop bounds a missed call.
+ */
+export const OFFERS_REVALIDATE_SECONDS = 120;
+
 export const tags = {
   products: 'products',
+  offers: 'offers',
   product: (slug: string) => `product:${slug}`,
   productId: (id: string) => `product-id:${id}`,
 };
@@ -49,7 +56,15 @@ export const serverApi = {
   product: (slug: string) => orNull(get<Product>(`/products/${encodeURIComponent(slug)}`, [tags.product(slug)])),
   reviews: (productId: string) => get<Review[]>(`/reviews/product/${productId}`, [tags.productId(productId)]),
   bundles: (productId: string) =>
-    get<{ productId: string; offers: BundleOffer[] }>(`/pricing/products/${productId}/bundles`, [tags.productId(productId), tags.products]),
+    get<{ productId: string; offers: BundleOffer[] }>(`/pricing/products/${productId}/bundles`, [
+      tags.productId(productId),
+      tags.products,
+      tags.offers,
+    ]),
+  /** Live, advertised offers with their pieces and worked examples (the offers read model). */
+  offers: () => get<OffersResponse>('/offers', [tags.offers], OFFERS_REVALIDATE_SECONDS),
+  /** Never throws: a page renders without offers when the API cannot be reached. */
+  offersOrNone: (): Promise<Pick<OffersResponse, 'offers'>> => serverApi.offers().catch(() => ({ offers: [] })),
   recommendations: (productId: string) =>
     get<{ productId: string; source: string; items: Recommendation[] }>(`/products/${productId}/recommendations?limit=4`, [
       tags.productId(productId),

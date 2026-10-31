@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { JsonLd } from '@/components/json-ld';
 import { BundleOffers } from '@/components/product/bundle-offers';
+import { OfferLine } from '@/components/product-card';
 import { ProductGallery } from '@/components/product/product-gallery';
 import { PurchasePanel } from '@/components/product/purchase-panel';
 import { ReviewsSection } from '@/components/product/reviews-section';
@@ -12,7 +13,7 @@ import { Reveal } from '@/components/reveal';
 import { fmtINR } from '@/lib/api';
 import { serverApi, type Recommendation } from '@/lib/server-api';
 import { SITE_NAME, absoluteUrl } from '@/lib/site';
-import { FREE_SHIPPING_THRESHOLD, type BundleOffer, type Product, type Review } from '@storefront/contracts';
+import { FREE_SHIPPING_THRESHOLD, offerBadges, type BundleOffer, type Product, type Review } from '@storefront/contracts';
 
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -108,11 +109,13 @@ export default async function ProductDetailPage({ params }: Props) {
   const product = await serverApi.product(slug);
   if (!product) notFound();
 
-  const [reviews, bundles, recommendations] = await Promise.all([
+  const [reviews, bundles, recommendations, { offers }] = await Promise.all([
     serverApi.reviews(product._id).catch(() => []),
     serverApi.bundles(product._id).catch(() => ({ offers: [] })),
     serverApi.recommendations(product._id).catch(() => ({ items: [], source: 'none' })),
+    serverApi.offersOrNone(),
   ]);
+  const offerBadge = offerBadges(offers)[product._id];
   const componentProducts = await bundleProducts(bundles.offers, product);
   const related = recommendations.items.filter(p => p.slug !== product.slug);
 
@@ -172,6 +175,14 @@ export default async function ProductDetailPage({ params }: Props) {
                 </>
               )}
             </div>
+            {offerBadge && (
+              <div data-testid="product-offer-line" className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <OfferLine badge={offerBadge} className="text-base" />
+                <Link href={`/offers#offer-${offerBadge.offerId}`} className="text-base font-semibold underline underline-offset-4">
+                  {offerBadge.kind === 'set' ? 'See the set' : 'See the offer'}
+                </Link>
+              </div>
+            )}
             {product.numReviews > 0 && (
               <a href="#reviews" className="mt-3 flex w-fit items-center gap-2 text-base underline-offset-4 hover:underline">
                 <Star className="h-4 w-4 fill-foreground text-foreground" aria-hidden />

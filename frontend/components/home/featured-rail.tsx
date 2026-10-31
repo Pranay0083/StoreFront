@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ProductCard, type CardProduct } from '@/components/product-card';
+import type { OfferBadge } from '@storefront/contracts';
 
 const arrow =
   'flex h-11 w-11 items-center justify-center bg-secondary transition-[background-color,transform,opacity] duration-150 ease-out hover:bg-accent active:scale-[0.97] disabled:opacity-40';
@@ -11,7 +12,16 @@ const arrow =
  * A row of large photographs that runs off the right edge: dragged or swiped on touch,
  * stepped with the two buttons on a desktop, and every card is a link the keyboard reaches.
  */
-export function FeaturedRail({ products, heading }: { products: CardProduct[]; heading: React.ReactNode }) {
+export function FeaturedRail({
+  products,
+  heading,
+  badges = {},
+}: {
+  products: CardProduct[];
+  heading: React.ReactNode;
+  /** Offer lines by product id, built once from the offers read model. */
+  badges?: Record<string, OfferBadge>;
+}) {
   const track = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: true, end: false });
 
@@ -57,6 +67,7 @@ export function FeaturedRail({ products, heading }: { products: CardProduct[]; h
           <ProductCard
             key={p._id}
             product={p}
+            badge={badges[p._id]}
             sizes="(max-width: 640px) 72vw, (max-width: 1024px) 40vw, 26vw"
             className="w-[72vw] shrink-0 snap-start sm:w-[40vw] lg:w-[26vw] 2xl:w-[22vw]"
           />

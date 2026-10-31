@@ -7,12 +7,21 @@ import { ProductGridSkeleton } from '@/components/skeletons';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query';
-import type { ProductListResponse } from '@storefront/contracts';
+import type { OfferBadge, ProductListResponse } from '@storefront/contracts';
 
 type PageParam = { cursor?: string; page?: number } | null;
 
 /** Infinite list seeded with the server-rendered first page; keyset cursors when the API offers them, pages for text search. */
-export function ProductResults({ query, initial }: { query: string; initial: ProductListResponse }) {
+export function ProductResults({
+  query,
+  initial,
+  badges = {},
+}: {
+  query: string;
+  initial: ProductListResponse;
+  /** Offer lines by product id, from the offers read model (one fetch per page, never per card). */
+  badges?: Record<string, OfferBadge>;
+}) {
   const sentinel = useRef<HTMLDivElement>(null);
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isError } = useInfiniteQuery({
     queryKey: queryKeys.products(query),
@@ -61,7 +70,7 @@ export function ProductResults({ query, initial }: { query: string; initial: Pro
       </p>
       <div data-testid="products-grid" className="grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-3">
         {items.map(p => (
-          <ProductCard key={p._id} product={p} sizes="(max-width: 1024px) 50vw, 28vw" />
+          <ProductCard key={p._id} product={p} badge={badges[p._id]} sizes="(max-width: 1024px) 50vw, 28vw" />
         ))}
       </div>
       <div ref={sentinel} aria-hidden className="h-px" />

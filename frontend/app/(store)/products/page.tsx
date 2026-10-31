@@ -10,7 +10,7 @@ import { ProductGridSkeleton } from '@/components/skeletons';
 import { serverApi } from '@/lib/server-api';
 import { absoluteUrl } from '@/lib/site';
 import { cn } from '@/lib/utils';
-import type { FacetCount } from '@storefront/contracts';
+import { offerBadges, type FacetCount } from '@storefront/contracts';
 
 const SIZES = ['S', 'M', 'L', 'XL', 'UK 8', 'UK 9', 'One Size'];
 const PRICE_RANGES = [
@@ -85,7 +85,11 @@ const chip =
 
 async function Results({ f }: { f: Filters }) {
   const qs = apiQuery(f);
-  const [first, categories] = await Promise.all([serverApi.products(qs), serverApi.categories().catch(() => [])]);
+  const [first, categories, { offers }] = await Promise.all([
+    serverApi.products(qs),
+    serverApi.categories().catch(() => []),
+    serverApi.offersOrNone(),
+  ]);
   const categoryFacets: FacetCount[] = first.facets?.categories ?? categories.map(c => ({ value: c.name, count: c.count }));
   const sizeCounts = new Map((first.facets?.sizes ?? []).map(s => [s.value, s.count]));
   const allCount = categoryFacets.reduce((s, c) => s + c.count, 0);
@@ -180,7 +184,7 @@ async function Results({ f }: { f: Filters }) {
       </FilterPanel>
 
       <div className="min-w-0">
-        <ProductResults key={qs.toString()} query={qs.toString()} initial={first} />
+        <ProductResults key={qs.toString()} query={qs.toString()} initial={first} badges={offerBadges(offers)} />
       </div>
     </div>
   );
