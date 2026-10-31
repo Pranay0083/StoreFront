@@ -1,5 +1,25 @@
-import { expect, test, type Page } from '@playwright/test';
-import { ADMIN, signIn } from './helpers';
+import { expect, request, test, type Page } from '@playwright/test';
+import { ADMIN, API, signIn } from './helpers';
+
+const PREFIX = 'Knit and canvas';
+
+/**
+ * Archives the sets earlier runs created. Two identical sets compete for the same pieces and the
+ * optimizer applies only one, so a leftover would keep this run's set from ever being advertised.
+ */
+async function archiveEarlierSets() {
+  const ctx = await request.newContext({ baseURL: `${API}/api/v1/` });
+  try {
+    const login = await ctx.post('auth/login', { data: ADMIN });
+    const { csrfToken } = (await login.json()) as { csrfToken: string };
+    const promotions = (await (await ctx.get('admin/promotions?status=active')).json()) as Array<{ _id: string; name: string }>;
+    for (const p of promotions.filter(p => p.name.startsWith(PREFIX))) {
+      expect((await ctx.delete(`admin/promotions/${p._id}`, { headers: { 'X-CSRF-Token': csrfToken } })).ok()).toBeTruthy();
+    }
+  } finally {
+    await ctx.dispose();
+  }
+}
 
 /** Reloads until the page shows the offer: the API revalidates the `offers` tag a few seconds after the change. */
 async function reloadUntilVisible(page: Page, path: string, locate: (page: Page) => ReturnType<Page['locator']>) {
@@ -14,7 +34,8 @@ test('a set created in the back office is advertised on /offers and the home pag
   page,
   browser,
 }) => {
-  const name = `Knit and canvas ${Date.now().toString(36)}`;
+  await archiveEarlierSets();
+  const name = `${PREFIX} ${Date.now().toString(36)}`;
 
   await signIn(page, ADMIN);
   await page.goto('/admin/promotions');
