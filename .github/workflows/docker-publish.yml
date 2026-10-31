@@ -44,12 +44,14 @@ jobs:
           RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
           RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          FRONTEND_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL || vars.NEXT_PUBLIC_SITE_URL }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL }}
         run: |
           out="$RUNNER_TEMP/backend.env"
           : > "$out"
           printf "%s='%s'\n" NODE_ENV production HOST 0.0.0.0 TRUST_PROXY 1 >> "$out"
-          for key in MONGO_URL JWT_SECRET ADMIN_PASSWORD RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET GROQ_API_KEY FRONTEND_URL; do
+          for key in MONGO_URL JWT_SECRET ADMIN_PASSWORD RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET GROQ_API_KEY FRONTEND_URL DB_NAME ADMIN_EMAIL; do
             [ -n "${!key}" ] && printf "%s='%s'\n" "$key" "${!key}" >> "$out"
           done
           grep -q '^MONGO_URL=' "$out" || { echo "::error::MONGO_URL secret is empty"; exit 1; }
@@ -99,4 +101,4 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:4001' }}
             INTERNAL_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://api:4001' }}
-            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || vars.FRONTEND_URL || 'http://localhost:3000' }}
