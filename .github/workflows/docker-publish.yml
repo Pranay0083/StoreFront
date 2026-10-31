@@ -35,6 +35,25 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # The deploy platform cannot inject env vars, so runtime config ships inside the (private) image.
+      - name: Write runtime env file
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          FRONTEND_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          out="$RUNNER_TEMP/backend.env"
+          : > "$out"
+          printf "%s='%s'\n" NODE_ENV production HOST 0.0.0.0 TRUST_PROXY 1 >> "$out"
+          for key in MONGO_URL JWT_SECRET ADMIN_PASSWORD RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET GROQ_API_KEY FRONTEND_URL; do
+            [ -n "${!key}" ] && printf "%s='%s'\n" "$key" "${!key}" >> "$out"
+          done
+          grep -q '^MONGO_URL=' "$out" || { echo "::error::MONGO_URL secret is empty"; exit 1; }
+
       - name: Build & push backend
         uses: docker/build-push-action@v6
         with:
@@ -44,6 +63,8 @@ jobs:
           no-cache: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          secret-files: |
+            backend_env=${{ runner.temp }}/backend.env
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -77,3 +98,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:4001' }}
+            INTERNAL_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://api:4001' }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
