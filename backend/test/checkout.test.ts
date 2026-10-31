@@ -63,7 +63,8 @@ describe('checkout reservations', () => {
     expect(await stockOf(p._id, 'M')).toBe(10);
     expect(await Order.countDocuments()).toBe(0);
     expect(await Reservation.countDocuments()).toBe(0);
-    expect(await OutboxModel.countDocuments()).toBe(0);
+    // Only the promotion's own PromotionChanged (written when it was created) may be in the outbox.
+    expect(await OutboxModel.countDocuments({ name: { $ne: 'PromotionChanged' } })).toBe(0);
     expect(await Redemption.countDocuments()).toBe(0);
   });
 

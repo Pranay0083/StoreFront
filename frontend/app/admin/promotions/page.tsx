@@ -31,7 +31,14 @@ import {
   Tabs,
   type PillTone,
 } from '@/components/admin/ledger';
-import { ActionEditor, ACTION_LABELS, ConditionEditor, defaultAction, defaultCondition } from '@/components/promotion-rule-builder';
+import {
+  ActionEditor,
+  ACTION_LABELS,
+  ConditionEditor,
+  defaultAction,
+  defaultCondition,
+  StorefrontToggle,
+} from '@/components/promotion-rule-builder';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -39,6 +46,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import {
+  defaultShowOnStorefront,
   PROMOTION_STATUSES,
   PromotionInputSchema,
   type ConditionSpec,
@@ -63,6 +71,7 @@ const EMPTY: Draft = {
   activation: 'auto',
   priority: 100,
   exclusive: false,
+  showOnStorefront: defaultShowOnStorefront('auto'),
   action: defaultAction('mixAndMatch'),
 };
 
@@ -88,6 +97,7 @@ function toDraft(p: Promotion): Draft {
     startsAt: p.startsAt,
     endsAt: p.endsAt,
     usageLimit: p.usageLimit,
+    showOnStorefront: p.showOnStorefront,
   };
 }
 
@@ -290,7 +300,11 @@ function PromotionEditor({ initial, onDone }: { initial: Promotion | null; onDon
             <FieldLabel label="Applies">
               <select
                 value={draft.activation}
-                onChange={e => set('activation', e.target.value as Draft['activation'])}
+                onChange={e => {
+                  // A new activation brings its own visibility default; the admin can still change it below.
+                  const activation = e.target.value as Draft['activation'];
+                  setDraft(d => ({ ...d, activation, showOnStorefront: defaultShowOnStorefront(activation) }));
+                }}
                 className={selectClass}
               >
                 <option value="auto">Automatically</option>
@@ -324,6 +338,13 @@ function PromotionEditor({ initial, onDone }: { initial: Promotion | null; onDon
               />
               Exclusive: never combines with other promotions
             </label>
+            <div className="md:col-span-3">
+              <StorefrontToggle
+                checked={draft.showOnStorefront ?? defaultShowOnStorefront(draft.activation)}
+                activation={draft.activation}
+                onChange={show => set('showOnStorefront', show)}
+              />
+            </div>
           </div>
         </div>
 
@@ -542,6 +563,7 @@ export default function AdminPromotionsPage() {
                       Version {p.version} · priority {p.priority}
                       {p.stackGroup && ` · group ${p.stackGroup}`}
                       {p.exclusive && ' · exclusive'}
+                      {p.showOnStorefront && ' · on the storefront'}
                     </p>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{ACTION_LABELS[p.action.type]}</TableCell>

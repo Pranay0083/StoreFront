@@ -96,6 +96,7 @@ describe('compiled promotions', () => {
     exclusive: false,
     action: { type: 'percentOff', percent: 10 },
     usedCount: 0,
+    showOnStorefront: false,
   };
 
   it('derives its pricing stage from the action and activation', () => {

@@ -42,6 +42,7 @@ export function promo(overrides: Partial<PromotionDefinition> & Pick<PromotionDe
     priority: 100,
     exclusive: false,
     usedCount: 0,
+    showOnStorefront: !overrides.code,
     ...overrides,
   });
 }

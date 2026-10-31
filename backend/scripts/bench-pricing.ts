@@ -91,6 +91,7 @@ const PROMOTIONS = Array.from({ length: 30 }, (_, i) => {
     conditions,
     action: randomAction(i),
     usedCount: 0,
+    showOnStorefront: true,
   });
 });
 

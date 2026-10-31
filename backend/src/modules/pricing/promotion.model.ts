@@ -16,6 +16,8 @@ const promotionSchema = new Schema(
     startsAt: { type: Date },
     endsAt: { type: Date },
     usageLimit: { type: Number },
+    /** Advertised on the storefront; set on create from the activation's default, backfilled by migration 090. */
+    showOnStorefront: { type: Boolean },
     usedCount: { type: Number, default: 0, required: true },
     version: { type: Number, default: 1, required: true },
     createdBy: { type: String },

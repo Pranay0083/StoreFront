@@ -54,6 +54,9 @@ import { RealtimeController, realtimeRoutes, registerRealtimeHandlers } from '..
 import { ImportsController, importsRoutes } from '../modules/imports/imports.routes';
 import { ImportsService } from '../modules/imports/imports.service';
 import { StorefrontRevalidator } from '../modules/storefront/storefront-revalidator';
+import { MongoOfferCatalog } from '../modules/offers/offer-catalog';
+import { OffersController, offersRoutes } from '../modules/offers/offers.routes';
+import { OffersService } from '../modules/offers/offers.service';
 import { ApiDocs, docsUiRoutes, OPENAPI_OVERRIDES, openApiRoutes } from '../modules/docs/docs.routes';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
@@ -168,6 +171,16 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     repositories.quotes,
     repositories.promotionRedemptions,
   ).withMetrics(metrics);
+  const offers = new OffersService(
+    repositories.promotions,
+    new MongoOfferCatalog(),
+    pricing,
+    infra.cache,
+    logger,
+    env.CATALOG_CACHE_TTL_SECONDS,
+    metrics.cacheObserver(),
+  );
+  offers.registerInvalidation(eventBus);
   const orders = new OrdersService(repositories.orders, pricing, cart, inventory, outbox, relay, tx, {
     reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
     refundWindowDays: REFUND_WINDOW_DAYS,
@@ -208,13 +221,14 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   registerRealtimeHandlers(eventBus, realtime);
   const imports = new ImportsService(catalog, jobs, logger, { maxBytes: env.IMPORT_MAX_BYTES, maxRows: env.IMPORT_MAX_ROWS });
   imports.register();
-  if (env.STOREFRONT_REVALIDATE_SECRET) {
-    new StorefrontRevalidator(
-      { url: env.STOREFRONT_REVALIDATE_URL ?? `${env.FRONTEND_URL}/api/revalidate`, secret: env.STOREFRONT_REVALIDATE_SECRET },
-      repositories.products,
-      logger,
-    ).register(eventBus, jobs, repositories.orders);
-  }
+  const storefront = env.STOREFRONT_REVALIDATE_SECRET
+    ? new StorefrontRevalidator(
+        { url: env.STOREFRONT_REVALIDATE_URL ?? `${env.FRONTEND_URL}/api/revalidate`, secret: env.STOREFRONT_REVALIDATE_SECRET },
+        repositories.products,
+        logger,
+      )
+    : undefined;
+  storefront?.register(eventBus, jobs, repositories.orders, repositories.promotions);
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -254,6 +268,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
       reservationSweeper.start();
       abandonedCarts.start(jobs);
       recommendations.start(jobs);
+      await storefront?.start().catch(err => logger.warn({ err }, 'Could not schedule offer boundaries'));
       await jobs.start();
     },
     async stop() {
@@ -307,7 +322,9 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ),
     promotionCache,
     pricing,
-    promotions: new PromotionsService(repositories.promotions, promotionCache, pricing),
+    promotions: new PromotionsService(repositories.promotions, promotionCache, pricing, tx, outbox),
+    offers,
+    storefront,
     jobsAdmin: new JobsAdminService(jobs, infra.deadLetters, outbox, relay),
     emailProvider,
     messagingProviders,
@@ -337,6 +354,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     staff: new StaffController(services.audit, services.adminUsers),
     pricing: new PricingController(services.pricing),
     promotions: new PromotionsController(services.promotions),
+    offers: new OffersController(services.offers),
     jobs: new JobsController(services.jobsAdmin),
     experiments: new ExperimentsController(services.experiments),
     recommendations: new RecommendationsController(services.recommendations, jobs),
@@ -355,6 +373,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/pricing', pricingRoutes(controllers.pricing, guards)],
+    ['/offers', offersRoutes(controllers.offers)],
     ['/experiments', experimentsRoutes(controllers.experiments, guards)],
     ['/realtime', realtimeRoutes(controllers.realtime, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],

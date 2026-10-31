@@ -4456,6 +4456,76 @@
         }
       }
     },
+    "/offers": {
+      "get": {
+        "operationId": "getOffers",
+        "tags": [
+          "offers"
+        ],
+        "summary": "Offers live now, with their in-stock pieces and a worked example priced by the pricing engine",
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Validation failed or the request is malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but not allowed (permission or CSRF)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/experiments/evaluate": {
       "get": {
         "operationId": "getExperimentsEvaluate",
@@ -5639,6 +5709,9 @@
                   "usageLimit": {
                     "type": "integer",
                     "exclusiveMinimum": 0
+                  },
+                  "showOnStorefront": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -6571,6 +6644,9 @@
                   "usageLimit": {
                     "type": "integer",
                     "exclusiveMinimum": 0
+                  },
+                  "showOnStorefront": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false

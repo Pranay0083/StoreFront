@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { OrderRefundLine, OrderStatus, Paise, RefundKind } from '@storefront/contracts';
+import type { OrderRefundLine, OrderStatus, Paise, PromotionStatus, RefundKind } from '@storefront/contracts';
 
 export interface StockLine {
   productId: string;
@@ -54,6 +54,8 @@ export interface DomainEventMap {
     restoredStatus: OrderStatus;
   };
   ProductChanged: { productId: string; change: 'created' | 'updated' | 'deleted' };
+  /** Any saved version of a promotion: new, edited, or moved between draft, active, paused and archived. */
+  PromotionChanged: { promotionId: string; version: number; change: 'created' | 'updated' | 'status'; status: PromotionStatus };
   StockLow: { productId: string; size: string; stock: number; threshold: number };
 }
 

@@ -13,6 +13,7 @@ export const OPENAPI_OVERRIDES: Record<string, OperationOverride> = {
   'GET /realtime/stream': { summary: 'Server-Sent Events stream of order and stock updates', responseContentType: 'text/event-stream' },
   'POST /payments/webhook': { summary: 'Razorpay webhook (HMAC-SHA256 signed raw body)' },
   'POST /mcp': { summary: 'Model Context Protocol endpoint (JSON-RPC over streamable HTTP)' },
+  'GET /offers': { summary: 'Offers live now, with their in-stock pieces and a worked example priced by the pricing engine' },
 };
 
 export class ApiDocs {

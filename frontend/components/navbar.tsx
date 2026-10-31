@@ -16,13 +16,16 @@ import {
 import { cn } from '@/lib/utils';
 import { isStaff } from '@storefront/contracts';
 
+/** The bar keeps to five links: the four departments (which together are the whole catalogue) and the offers. */
 const NAV = [
-  { label: 'Shop all', href: '/products', testId: 'nav-link-shop-all' },
   { label: 'Men', href: '/products?category=Men', testId: 'nav-link-men' },
   { label: 'Women', href: '/products?category=Women', testId: 'nav-link-women' },
   { label: 'Footwear', href: '/products?category=Footwear', testId: 'nav-link-footwear' },
   { label: 'Accessories', href: '/products?category=Accessories', testId: 'nav-link-accessories' },
+  { label: 'Offers', href: '/offers', testId: 'nav-link-offers' },
 ];
+/** The phone menu has room for the whole catalogue as its first line. */
+const PHONE_NAV = [{ label: 'Shop all', href: '/products', testId: 'nav-link-shop-all' }, ...NAV.map(n => ({ ...n, testId: undefined }))];
 
 const barButton =
   'flex h-10 items-center gap-2 px-2 text-[15px] font-medium transition-[background-color,transform] duration-150 ease-out hover:bg-foreground/[0.06] active:scale-[0.97]';
@@ -132,32 +135,33 @@ export function Navbar() {
         </div>
       </div>
 
-      {menuOpen && (
-        <nav
-          id="phone-menu"
-          aria-label="Main"
-          className="absolute inset-x-0 top-16 h-[calc(100svh-4rem)] overflow-y-auto bg-background px-4 pb-10 pt-4 ease-out animate-in fade-in-0 slide-in-from-top-2 duration-200 lg:hidden"
-        >
-          <ul className="space-y-1">
-            {NAV.map(n => (
-              <li key={n.href}>
-                <Link
-                  href={n.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-2 text-display-md font-extrabold transition-transform duration-150 ease-out active:scale-[0.98]"
-                >
-                  {n.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-10 text-base">
-            <Link href="/orders" onClick={() => setMenuOpen(false)} className="underline underline-offset-4">
-              Track an order
-            </Link>
-          </p>
-        </nav>
-      )}
+      {/* Always mounted (hidden while closed) so every link and test hook exists; showing it replays the entrance. */}
+      <nav
+        id="phone-menu"
+        aria-label="Main"
+        hidden={!menuOpen}
+        className="absolute inset-x-0 top-16 h-[calc(100svh-4rem)] overflow-y-auto bg-background px-4 pb-10 pt-4 ease-out animate-in fade-in-0 slide-in-from-top-2 duration-200 lg:hidden"
+      >
+        <ul className="space-y-1">
+          {PHONE_NAV.map(n => (
+            <li key={n.href}>
+              <Link
+                href={n.href}
+                data-testid={n.testId}
+                onClick={() => setMenuOpen(false)}
+                className="block py-2 text-display-md font-extrabold transition-transform duration-150 ease-out active:scale-[0.98]"
+              >
+                {n.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-10 text-base">
+          <Link href="/orders" onClick={() => setMenuOpen(false)} className="underline underline-offset-4">
+            Track an order
+          </Link>
+        </p>
+      </nav>
     </header>
   );
 }

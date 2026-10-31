@@ -61,7 +61,7 @@ export const RATE_LIMIT_POLICIES = {
   catalogRead: {
     windowMs: MINUTE,
     limit: 120,
-    matches: route('GET', /^\/products(\/|$)/, /^\/reviews\/product\//),
+    matches: route('GET', /^\/products(\/|$)/, /^\/reviews\/product\//, /^\/offers\/?$/),
     message: 'Too many catalog requests, please slow down',
   },
   mcp: {

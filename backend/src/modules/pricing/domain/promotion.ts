@@ -22,6 +22,8 @@ export interface PromotionDefinition {
   endsAt?: Date;
   usageLimit?: number;
   usedCount: number;
+  /** Advertised on the storefront (home, /offers, product cards). */
+  showOnStorefront: boolean;
 }
 
 /** A promotion whose JSON rules have been interpreted into condition and action objects. */
