@@ -71,3 +71,4 @@ dump.rdb
 test-results/
 playwright-report/
 .lighthouseci/
+.taste-skill/

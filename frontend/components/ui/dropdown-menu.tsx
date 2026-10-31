@@ -16,7 +16,7 @@ export const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 min-w-[10rem] overflow-hidden border border-black/10 bg-white p-1 text-foreground shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+        'z-50 min-w-[11rem] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-hidden bg-card p-1 text-foreground shadow-xl ease-out data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:duration-100',
         className,
       )}
       {...props}
@@ -32,7 +32,7 @@ export const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-sm outline-none transition-colors focus:bg-black focus:text-white data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex h-10 cursor-pointer select-none items-center gap-2.5 px-3 text-sm outline-none focus:bg-secondary data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className,
     )}
     {...props}
@@ -41,9 +41,9 @@ export const DropdownMenuItem = React.forwardRef<
 DropdownMenuItem.displayName = 'DropdownMenuItem';
 
 export const DropdownMenuSeparator = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('-mx-1 my-1 h-px bg-black/10', className)} {...props} />
+  <div className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />
 );
 
 export const DropdownMenuLabel = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('px-3 py-2 label-caps text-muted-foreground', className)} {...props} />
+  <div className={cn('px-3 pb-1 pt-2 text-xs text-muted-foreground', className)} {...props} />
 );

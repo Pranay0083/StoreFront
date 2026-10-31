@@ -14,11 +14,11 @@ export const SheetContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <SheetPrimitive.Portal>
-    <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+    <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-300 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-200" />
     <SheetPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col border-l border-black/10 bg-white shadow-2xl transition data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right duration-300',
+        'fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col bg-card shadow-2xl ease-drawer data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=open]:duration-300 data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=closed]:duration-200',
         className,
       )}
       {...props}
@@ -26,7 +26,7 @@ export const SheetContent = React.forwardRef<
       {children}
       <SheetPrimitive.Close
         data-testid="cart-sheet-close"
-        className="absolute right-5 top-5 opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
+        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center opacity-70 transition-opacity duration-150 hover:opacity-100"
       >
         <X className="h-5 w-5" />
         <span className="sr-only">Close</span>
