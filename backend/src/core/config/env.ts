@@ -1,4 +1,5 @@
 import { hkdfSync } from 'node:crypto';
+import { CHECKOUT_HOLD_MINUTES } from '@storefront/contracts';
 import { z } from 'zod';
 
 const bool = z.enum(['true', 'false']).transform(v => v === 'true');
@@ -58,7 +59,7 @@ const EnvSchema = z
           return false;
         }
       }, 'AGENT_MODEL_PRICING must be a JSON object of {model: {input, output}} USD per million tokens'),
-    RESERVATION_TTL_MINUTES: z.coerce.number().positive().default(15),
+    RESERVATION_TTL_MINUTES: z.coerce.number().positive().default(CHECKOUT_HOLD_MINUTES),
     RESERVATION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_000),
     RECOMMENDATIONS_REBUILD_INTERVAL_MS: z.coerce
