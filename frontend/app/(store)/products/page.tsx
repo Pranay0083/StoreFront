@@ -12,7 +12,15 @@ import { absoluteUrl } from '@/lib/site';
 import { cn } from '@/lib/utils';
 import { offerBadges, type FacetCount } from '@storefront/contracts';
 
-const SIZES = ['S', 'M', 'L', 'XL', 'UK 8', 'UK 9', 'One Size'];
+const APPAREL_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+
+/** Apparel smallest to largest, then shoe sizes by number, then anything else (One Size) last. */
+function sizeRank(size: string): number {
+  const apparel = APPAREL_ORDER.indexOf(size);
+  if (apparel >= 0) return apparel;
+  const shoe = /^UK (\d+(?:\.5)?)$/.exec(size);
+  return shoe ? 100 + Number(shoe[1]) : 1000;
+}
 const PRICE_RANGES = [
   { label: 'Under ₹2,000', min: '', max: '200000' },
   { label: '₹2,000 – ₹5,000', min: '200000', max: '500000' },
@@ -92,6 +100,7 @@ async function Results({ f }: { f: Filters }) {
   ]);
   const categoryFacets: FacetCount[] = first.facets?.categories ?? categories.map(c => ({ value: c.name, count: c.count }));
   const sizeCounts = new Map((first.facets?.sizes ?? []).map(s => [s.value, s.count]));
+  const sizes = [...sizeCounts.keys()].sort((a, b) => sizeRank(a) - sizeRank(b) || a.localeCompare(b));
   const allCount = categoryFacets.reduce((s, c) => s + c.count, 0);
   const activeFilters = [f.category, f.size, f.minPrice || f.maxPrice, f.q].filter(Boolean).length;
 
@@ -134,7 +143,7 @@ async function Results({ f }: { f: Filters }) {
             Size
           </h2>
           <div className="flex flex-wrap gap-2">
-            {SIZES.map(s => (
+            {sizes.map(s => (
               <Link
                 key={s}
                 scroll={false}
