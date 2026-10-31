@@ -25,7 +25,7 @@ STOREFRONT's printed artefact is the **receipt** (and its cousin, the swing tag)
 | Field (inverted)    | ink ground, paper text                    | `bg-primary text-primary-foreground`            |
 | Back office surface | `[data-surface='ledger']` scope           | white cards, near-white ground, `text-chart`    |
 
-**Type:** Schibsted Grotesk only (variable, via `next/font`). Display: weight 800, tracking -0.05em, leading ≤ 0.9 (`text-display-xl`, `text-display-lg`, `text-display-md`). Text: 16-18px at weight 400, leading 1.5. Money: `tabular-nums`. No monospace outside real code blocks, even on receipts.
+**Type:** Schibsted Grotesk only (variable, via `next/font`). Display: weight 800, tracking -0.05em, leading ≤ 0.9 (`text-display-xl`, `text-display-lg`, `text-display-md`). Text: 16-18px at weight 400, leading 1.5. Money uses the face's proportional figures: its tabular figures give commas and decimal points a digit's width, so prices read as monospace. `tabular-nums` belongs only in data-table columns that must align digit for digit (the back office). No monospace outside real code blocks, even on receipts.
 
 **Shape:** square corners. **Shadows:** only on things that float (menus, dialogs, the cart drawer, toasts).
 
