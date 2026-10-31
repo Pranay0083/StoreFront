@@ -54,6 +54,9 @@ import { RealtimeController, realtimeRoutes, registerRealtimeHandlers } from '..
 import { ImportsController, importsRoutes } from '../modules/imports/imports.routes';
 import { ImportsService } from '../modules/imports/imports.service';
 import { StorefrontRevalidator } from '../modules/storefront/storefront-revalidator';
+import { MongoOfferCatalog } from '../modules/offers/offer-catalog';
+import { OffersController, offersRoutes } from '../modules/offers/offers.routes';
+import { OffersService } from '../modules/offers/offers.service';
 import { ApiDocs, docsUiRoutes, OPENAPI_OVERRIDES, openApiRoutes } from '../modules/docs/docs.routes';
 import { createSearchProvider } from '../modules/search/search.factory';
 import { SearchService } from '../modules/search/search.service';
@@ -168,6 +171,16 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     repositories.quotes,
     repositories.promotionRedemptions,
   ).withMetrics(metrics);
+  const offers = new OffersService(
+    repositories.promotions,
+    new MongoOfferCatalog(),
+    pricing,
+    infra.cache,
+    logger,
+    env.CATALOG_CACHE_TTL_SECONDS,
+    metrics.cacheObserver(),
+  );
+  offers.registerInvalidation(eventBus);
   const orders = new OrdersService(repositories.orders, pricing, cart, inventory, outbox, relay, tx, {
     reservationTtlMs: env.RESERVATION_TTL_MINUTES * 60_000,
     refundWindowDays: REFUND_WINDOW_DAYS,
@@ -308,6 +321,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     promotionCache,
     pricing,
     promotions: new PromotionsService(repositories.promotions, promotionCache, pricing, tx, outbox),
+    offers,
     jobsAdmin: new JobsAdminService(jobs, infra.deadLetters, outbox, relay),
     emailProvider,
     messagingProviders,
@@ -337,6 +351,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     staff: new StaffController(services.audit, services.adminUsers),
     pricing: new PricingController(services.pricing),
     promotions: new PromotionsController(services.promotions),
+    offers: new OffersController(services.offers),
     jobs: new JobsController(services.jobsAdmin),
     experiments: new ExperimentsController(services.experiments),
     recommendations: new RecommendationsController(services.recommendations, jobs),
@@ -355,6 +370,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ['/agent', agentRoutes(controllers.agent, guards)],
     ['/mcp', mcpRoutes(controllers.mcp)],
     ['/pricing', pricingRoutes(controllers.pricing, guards)],
+    ['/offers', offersRoutes(controllers.offers)],
     ['/experiments', experimentsRoutes(controllers.experiments, guards)],
     ['/realtime', realtimeRoutes(controllers.realtime, guards)],
     ['/admin/inventory', inventoryRoutes(controllers.inventory, guards)],
