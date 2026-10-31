@@ -5,6 +5,7 @@ import { UserModel } from '../../modules/auth/user.model';
 import { ProductModel } from '../../modules/catalog/product.model';
 import { OrderModel } from '../../modules/orders/order.model';
 import { PromotionModel } from '../../modules/pricing/promotion.model';
+import { DEMO_PRODUCTS } from './demo-products';
 import { seedDemoData } from './demo-seeder';
 
 describe('seedDemoData', () => {
@@ -16,7 +17,7 @@ describe('seedDemoData', () => {
 
   it('populates an empty database once and is idempotent afterwards', async () => {
     const env = { ADMIN_EMAIL: 'admin@test.dev', ADMIN_PASSWORD: 'Admin@12345' };
-    expect(await seedDemoData(env)).toEqual({ catalogSeeded: true });
+    expect(await seedDemoData(env)).toEqual({ catalogSeeded: true, productsAdded: DEMO_PRODUCTS.length });
     const counts = async () => ({
       products: await ProductModel.countDocuments(),
       orders: await OrderModel.countDocuments(),
@@ -24,12 +25,12 @@ describe('seedDemoData', () => {
       users: await UserModel.countDocuments(),
     });
     const first = await counts();
-    expect(first.products).toBeGreaterThan(20);
+    expect(first.products).toBe(DEMO_PRODUCTS.length);
     expect(first.orders).toBe(110);
     expect(await PromotionModel.exists({ code: 'WELCOME10', status: 'active' })).not.toBeNull();
     expect(await UserModel.exists({ email: 'admin@test.dev', role: 'admin' })).not.toBeNull();
 
-    expect(await seedDemoData(env)).toEqual({ catalogSeeded: false });
+    expect(await seedDemoData(env)).toEqual({ catalogSeeded: false, productsAdded: 0 });
     expect(await counts()).toEqual(first);
   });
 
