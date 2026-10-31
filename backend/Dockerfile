@@ -25,10 +25,11 @@ COPY --chown=node:node packages/contracts ./packages/contracts
 COPY --chown=node:node backend/package.json backend/tsconfig.json ./backend/
 COPY --chown=node:node backend/src ./backend/src
 COPY --chown=node:node --chmod=0755 backend/docker-entrypoint.sh /usr/local/bin/storefront
-# Hosts that cannot inject runtime env get an optional /app/.env from a build secret; real env vars still win.
+# Hosts that cannot inject runtime env get an optional backend/.env (the path src/core/config/dotenv.ts
+# loads) from a build secret; real env vars still win.
 RUN --mount=type=secret,id=backend_env,required=false \
     if [ -f /run/secrets/backend_env ]; then \
-      cp /run/secrets/backend_env /app/.env && chown node:node /app/.env && chmod 0400 /app/.env; \
+      cp /run/secrets/backend_env /app/backend/.env && chown node:node /app/backend/.env && chmod 0400 /app/backend/.env; \
     fi
 
 USER node
