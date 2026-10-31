@@ -221,13 +221,14 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
   registerRealtimeHandlers(eventBus, realtime);
   const imports = new ImportsService(catalog, jobs, logger, { maxBytes: env.IMPORT_MAX_BYTES, maxRows: env.IMPORT_MAX_ROWS });
   imports.register();
-  if (env.STOREFRONT_REVALIDATE_SECRET) {
-    new StorefrontRevalidator(
-      { url: env.STOREFRONT_REVALIDATE_URL ?? `${env.FRONTEND_URL}/api/revalidate`, secret: env.STOREFRONT_REVALIDATE_SECRET },
-      repositories.products,
-      logger,
-    ).register(eventBus, jobs, repositories.orders);
-  }
+  const storefront = env.STOREFRONT_REVALIDATE_SECRET
+    ? new StorefrontRevalidator(
+        { url: env.STOREFRONT_REVALIDATE_URL ?? `${env.FRONTEND_URL}/api/revalidate`, secret: env.STOREFRONT_REVALIDATE_SECRET },
+        repositories.products,
+        logger,
+      )
+    : undefined;
+  storefront?.register(eventBus, jobs, repositories.orders, repositories.promotions);
 
   const reservationScheduler = new QueuedReservationScheduler(orders, repositories.orders, jobs, logger, {
     ttlMs: env.RESERVATION_TTL_MINUTES * 60_000,
@@ -267,6 +268,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
       reservationSweeper.start();
       abandonedCarts.start(jobs);
       recommendations.start(jobs);
+      await storefront?.start().catch(err => logger.warn({ err }, 'Could not schedule offer boundaries'));
       await jobs.start();
     },
     async stop() {
@@ -322,6 +324,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     pricing,
     promotions: new PromotionsService(repositories.promotions, promotionCache, pricing, tx, outbox),
     offers,
+    storefront,
     jobsAdmin: new JobsAdminService(jobs, infra.deadLetters, outbox, relay),
     emailProvider,
     messagingProviders,
