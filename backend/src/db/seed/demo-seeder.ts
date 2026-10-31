@@ -5,7 +5,6 @@ import { logger } from '../../core/logger';
 import type { Env } from '../../core/config/env';
 import { UserModel } from '../../modules/auth/user.model';
 import { ProductModel } from '../../modules/catalog/product.model';
-import { recordOpeningBalances } from '../../modules/inventory/opening-balances';
 import { OrderModel } from '../../modules/orders/order.model';
 import { ReviewModel } from '../../modules/reviews/review.model';
 import { seedDemoExperiments } from './demo-experiments';
@@ -60,23 +59,67 @@ function pickOrderPath(daysAgo: number): OrderPath {
   ] as OrderPath[]);
 }
 
-export interface SeedResult {
-  catalogSeeded: boolean;
+/**
+ * Appends one ADJUST "opening balance" movement per variant of the given, just-inserted products: the same
+ * movements `recordOpeningBalances` writes, but scoped to these products. Running the store-wide version on a
+ * live store would also "explain away" any genuine drift on existing products, which reconcile must keep showing.
+ */
+async function recordSeedOpeningBalances(products: ReadonlyArray<{ _id: unknown; sizes: Array<{ size: string; stock: number }> }>) {
+  const createdAt = new Date();
+  const movements = products.flatMap(p =>
+    p.sizes
+      .filter(v => v.stock !== 0)
+      .map(v => ({
+        productId: p._id,
+        size: v.size,
+        type: 'ADJUST',
+        qty: Math.abs(v.stock),
+        delta: v.stock,
+        actor: 'system:seed',
+        note: 'Opening balance',
+        createdAt,
+      })),
+  );
+  if (movements.length) await mongoose.connection.db!.collection('inventorymovements').insertMany(movements);
 }
 
 /**
- * Idempotent demo seed: ensures the admin and demo customer accounts and the demo promotions (including the WELCOME10 and FLAT500 codes) exist,
- * and populates the catalog, historical orders and reviews only when the catalog is empty.
+ * Inserts every demo product whose slug is not in the catalog yet, with its opening stock on the ledger.
+ * Existing products are never read back or modified, so admin edits, sales and stock levels survive.
+ */
+async function topUpCatalog() {
+  const wanted = DEMO_PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) }));
+  const present = new Set((await ProductModel.find({ slug: { $in: wanted.map(p => p.slug) } }, { slug: 1 }).lean()).map(p => p.slug));
+  const missing = wanted.filter(p => !present.has(p.slug));
+  if (!missing.length) return [];
+  const inserted = await ProductModel.insertMany(missing);
+  await recordSeedOpeningBalances(inserted);
+  return inserted;
+}
+
+export interface SeedResult {
+  /** True when the catalog was empty, so demo orders and reviews were generated too. */
+  catalogSeeded: boolean;
+  /** Demo products inserted by this run (all of them on a fresh database, only the missing ones afterwards). */
+  productsAdded: number;
+}
+
+/**
+ * Idempotent, additive demo seed: ensures the admin and demo customer accounts, the demo promotions (including the
+ * WELCOME10 and FLAT500 codes) and every demo product exist, inserting only what is missing. Historical orders and
+ * reviews are generated only on a fresh catalog, never invented for an existing store.
  */
 export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWORD'>): Promise<SeedResult> {
   await seedAdmin(env);
   const customer = await seedCustomer('customer@storefront.dev', 'Demo Customer', 'Customer@123');
   await seedDemoPromotions(mongoose.connection.db!);
   await seedDemoExperiments(mongoose.connection.db!);
-  if ((await ProductModel.countDocuments()) > 0) return { catalogSeeded: false };
-
-  const products = await ProductModel.insertMany(DEMO_PRODUCTS.map(p => ({ ...p, slug: slugify(p.title) })));
-  await recordOpeningBalances(mongoose.connection.db!, 'system:seed');
+  const freshCatalog = (await ProductModel.countDocuments()) === 0;
+  const products = await topUpCatalog();
+  if (!freshCatalog) {
+    if (products.length) logger.info({ added: products.length }, 'Topped up the demo catalog with new products');
+    return { catalogSeeded: false, productsAdded: products.length };
+  }
 
   const buyerNames = ['Aarav Shah', 'Meera Iyer', 'Kabir Rao', 'Ananya Das'];
   const buyers = [customer];
@@ -173,5 +216,5 @@ export async function seedDemoData(env: Pick<Env, 'ADMIN_EMAIL' | 'ADMIN_PASSWOR
     await p.save();
   }
   logger.info({ products: products.length, orders: orders.length }, 'Seeded demo catalog, orders and reviews');
-  return { catalogSeeded: true };
+  return { catalogSeeded: true, productsAdded: products.length };
 }
