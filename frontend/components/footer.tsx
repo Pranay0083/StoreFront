@@ -1,4 +1,9 @@
 import Link from 'next/link';
+import { getPolicy, policyPath, type PolicySlug } from '@storefront/contracts';
+
+/** Help links take their names from the policies themselves; privacy and terms sit by the copyright line. */
+const policyLink = (slug: PolicySlug) => ({ label: getPolicy(slug)!.title, href: policyPath(slug), testId: `footer-policy-${slug}` });
+const LEGAL: PolicySlug[] = ['privacy', 'terms'];
 
 const COLUMNS = [
   {
@@ -19,6 +24,13 @@ const COLUMNS = [
     ],
   },
   {
+    title: 'Help',
+    links: [
+      ...(['shipping', 'returns', 'cancellations', 'payments', 'size-guide', 'help'] as const).map(policyLink),
+      { label: 'All policies', href: '/policies', testId: 'footer-policies-link' },
+    ],
+  },
+  {
     title: 'Platform',
     links: [
       { label: 'Documentation', href: '/docs', testId: 'footer-docs-link' },
@@ -34,11 +46,11 @@ export function Footer() {
   return (
     <footer className="mt-32 bg-primary text-primary-foreground sm:mt-40 [&_:focus-visible]:outline-card">
       <div className="mx-auto max-w-[1760px] px-4 pt-16 sm:px-8 sm:pt-24">
-        <div className="grid gap-12 md:grid-cols-12 md:gap-8">
-          <p className="max-w-[34ch] text-xl leading-snug md:col-span-5">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-8">
+          <p className="max-w-[34ch] text-xl leading-snug lg:col-span-4">
             Every order is tracked from the moment it is placed to the day it arrives, and you can cancel any time before it ships.
           </p>
-          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 md:col-span-7">
+          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4 lg:col-span-8">
             {COLUMNS.map(col => (
               <div key={col.title}>
                 <h2 className="text-base font-semibold">{col.title}</h2>
@@ -74,7 +86,22 @@ export function Footer() {
             STOREFRONT
           </text>
         </svg>
-        <p className="py-6 text-sm text-primary-foreground/70">© {new Date().getFullYear()} Storefront</p>
+        <div className="flex flex-wrap gap-x-6 gap-y-2 py-6 text-sm text-primary-foreground/70">
+          <p>© {new Date().getFullYear()} Storefront</p>
+          {LEGAL.map(slug => {
+            const l = policyLink(slug);
+            return (
+              <Link
+                key={slug}
+                href={l.href}
+                data-testid={l.testId}
+                className="transition-colors duration-150 hover:text-primary-foreground hover:underline hover:underline-offset-4"
+              >
+                {l.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </footer>
   );

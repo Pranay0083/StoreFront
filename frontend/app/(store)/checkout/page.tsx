@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -11,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, ApiError, errorMessage, fmtINR } from '@/lib/api';
 import { REQUOTE_CODES, usePriceQuote } from '@/lib/use-price-quote';
-import type { Order } from '@storefront/contracts';
+import { POLICY_HIGHLIGHTS, policyPath, type Order } from '@storefront/contracts';
+import { PolicyHighlights } from '../policies/_components/policy-highlights';
 
 interface RazorpaySuccess {
   razorpay_order_id: string;
@@ -277,16 +279,21 @@ export default function CheckoutPage() {
               Payment
             </h2>
             {mode === 'demo' ? (
-              <p data-testid="checkout-demo-banner" className="mt-4 bg-secondary px-5 py-4 text-[15px] leading-relaxed">
-                Payments are in demo mode. Paying simulates a Razorpay capture through the same idempotent confirmation the live keys use,
-                and no card is charged.
+              <p data-testid="checkout-demo-banner" className="mt-4 bg-secondary px-5 py-4 text-base leading-relaxed">
+                {POLICY_HIGHLIGHTS.demoPayment.text}{' '}
+                <Link href={policyPath('payments', 'demo-mode')} className="underline underline-offset-4">
+                  How payments work
+                </Link>
               </p>
             ) : (
-              <p className="mt-4 text-[15px] leading-relaxed">
-                You pay on Razorpay’s own screen, by card, UPI or netbanking. We confirm the payment’s signature before the order is marked
-                paid.
+              <p className="mt-4 text-base leading-relaxed">
+                {POLICY_HIGHLIGHTS.payment.text}{' '}
+                <Link href={policyPath('payments')} className="underline underline-offset-4">
+                  How payments work
+                </Link>
               </p>
             )}
+            <PolicyHighlights keys={['cancelling', 'returns']} className="mt-6" />
           </section>
         </form>
 
@@ -317,7 +324,9 @@ export default function CheckoutPage() {
               </Button>
             </div>
           </PayBar>
-          <p className="mt-3 text-sm text-muted-foreground">Your pieces are held for you while you pay.</p>
+          <p data-testid="checkout-hold-note" className="mt-3 text-sm text-muted-foreground">
+            {POLICY_HIGHLIGHTS.hold.text}
+          </p>
         </aside>
       </div>
     </div>

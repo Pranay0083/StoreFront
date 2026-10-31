@@ -1,13 +1,14 @@
 'use client';
 
 import { Minus, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { fmtINR } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { MAX_LINE_QTY, type Product } from '@storefront/contracts';
+import { MAX_LINE_QTY, policyPath, type Product } from '@storefront/contracts';
 
 const press = 'transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97]';
 
@@ -62,13 +63,24 @@ export function PurchasePanel({ product }: { product: Product }) {
             </button>
           ))}
         </div>
-        <p
-          data-testid={selected && selected.stock <= 5 ? 'product-low-stock-note' : undefined}
-          className="mt-3 min-h-6 text-base"
-          role="status"
-        >
-          {selected && selected.stock <= 5 ? `Only ${selected.stock} left in ${selected.size}` : ''}
-        </p>
+        <div className="mt-3 flex items-baseline justify-between gap-4">
+          <p
+            data-testid={selected && selected.stock <= 5 ? 'product-low-stock-note' : undefined}
+            className="min-h-6 text-base"
+            role="status"
+          >
+            {selected && selected.stock <= 5 ? `Only ${selected.stock} left in ${selected.size}` : ''}
+          </p>
+          {product.sizes.length > 1 && (
+            <Link
+              href={policyPath('size-guide', product.category === 'Footwear' ? 'footwear' : 'apparel')}
+              data-testid="product-size-guide-link"
+              className="shrink-0 text-base underline underline-offset-4"
+            >
+              Size guide
+            </Link>
+          )}
+        </div>
       </fieldset>
 
       <div className="mt-4 flex items-stretch gap-3">
