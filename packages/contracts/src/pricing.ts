@@ -142,7 +142,15 @@ const promotionFields = {
   startsAt: isoDate.optional(),
   endsAt: isoDate.optional(),
   usageLimit: z.number().int().positive().optional(),
+  /**
+   * Whether the storefront advertises the offer (home page, /offers, product cards). Omitted means
+   * the default for its activation: automatic offers are shown, codes stay private until opted in.
+   */
+  showOnStorefront: z.boolean().optional(),
 };
+
+/** Automatic offers are advertised by default; a code is only shown if the admin opts in. */
+export const defaultShowOnStorefront = (activation: PromotionActivation | undefined): boolean => activation !== 'code';
 
 const activationRule = (p: { activation?: PromotionActivation; code?: string }) => (p.activation === 'code') === Boolean(p.code);
 const activationMessage = { message: 'Code promotions need a code, and automatic promotions must not have one', path: ['code'] };
@@ -164,8 +172,9 @@ export const PromotionUpdateSchema = z
   .refine(windowRule, windowMessage);
 export type PromotionUpdate = z.infer<typeof PromotionUpdateSchema>;
 
-export interface Promotion extends Omit<PromotionInput, 'startsAt' | 'endsAt'> {
+export interface Promotion extends Omit<PromotionInput, 'startsAt' | 'endsAt' | 'showOnStorefront'> {
   _id: string;
+  showOnStorefront: boolean;
   version: number;
   usedCount: number;
   startsAt?: string;

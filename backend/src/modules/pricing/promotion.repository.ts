@@ -1,4 +1,4 @@
-import type { PromotionInput, PromotionStatus, PromotionUpdate } from '@storefront/contracts';
+import { defaultShowOnStorefront, type PromotionInput, type PromotionStatus, type PromotionUpdate } from '@storefront/contracts';
 import mongoose, { type ClientSession } from 'mongoose';
 import type { PromotionDefinition } from './domain/promotion';
 import { PromotionModel, type PromotionRecord, PromotionVersionModel, type PromotionVersionRecord } from './promotion.model';
@@ -14,6 +14,10 @@ const toPersisted = <T extends Partial<PromotionInput>>(input: T) => {
   } as Partial<Persisted>;
 };
 
+/** Documents written before migration 090 (or inserted raw, like the demo seed) take their activation's default. */
+export const isAdvertised = (r: Pick<PromotionRecord, 'activation' | 'showOnStorefront'>): boolean =>
+  r.showOnStorefront ?? defaultShowOnStorefront(r.activation as PromotionDefinition['activation']);
+
 export function toDefinition(r: PromotionRecord): PromotionDefinition {
   return {
     id: String(r._id),
@@ -26,6 +30,7 @@ export function toDefinition(r: PromotionRecord): PromotionDefinition {
     exclusive: r.exclusive,
     action: r.action,
     usedCount: r.usedCount,
+    showOnStorefront: isAdvertised(r),
     ...(r.code && { code: r.code }),
     ...(r.stackGroup && { stackGroup: r.stackGroup }),
     ...(r.conditions && { conditions: r.conditions }),
@@ -60,12 +65,18 @@ export class PromotionRepository {
     return (await PromotionModel.exists({ code, ...(exceptId && { _id: { $ne: exceptId } }) })) !== null;
   }
 
-  /** Creates the promotion and its version-1 snapshot atomically. */
-  async create(input: PromotionInput, by: string): Promise<PromotionRecord> {
-    return mongoose.connection.transaction(async session => {
-      const [doc] = await PromotionModel.create([{ ...toPersisted(input), version: 1, createdBy: by, updatedBy: by }], { session });
+  /**
+   * Creates the promotion and its version-1 snapshot atomically. Pass `session` to join the caller's
+   * transaction (so an outbox event commits with the write); otherwise the repository opens its own.
+   */
+  async create(input: PromotionInput, by: string, session?: ClientSession): Promise<PromotionRecord> {
+    return this.inTransaction(session, async s => {
+      const showOnStorefront = input.showOnStorefront ?? defaultShowOnStorefront(input.activation);
+      const [doc] = await PromotionModel.create([{ ...toPersisted(input), showOnStorefront, version: 1, createdBy: by, updatedBy: by }], {
+        session: s,
+      });
       const record = doc.toObject() as PromotionRecord;
-      await this.snapshot(record, by, session);
+      await this.snapshot(record, by, s);
       return record;
     });
   }
@@ -81,8 +92,9 @@ export class PromotionRepository {
     by: string,
     expectedVersion?: number,
     unset: readonly string[] = [],
+    outer?: ClientSession,
   ): Promise<PromotionRecord | null> {
-    return mongoose.connection.transaction(async session => {
+    return this.inTransaction(outer, async session => {
       const record = await PromotionModel.findOneAndUpdate(
         { _id: id, ...(expectedVersion !== undefined && { version: expectedVersion }) },
         {
@@ -116,6 +128,10 @@ export class PromotionRepository {
 
   async releaseRedemption(id: string, session?: ClientSession): Promise<void> {
     await PromotionModel.updateOne({ _id: id, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } }, { session });
+  }
+
+  private inTransaction<T>(session: ClientSession | undefined, work: (session: ClientSession) => Promise<T>): Promise<T> {
+    return session ? work(session) : mongoose.connection.transaction(work);
   }
 
   private async snapshot(record: PromotionRecord, by: string, session: ClientSession): Promise<void> {

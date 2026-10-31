@@ -307,7 +307,7 @@ export function buildContainer(env: Env, infra: Infrastructure = memoryInfrastru
     ),
     promotionCache,
     pricing,
-    promotions: new PromotionsService(repositories.promotions, promotionCache, pricing),
+    promotions: new PromotionsService(repositories.promotions, promotionCache, pricing, tx, outbox),
     jobsAdmin: new JobsAdminService(jobs, infra.deadLetters, outbox, relay),
     emailProvider,
     messagingProviders,

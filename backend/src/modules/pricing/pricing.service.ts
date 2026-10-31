@@ -253,7 +253,7 @@ export class PricingService implements PricingEngine {
 
     for (const promo of (await this.cache.index()).touching(selectable)) {
       const action = promo.consumingAction();
-      if (!action || promo.requiresCode || !promo.isLive(now)) continue;
+      if (!action || promo.requiresCode || !promo.def.showOnStorefront || !promo.isLive(now)) continue;
       const base = {
         promotionId: promo.id,
         name: promo.name,
