@@ -1,7 +1,7 @@
 # Build context: repository root.
 # NEXT_PUBLIC_API_URL and INTERNAL_API_URL are public URLs (inlined into the client bundle and the
 # rewrites manifest at build time), never secrets.
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/contracts/package.json ./packages/contracts/
@@ -9,7 +9,7 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 RUN npm ci --workspace frontend --include-workspace-root=false --ignore-scripts
 
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=http://localhost:4001
 ARG INTERNAL_API_URL=http://api:4001
@@ -24,7 +24,7 @@ COPY packages ./packages
 COPY frontend ./frontend
 RUN mkdir -p frontend/public && npm run build -w frontend
 
-FROM node:22-alpine AS runner
+FROM node:25-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
