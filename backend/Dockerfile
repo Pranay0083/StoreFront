@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Build context: repository root. One image runs the API, the worker or migrations (see docker-entrypoint.sh).
 # Secrets are never baked in: every credential is provided as a runtime environment variable.
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/contracts/package.json ./packages/contracts/
@@ -11,7 +11,7 @@ RUN npm ci --workspace backend --include-workspace-root=false --omit=dev --ignor
   && mkdir -p backend/node_modules \
   && npm cache clean --force
 
-FROM node:22-alpine AS runner
+FROM node:25-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
