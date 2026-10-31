@@ -1,15 +1,14 @@
 'use client';
 
-import { Lock } from 'lucide-react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { AppliedOffers, LinePrice, PriceSummary, PromoCodes, lineKey } from '@/components/price-breakdown';
+import { Field, INVALID } from '@/components/checkout/field';
+import { PayBar } from '@/components/checkout/pay-bar';
+import { PriceBreakdown, PromoCodes } from '@/components/price-breakdown';
 import { useAuth, useCart } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { api, ApiError, errorMessage, fmtINR } from '@/lib/api';
 import { REQUOTE_CODES, usePriceQuote } from '@/lib/use-price-quote';
 import type { Order } from '@storefront/contracts';
@@ -40,20 +39,79 @@ declare global {
   }
 }
 
+type Address = { name: string; line1: string; city: string; state: string; pincode: string; phone: string };
+type AddressKey = keyof Address;
+
+/** The delivery fields, with the keyboard and autofill each one wants on a phone. */
+const FIELDS: Array<{
+  key: AddressKey;
+  label: string;
+  span: string;
+  hint?: string;
+  testId: string;
+  props: React.InputHTMLAttributes<HTMLInputElement>;
+}> = [
+  { key: 'name', label: 'Full name', span: 'col-span-2', testId: 'checkout-name-input', props: { autoComplete: 'shipping name' } },
+  {
+    key: 'line1',
+    label: 'Address',
+    span: 'col-span-2',
+    testId: 'checkout-address-input',
+    props: { autoComplete: 'shipping street-address' },
+  },
+  { key: 'city', label: 'City', span: 'col-span-1', testId: 'checkout-city-input', props: { autoComplete: 'shipping address-level2' } },
+  {
+    key: 'state',
+    label: 'State',
+    span: 'col-span-1',
+    testId: 'checkout-state-input',
+    props: { autoComplete: 'shipping address-level1' },
+  },
+  {
+    key: 'pincode',
+    label: 'Pincode',
+    span: 'col-span-1',
+    hint: '6 digits',
+    testId: 'checkout-pincode-input',
+    props: { autoComplete: 'shipping postal-code', inputMode: 'numeric', maxLength: 6, pattern: '[0-9]*' },
+  },
+  {
+    key: 'phone',
+    label: 'Phone',
+    span: 'col-span-1',
+    hint: '10 digits',
+    testId: 'checkout-phone-input',
+    props: { type: 'tel', autoComplete: 'shipping tel-national', inputMode: 'tel', maxLength: 10 },
+  },
+];
+
+/** The same rules the API's address schema applies, said the way a person would. */
+function validate(a: Address): Partial<Record<AddressKey, string>> {
+  const errors: Partial<Record<AddressKey, string>> = {};
+  if (a.name.trim().length < 2) errors.name = 'Enter the name of the person receiving the parcel.';
+  if (a.line1.trim().length < 4) errors.line1 = 'Enter the house number and street.';
+  if (a.city.trim().length < 2) errors.city = 'Enter the city.';
+  if (a.state.trim().length < 2) errors.state = 'Enter the state.';
+  if (!/^\d{6}$/.test(a.pincode)) errors.pincode = a.pincode ? 'A pincode has exactly 6 digits.' : 'Enter the pincode.';
+  if (!/^\d{10}$/.test(a.phone))
+    errors.phone = a.phone ? 'A mobile number has exactly 10 digits.' : 'Enter a mobile number for the courier.';
+  return errors;
+}
+
 export default function CheckoutPage() {
   const { user } = useAuth();
   const { items, clear } = useCart();
   const router = useRouter();
   const [mode, setMode] = useState<'demo' | 'razorpay' | null>(null);
   const [paying, setPaying] = useState(false);
-  const [address, setAddress] = useState({ name: '', line1: '', city: '', state: '', pincode: '', phone: '' });
+  const [address, setAddress] = useState<Address>({ name: '', line1: '', city: '', state: '', pincode: '', phone: '' });
+  const [errors, setErrors] = useState<Partial<Record<AddressKey, string>> | null>(null);
   const [codes, setCodes] = useState<string[]>([]);
   const { quote, loading: quoting, error: quoteError, refresh } = usePriceQuote(items, codes);
   const checkoutAttempt = useRef<{ body: string; key: string } | null>(null);
 
   const breakdown = quote?.breakdown ?? null;
   const total = breakdown?.total ?? 0;
-  const pricedLines = new Map((breakdown?.lines ?? []).map(l => [lineKey(l), l]));
 
   useEffect(() => {
     if (user === false) router.replace('/login?next=/checkout');
@@ -72,11 +130,16 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setAddress(a => ({ ...a, [k]: e.target.value }));
+  const set = (k: AddressKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = k === 'pincode' || k === 'phone' ? e.target.value.replace(/\D/g, '') : e.target.value;
+    const next = { ...address, [k]: value };
+    setAddress(next);
+    // After a first attempt, errors clear as each field is put right.
+    if (errors) setErrors(validate(next));
+  };
 
   const finishPayment = (order: Order) => {
     clear();
-    toast.success('Payment confirmed — order is now PAID');
     router.replace(`/orders/${order._id}?paid=1`);
   };
 
@@ -99,11 +162,11 @@ export default function CheckoutPage() {
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Razorpay'));
+      script.onerror = () => reject(new Error('We couldn’t load Razorpay. Check your connection and try again.'));
       document.body.appendChild(script);
     });
     const Razorpay = window.Razorpay;
-    if (!Razorpay) throw new Error('Failed to load Razorpay');
+    if (!Razorpay) throw new Error('We couldn’t load Razorpay. Check your connection and try again.');
     const rzp = new Razorpay({
       key: setup.keyId,
       amount: setup.amount,
@@ -127,16 +190,14 @@ export default function CheckoutPage() {
     rzp.open();
   };
 
-  const placeOrder = async () => {
-    for (const [k, label] of Object.entries({
-      name: 'Full name',
-      line1: 'Address',
-      city: 'City',
-      state: 'State',
-      pincode: 'Pincode',
-      phone: 'Phone',
-    })) {
-      if (!address[k as keyof typeof address]) return toast.error(`${label} is required`);
+  const placeOrder = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const found = validate(address);
+    setErrors(found);
+    const firstInvalid = FIELDS.find(f => found[f.key]);
+    if (firstInvalid) {
+      document.getElementById(firstInvalid.key)?.focus();
+      return;
     }
     if (!quote || quoting) return;
     if (breakdown?.rejectedCodes.length) return toast.error('Remove the promo codes that cannot be applied first');
@@ -170,120 +231,93 @@ export default function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-6xl px-5 py-32 text-center sm:px-8">
-        <p className="font-serif text-3xl">Your bag is empty.</p>
-        <Button className="mt-6" onClick={() => router.push('/products')} data-testid="checkout-empty-shop-button">
+      <div className="mx-auto max-w-7xl px-5 pb-24 pt-10 sm:px-8 sm:pt-14">
+        <h1 className="text-display-md font-extrabold">Checkout</h1>
+        <p className="mt-6 max-w-xl text-lg">Your bag is empty, so there is nothing to pay for yet.</p>
+        <Button size="lg" className="mt-8" onClick={() => router.push('/products')} data-testid="checkout-empty-shop-button">
           Browse the collection
         </Button>
       </div>
     );
   }
 
+  const payLabel = paying ? 'Placing your order…' : breakdown ? `Pay ${fmtINR(total)}` : 'Pay';
+
   return (
-    <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8" data-testid="checkout-page">
-      <h1 className="font-serif text-4xl font-semibold tracking-tighter sm:text-5xl">Checkout</h1>
+    <div className="mx-auto max-w-7xl px-5 pb-16 pt-10 sm:px-8 sm:pt-14 lg:pb-24" data-testid="checkout-page">
+      <h1 className="text-display-md font-extrabold">Checkout</h1>
 
-      <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_400px]">
-        <div className="space-y-6">
-          <p className="label-caps text-muted-foreground">Shipping address</p>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="name">Full name</Label>
-              <Input id="name" data-testid="checkout-name-input" value={address.name} onChange={set('name')} placeholder="Asha Verma" />
+      <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-16">
+        <form id="checkout-form" noValidate onSubmit={placeOrder} className="space-y-14">
+          <section aria-labelledby="address-heading">
+            <h2 id="address-heading" className="text-xl font-bold tracking-[-0.02em]">
+              Delivery address
+            </h2>
+            <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-5">
+              {FIELDS.map(f => (
+                <Field key={f.key} id={f.key} label={f.label} hint={f.hint} error={errors?.[f.key]} className={f.span}>
+                  {control => (
+                    <Input
+                      {...control}
+                      {...f.props}
+                      data-testid={f.testId}
+                      value={address[f.key]}
+                      onChange={set(f.key)}
+                      enterKeyHint={f.key === 'phone' ? 'done' : 'next'}
+                      className={`scroll-mt-32 ${INVALID}`}
+                    />
+                  )}
+                </Field>
+              ))}
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="line1">Address</Label>
-              <Input
-                id="line1"
-                data-testid="checkout-address-input"
-                value={address.line1}
-                onChange={set('line1')}
-                placeholder="221B Residency Road"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input id="city" data-testid="checkout-city-input" value={address.city} onChange={set('city')} placeholder="Bengaluru" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
-              <Input id="state" data-testid="checkout-state-input" value={address.state} onChange={set('state')} placeholder="Karnataka" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pincode">Pincode</Label>
-              <Input
-                id="pincode"
-                data-testid="checkout-pincode-input"
-                value={address.pincode}
-                onChange={set('pincode')}
-                placeholder="560025"
-                maxLength={6}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                data-testid="checkout-phone-input"
-                value={address.phone}
-                onChange={set('phone')}
-                placeholder="9812345678"
-                maxLength={10}
-              />
-            </div>
-          </div>
+          </section>
 
-          {mode === 'demo' && (
-            <div data-testid="checkout-demo-banner" className="border border-amber-700/30 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Payments are in <strong>demo mode</strong> — clicking Pay simulates a Razorpay capture through the same idempotent
-              confirmation path. Add Razorpay keys to go live.
-            </div>
-          )}
-        </div>
+          <section aria-labelledby="payment-heading">
+            <h2 id="payment-heading" className="text-xl font-bold tracking-[-0.02em]">
+              Payment
+            </h2>
+            {mode === 'demo' ? (
+              <p data-testid="checkout-demo-banner" className="mt-4 bg-secondary px-5 py-4 text-[15px] leading-relaxed">
+                Payments are in demo mode. Paying simulates a Razorpay capture through the same idempotent confirmation the live keys use,
+                and no card is charged.
+              </p>
+            ) : (
+              <p className="mt-4 text-[15px] leading-relaxed">
+                You pay on Razorpay’s own screen, by card, UPI or netbanking. We confirm the payment’s signature before the order is marked
+                paid.
+              </p>
+            )}
+          </section>
+        </form>
 
-        <aside className="h-fit border border-black/10 bg-white p-8">
-          <p className="label-caps text-muted-foreground">Order summary</p>
-          <div className="mt-6 max-h-72 space-y-4 overflow-y-auto">
-            {items.map(i => (
-              <div key={`${i.productId}-${i.size}`} className="flex items-center gap-3">
-                <div className="relative h-16 w-14 shrink-0 overflow-hidden bg-muted">
-                  <Image src={i.image} alt={i.title} fill sizes="56px" className="object-cover" />
-                </div>
-                <div className="flex-1 text-sm">
-                  <p className="font-medium leading-tight">{i.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {i.size} × {i.qty}
-                  </p>
-                </div>
-                <LinePrice listTotal={i.price * i.qty} line={pricedLines.get(lineKey(i))} breakdown={breakdown} />
+        <aside className="lg:sticky lg:top-24 lg:self-start">
+          <PriceBreakdown
+            breakdown={breakdown}
+            loading={quoting}
+            error={quoteError}
+            onRetry={refresh}
+            items
+            promo={<PromoCodes codes={codes} onChange={setCodes} breakdown={breakdown} loading={quoting} />}
+          />
+          <PayBar className="lg:mt-4">
+            <div className="flex items-center gap-4">
+              <div className="shrink-0 lg:hidden">
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-xl font-extrabold tracking-[-0.02em]">{breakdown ? fmtINR(total) : '—'}</p>
               </div>
-            ))}
-          </div>
-          <div className="mt-6 border-t border-black/10 pt-5">
-            <PromoCodes codes={codes} onChange={setCodes} breakdown={breakdown} />
-          </div>
-          {breakdown && (
-            <div className="mt-5 border-t border-black/10 pt-5">
-              <AppliedOffers breakdown={breakdown} />
+              <Button
+                type="submit"
+                form="checkout-form"
+                data-testid="checkout-pay-button"
+                size="lg"
+                className="flex-1 lg:w-full"
+                disabled={paying || mode === null || !quote || quoting}
+              >
+                {payLabel}
+              </Button>
             </div>
-          )}
-          <div className="mt-5 border-t border-black/10 pt-5">
-            <PriceSummary breakdown={breakdown} loading={quoting} />
-            {quoteError && <p className="mt-2 text-xs text-destructive">{quoteError}</p>}
-          </div>
-          <Button
-            data-testid="checkout-pay-button"
-            size="lg"
-            className="mt-8 w-full"
-            onClick={placeOrder}
-            disabled={paying || mode === null || !quote || quoting}
-          >
-            <Lock className="h-4 w-4" />
-            {paying ? 'Processing…' : mode === 'demo' ? `Demo Pay ${fmtINR(total)}` : `Pay ${fmtINR(total)}`}
-          </Button>
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            Best price chosen automatically · Signature-verified · Stock reserved at checkout
-          </p>
+          </PayBar>
+          <p className="mt-3 text-sm text-muted-foreground">Your pieces are held for you while you pay.</p>
         </aside>
       </div>
     </div>
