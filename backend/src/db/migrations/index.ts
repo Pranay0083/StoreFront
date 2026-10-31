@@ -18,6 +18,7 @@ import { experimentsIndexes } from './070-experiments';
 import { recommendationsIndexes } from './071-recommendations';
 import { productImportsIndexes } from './072-product-imports';
 import { catalogListingIndexes } from './080-catalog-listing-indexes';
+import { promotionStorefrontVisibility } from './090-promotion-storefront-visibility';
 
 export const migrations: readonly Migration[] = [
   ensureIndexes,
@@ -39,4 +40,5 @@ export const migrations: readonly Migration[] = [
   recommendationsIndexes,
   productImportsIndexes,
   catalogListingIndexes,
+  promotionStorefrontVisibility,
 ];
