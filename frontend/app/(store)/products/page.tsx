@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { offerBadges, type FacetCount } from '@storefront/contracts';
 
 const APPAREL_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+/** Plain listings carry no facets (only search does), so offer the size guide's full run. */
+const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11', 'One Size'];
 
 /** Apparel smallest to largest, then shoe sizes by number, then anything else (One Size) last. */
 function sizeRank(size: string): number {
@@ -100,7 +102,7 @@ async function Results({ f }: { f: Filters }) {
   ]);
   const categoryFacets: FacetCount[] = first.facets?.categories ?? categories.map(c => ({ value: c.name, count: c.count }));
   const sizeCounts = new Map((first.facets?.sizes ?? []).map(s => [s.value, s.count]));
-  const sizes = [...sizeCounts.keys()].sort((a, b) => sizeRank(a) - sizeRank(b) || a.localeCompare(b));
+  const sizes = (sizeCounts.size ? [...sizeCounts.keys()] : STANDARD_SIZES).sort((a, b) => sizeRank(a) - sizeRank(b) || a.localeCompare(b));
   const allCount = categoryFacets.reduce((s, c) => s + c.count, 0);
   const activeFilters = [f.category, f.size, f.minPrice || f.maxPrice, f.q].filter(Boolean).length;
 
